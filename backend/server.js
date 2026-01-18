@@ -12,7 +12,12 @@ const anomalyRoutes = require('./routes/anomaly.routes');
 const uploadRoutes = require('./routes/upload.routes');
 
 const Registration = require('./src/models/member1-kumara/RegistrationModel');
-console.log('✅ Registration model ready');
+const Sensor = require('./src/models/member1-kumara/SensorModel');
+const SensorTest = require('./src/models/member1-kumara/SensorTestModel');
+const FsGeneral = require('./src/models/member1-kumara/FsGeneralModel');
+const FsContact = require('./src/models/member1-kumara/FsContactModel');
+const FsFuel = require('./src/models/member1-kumara/FsFuelModel');
+const Anomaly = require('./src/models/member1-kumara/AnomalyModel');
 
 const app = express();
 app.use(cors());
