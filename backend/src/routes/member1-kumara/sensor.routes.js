@@ -1,8 +1,8 @@
-const router = require('express').Router();
-const controller = require('../controllers/sensor.controller');
+const express = require('express');
+const router = express.Router();
 
-router.get('/', controller.getLatestReadings);
-router.post('/', controller.createSensorReading);
-router.get('/health', controller.getSensorHealth);
+router.get('/test', (req, res) => {
+  res.json({ message: 'Sensor routes working ✅' });
+});
 
 module.exports = router;
