@@ -1,12 +1,18 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import './layout.css';
 
 const Sidebar = () => {
+    const navigate = useNavigate();
+
     const menuItems = [
         {
             title: "Real Time Fuel Monitoring",
             member: "Senura",
-            features: ["Dispensed Error Detection", "Fuel quantity-Predictions"]
+            features: [
+        { name: "Dispensed Error Detection", path: "/anomaly" },
+        { name: "Fuel quantity-Predictions", path: "/fuel-prediction" }
+            ]
         },
         {
             title: "Recommendations",
