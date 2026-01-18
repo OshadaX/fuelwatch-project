@@ -2,9 +2,9 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const connectDB = require('./config/db');
+const connectDB = require('./src/config/db');
 
-const authRoutes = require('./routes/auth.routes');
+const authRoutes = require('./src/routes/member1-kumara/auth.routes');
 const stationRoutes = require('./routes/station.routes');
 const fuelRoutes = require('./routes/fuel.routes');
 const sensorRoutes = require('./routes/sensor.routes');
@@ -33,6 +33,8 @@ app.use('/api/fuel', fuelRoutes);
 app.use('/api/sensor', sensorRoutes);
 app.use('/api/anomaly', anomalyRoutes);
 app.use('/api/upload', uploadRoutes);
+
+
 
 app.get('/', (_, res) => res.json({ status: 'FuelWatch API running' }));
 
