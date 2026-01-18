@@ -4,9 +4,9 @@ import './layout.css';
 const Sidebar = () => {
     const menuItems = [
         {
-            title: "Fuel Monitoring",
-            member: "Kumara",
-            features: ["Anomaly Detection", "Demand Prediction"]
+            title: "Real Time Fuel Monitoring",
+            member: "Senura",
+            features: ["Anomaly Detection", "Fuel quantity Predictions"]
         },
         {
             title: "Recommendations",
