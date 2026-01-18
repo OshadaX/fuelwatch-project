@@ -11,6 +11,9 @@ const sensorRoutes = require('./routes/sensor.routes');
 const anomalyRoutes = require('./routes/anomaly.routes');
 const uploadRoutes = require('./routes/upload.routes');
 
+const Registration = require('./src/models/member1-kumara/RegistrationModel');
+console.log('✅ Registration model ready');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
