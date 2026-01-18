@@ -5,11 +5,11 @@ require('dotenv').config();
 const connectDB = require('./src/config/db');
 
 const authRoutes = require('./src/routes/member1-kumara/auth.routes');
-const stationRoutes = require('./routes/station.routes');
-const fuelRoutes = require('./routes/fuel.routes');
-const sensorRoutes = require('./routes/sensor.routes');
-const anomalyRoutes = require('./routes/anomaly.routes');
-const uploadRoutes = require('./routes/upload.routes');
+const stationRoutes = require('./src/routes/member1-kumara/station.routes');
+const fuelRoutes = require('./src/routes/member1-kumara/fuel.routes');
+const sensorRoutes = require('./src/routes/member1-kumara/sensor.routes');
+const anomalyRoutes = require('./src/routes/member1-kumara/anomaly.routes');
+const uploadRoutes = require('./src/routes/member1-kumara/upload.routes');
 
 const Registration = require('./src/models/member1-kumara/RegistrationModel');
 const Sensor = require('./src/models/member1-kumara/SensorModel');
