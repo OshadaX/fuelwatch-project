@@ -6,7 +6,7 @@ const Sidebar = () => {
         {
             title: "Real Time Fuel Monitoring",
             member: "Senura",
-            features: ["Anomaly Detection", "Fuel quantity-Predictions"]
+            features: ["Dispensed Error Detection", "Fuel quantity-Predictions"]
         },
         {
             title: "Recommendations",
