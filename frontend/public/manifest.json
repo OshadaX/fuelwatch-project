@@ -1,0 +1,8 @@
+{
+  "short_name": "FuelWatch",
+  "name": "FuelWatch",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#351B65"
+}

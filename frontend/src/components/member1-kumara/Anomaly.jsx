@@ -1,5 +1,5 @@
 // src/pages/Anomaly.jsx - ✅ MONGODB + CRITICAL ALERTS + BACK BUTTON
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -280,29 +280,35 @@ function Anomaly() {
     }
   };
 
-  const fetchAnomalies = async () => {
-    setLoading(true);
-    setError(null);
-    const apiUrl = isLive ? LIVE_API : SAMPLE_API;
-    
-    try {
-      const response = await fetch(apiUrl, { headers: { 'Content-Type': 'application/json' } });
-      if (!response.ok) throw new Error(`API ${response.status}`);
-      const data = await response.json();
-      const transformed = transformMongoData(Array.isArray(data) ? data : []);
-      setAnomalies(transformed);
-    } catch (err) {
-      console.error("API Error:", err);
-      setError(isLive ? "🔄 MongoDB down - using samples" : "Backend error");
-      setAnomalies(SAMPLE_ANOMALIES);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAnomalies = useCallback(async () => {
+  setLoading(true);
+  setError(null);
+  const apiUrl = isLive ? LIVE_API : SAMPLE_API;
+
+  try {
+    const response = await fetch(apiUrl, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) throw new Error(`API ${response.status}`);
+
+    const data = await response.json();
+    const transformed = transformMongoData(Array.isArray(data) ? data : []);
+    setAnomalies(transformed);
+  } catch (err) {
+    console.error("API Error:", err);
+    setError(isLive ? "🔄 MongoDB down - using samples" : "Backend error");
+    setAnomalies(SAMPLE_ANOMALIES);
+  } finally {
+    setLoading(false);
+  }
+}, [isLive]);
+
 
   useEffect(() => {
-    fetchAnomalies();
-  }, [isLive]);
+  fetchAnomalies();
+}, [fetchAnomalies]);
+
 
   // CRITICAL ALERTS LOGIC (unchanged)
   useEffect(() => {
