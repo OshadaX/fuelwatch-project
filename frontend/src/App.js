@@ -7,10 +7,9 @@ import MainLayout from "./components/shared/MainLayout";
 import "./index.css";
 
 // Existing pages
+import Portal from "./components/member1-kumara/Portal"
 import Anomaly from "./components/member1-kumara/Anomaly";
 import SensorTest from "./components/member1-kumara/SensorTest";
-
-// ✅ New Forecast page/component
 import FuelForecastPanel from "./components/member1-kumara/FuelForecastPanel";
 
 function App() {
@@ -35,6 +34,7 @@ function App() {
                 }
               />
 
+              <Route path="/portal" element={<Portal />} />
               {/* Existing routes */}
               <Route path="/anomaly" element={<Anomaly />} />
               <Route path="/sensor-test" element={<SensorTest />} />

@@ -10,8 +10,9 @@ const Sidebar = () => {
       title: "Real Time Fuel Monitoring",
       member: "Senura",
       features: [
+        { name: "Fuelwatch Portal", path: "/portal" },
         { name: "Dispensed Error Detection", path: "/anomaly" },
-        { name: "Fuel quantity-Predictions", path: "/fuel-prediction" },
+        { name: "Fuel quantity-Predictions", path: "/fuel-forecast" },
         { name: "Sensor Testing", path: "/sensor-test" }
       ]
     },

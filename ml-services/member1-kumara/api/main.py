@@ -27,14 +27,14 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # ===============================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change later for production
+    allow_origins=["*"],   # change later for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ===============================
-# LOAD MODEL ON STARTUP
+# LOAD MODEL
 # ===============================
 try:
     predictor = FuelDemandPredictor()
@@ -43,9 +43,6 @@ except Exception as e:
     print("⚠️ ML model not loaded:", e)
 
 
-# ===============================
-# HEALTH CHECK
-# ===============================
 @app.get("/health")
 def health():
     return {
@@ -55,18 +52,17 @@ def health():
     }
 
 
-# ==========================================================
-# ✅ SINGLE ENDPOINT: UPLOAD PDF (optional) + PREDICT
-# ==========================================================
 @app.post("/forecast")
 async def forecast(
-    mode: str = Form(...),                  # weekly | monthly | annual
-    file: UploadFile = File(None)           # optional PDF
+    mode: str = Form(...),                 # weekly | monthly | annual
+    file: UploadFile = File(None)          # optional PDF
 ):
     """
     ONE endpoint:
-    - If file is provided (PDF): ingest it (parse -> update raw -> rebuild processed)
-    - Then run prediction for given mode and return results
+    - If PDF is provided -> parse it -> rebuild processed dataset
+    - Detect fuel types included in PDF
+    - Forecast ONLY those fuel types
+    - If no PDF, forecast ALL fuel types
     """
 
     if predictor is None:
@@ -79,20 +75,21 @@ async def forecast(
     ingest_result = {
         "ingested": False,
         "pdf_saved_as": None,
+        "fuel_types_detected": None,
         "stdout": None,
         "stderr": None,
     }
 
+    fuel_filter = None
+
     # ---------------------------
-    # 1) If PDF is sent -> ingest
+    # 1) If PDF exists -> ingest
     # ---------------------------
     if file is not None:
         if not file.filename.lower().endswith(".pdf"):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
         pdf_path = UPLOAD_DIR / file.filename
-
-        # Save uploaded PDF
         with open(pdf_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
@@ -109,7 +106,6 @@ async def forecast(
         ingest_result["stderr"] = result.stderr
 
         if result.returncode != 0:
-            # Stop here: ingest failed
             return {
                 "ok": False,
                 "message": "PDF ingest failed. Forecast not generated.",
@@ -118,8 +114,27 @@ async def forecast(
 
         ingest_result["ingested"] = True
 
-        # OPTIONAL: rebuild processed dataset automatically after ingest
-        # (if your parse_report_pdf already triggers prepare_data, you can remove this)
+        # parse JSON from stdout to get fuel types
+        output_text = (result.stdout or "").strip()
+        parsed_json = None
+        try:
+            parsed_json = json.loads(output_text)
+        except Exception:
+            parsed_json = None
+
+        # ✅ We expect parse_report_pdf to print something like:
+        # {"fuel_types": ["Lanka Auto Diesel", "Lanka Petrol 92 Octane"], ...}
+        if isinstance(parsed_json, dict):
+            fuels = (
+                parsed_json.get("fuel_types")
+                or parsed_json.get("fuel_cols")
+                or parsed_json.get("items")
+            )
+            if isinstance(fuels, list) and fuels:
+                fuel_filter = fuels
+                ingest_result["fuel_types_detected"] = fuels
+
+        # rebuild processed dataset (if your parser already rebuilds it, you can remove this)
         prep = subprocess.run(
             [sys.executable, "-m", "scripts.prepare_data"],
             cwd=str(BASE_DIR),
@@ -136,18 +151,19 @@ async def forecast(
             }
 
     # ---------------------------
-    # 2) Predict using processed CSV
+    # 2) Predict (filtered)
     # ---------------------------
     if not PROCESSED_DAILY_CSV.exists():
         raise HTTPException(status_code=400, detail="Processed dataset not found. Run prepare_data first.")
 
     hist = pd.read_csv(PROCESSED_DAILY_CSV)
-    forecast_result = predictor.predict_mode(hist, mode)
+
+    forecast_result = predictor.predict_mode(hist, mode, fuel_filter=fuel_filter)
 
     return {
         "ok": True,
         "message": "Forecast generated successfully",
         "mode": mode,
-        "ingest": ingest_result,            # tells manager if pdf was used or not
-        "forecast": forecast_result         # totals + daily breakdown
+        "ingest": ingest_result,
+        "forecast": forecast_result
     }
