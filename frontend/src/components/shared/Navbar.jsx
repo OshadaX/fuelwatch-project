@@ -1,13 +1,17 @@
 import React from 'react';
-import './layout.css';
 
-const Navbar = () => {
+const Navbar = ({ onBrandClick }) => {
     return (
-        <nav className="navbar">
-            <div className="navbar-brand">FUELWATCH</div>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Admin Dashboard</span>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
+        <nav className="h-full w-full bg-white border-b border-slate-200 flex items-center px-8 shadow-sm">
+            <div
+                className="text-2xl font-bold text-blue-600 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={onBrandClick}
+            >
+                FUELWATCH
+            </div>
+            <div className="ml-auto flex items-center gap-4">
+                <span className="text-sm text-slate-500">Admin Dashboard</span>
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
                     ON
                 </div>
             </div>
