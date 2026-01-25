@@ -1,0 +1,27 @@
+{
+  "lookback_days": 14,
+  "feature_cols": [
+    "Lanka Auto Diesel",
+    "Lanka Petrol 92 Octane",
+    "Lanka Petrol 95 Octane",
+    "Lanka Super Diesel",
+    "dow",
+    "month",
+    "weekofyear",
+    "year",
+    "is_weekend"
+  ],
+  "fuel_cols": [
+    "Lanka Auto Diesel",
+    "Lanka Petrol 92 Octane",
+    "Lanka Petrol 95 Octane",
+    "Lanka Super Diesel"
+  ],
+  "time_cols": [
+    "dow",
+    "month",
+    "weekofyear",
+    "year",
+    "is_weekend"
+  ]
+}
