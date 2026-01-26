@@ -1,3 +1,8 @@
+:root {
+    --sidebar-collapsed-width: 80px;
+    --transition-speed: 0.3s;
+}
+
 .main-layout {
     display: flex;
     min-height: 100vh;
@@ -7,7 +12,15 @@
     flex: 1;
     margin-left: var(--sidebar-width);
     padding-top: var(--navbar-height);
-    transition: margin 0.3s ease;
+    transition: margin var(--transition-speed) ease;
+}
+
+.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+.sidebar-collapsed .navbar {
+    left: var(--sidebar-collapsed-width);
 }
 
 /* Navbar */
@@ -24,6 +37,7 @@
     padding: 0 2rem;
     z-index: 100;
     box-shadow: var(--shadow-sm);
+    transition: left var(--transition-speed) ease;
 }
 
 .navbar-brand {
@@ -41,20 +55,49 @@
     width: var(--sidebar-width);
     background: var(--sidebar-bg);
     color: var(--sidebar-text);
-    padding: 2rem 1rem;
+    padding: 1.5rem 0.5rem;
     display: flex;
     flex-direction: column;
+    transition: width var(--transition-speed) ease;
+    overflow-x: hidden;
+    z-index: 101;
+}
+
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
 }
 
 .sidebar-header {
     margin-bottom: 2rem;
-    padding-left: 1rem;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 40px;
+}
+
+.sidebar-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--sidebar-text);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-nav {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    padding: 0 0.5rem;
 }
 
 .sidebar-item {
@@ -64,6 +107,12 @@
     border-radius: 0.5rem;
     transition: all 0.2s;
     cursor: pointer;
+    white-space: nowrap;
+}
+
+.collapsed .sidebar-item {
+    padding: 0.75rem;
+    justify-content: center;
 }
 
 .sidebar-item:hover {
@@ -81,4 +130,26 @@
     color: var(--secondary-color);
     margin: 1.5rem 0 0.5rem 1rem;
     font-weight: 600;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+
+.collapsed .sidebar-section-title {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sidebar-label {
+    margin-left: 0.5rem;
+    transition: opacity 0.2s;
+    opacity: 1;
+}
+
+.collapsed .sidebar-label {
+    display: none;
+}
+
+.collapsed .sidebar-header h1 {
+    display: none;
 }
