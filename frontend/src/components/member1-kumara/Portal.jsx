@@ -16,19 +16,16 @@ import {
   Pencil,
   X,
   RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 
 /**
- * ✅ Backend endpoint base: /api/station  (UPDATED)
+ * ✅ Backend endpoint base: /api/station
  * - GET    /api/station            (list, supports ?page&limit&q)
  * - POST   /api/station            (create)
  * - PUT    /api/station/:id        (update)
  * - DELETE /api/station/:id        (delete)
- *
- * If your backend returns either:
- *  A) { items: [], total: number, page, limit, pages }
- *  B) []  (simple array)
- * This component supports both.
  */
 
 // Change this if needed
@@ -40,33 +37,127 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Validation schema (based on your required fields)
-const schema = z.object({
-  Id: z.string().min(1, "Station Id is required"),
-  Name: z.string().min(1, "Station name is required"),
-  Location: z.string().min(1, "Location is required"),
+// ====== Strict validations (100% user input validations) ======
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:mm
+const stationIdRegex = /^[A-Z0-9-]{3,20}$/; // e.g. ST-0001
+const personIdRegex = /^[A-Z0-9-]{2,20}$/; // e.g. P-100
+const phoneRegex = /^(?:\+94|0)\d{9}$/; // Sri Lanka style: 0771234567 or +94771234567
 
-  person: z.object({
-    Id: z.string().min(1, "Person Id is required"),
-    PersonName: z.string().min(1, "Person name is required"),
-    PersonDesignation: z.string().min(1, "Designation is required"),
-    PersonEmail: z.string().email("Valid email required"),
-    ContactNumber: z.string().min(7, "Valid contact number required"),
-    StartTime: z.string().min(1, "Start time required"),
-    EndTime: z.string().min(1, "End time required"),
-  }),
+const allowedFuelTypes = [
+  "Lanka Auto Diesel",
+  "Lanka Super Diesel",
+  "Lanka Petrol 92 Octane",
+  "Lanka Petrol 95 Octane",
+  "Industrial Kerosene",
+  "Auto Kerosene",
+];
 
-  tanks: z
-    .array(
-      z.object({
-        fuel_type: z.string().min(1, "Fuel type required"),
-        number_of_tanks: z.coerce.number().int().min(1, "Min 1"),
-        tank_index: z.coerce.number().int().min(1, "Min 1"),
-        tank_capacity: z.coerce.number().min(0, "Must be >= 0"),
-      })
-    )
-    .min(1, "At least one tank is required"),
-});
+const schema = z
+  .object({
+    Id: z
+      .string()
+      .trim()
+      .min(3, "Station Id is required")
+      .max(20, "Max 20 characters")
+      .regex(stationIdRegex, "Use format like ST-0001 (A-Z, 0-9, - only)"),
+    Name: z
+      .string()
+      .trim()
+      .min(3, "Station name is required (min 3 chars)")
+      .max(80, "Station name too long (max 80)"),
+    Location: z
+      .string()
+      .trim()
+      .min(3, "Location is required (min 3 chars)")
+      .max(120, "Location too long (max 120)"),
+
+    person: z.object({
+      Id: z
+        .string()
+        .trim()
+        .min(2, "Person Id is required")
+        .max(20, "Max 20 characters")
+        .regex(personIdRegex, "Use A-Z, 0-9, - only (e.g. P-100)"),
+      PersonName: z
+        .string()
+        .trim()
+        .min(3, "Person name required (min 3 chars)")
+        .max(60, "Max 60 characters")
+        .regex(/^[A-Za-z\s.'-]+$/, "Name can contain letters, spaces, . ' -"),
+      PersonDesignation: z
+        .string()
+        .trim()
+        .min(2, "Designation is required")
+        .max(50, "Max 50 characters"),
+      PersonEmail: z.string().trim().email("Valid email required"),
+      ContactNumber: z
+        .string()
+        .trim()
+        .regex(phoneRegex, "Use 0XXXXXXXXX or +94XXXXXXXXX"),
+      StartTime: z
+        .string()
+        .trim()
+        .regex(timeRegex, "Time must be HH:mm (24-hour)"),
+      EndTime: z
+        .string()
+        .trim()
+        .regex(timeRegex, "Time must be HH:mm (24-hour)"),
+    }),
+
+    tanks: z
+      .array(
+        z.object({
+          fuel_type: z
+            .string()
+            .trim()
+            .min(1, "Fuel type is required")
+            .refine(
+              (v) => allowedFuelTypes.includes(v),
+              "Select a valid fuel type from the list"
+            ),
+          number_of_tanks: z.coerce.number().int().min(1, "Min 1").max(50, "Max 50"),
+          tank_index: z.coerce.number().int().min(1, "Min 1").max(200, "Too large"),
+          tank_capacity: z
+            .coerce
+            .number()
+            .min(500, "Capacity too low (min 500L)")
+            .max(100000, "Capacity too high (max 100000L)"),
+        })
+      )
+      .min(1, "At least one tank is required")
+      .max(50, "Too many tanks (max 50)"),
+  })
+  .superRefine((data, ctx) => {
+    // EndTime must be after StartTime
+    const toMins = (t) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m;
+    };
+    if (data?.person?.StartTime && data?.person?.EndTime) {
+      if (toMins(data.person.EndTime) <= toMins(data.person.StartTime)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["person", "EndTime"],
+          message: "End time must be after Start time",
+        });
+      }
+    }
+
+    // Tank index must be unique inside this station
+    const seen = new Set();
+    data.tanks.forEach((t, i) => {
+      const key = `${t.fuel_type}::${t.tank_index}`;
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tanks", i, "tank_index"],
+          message: "Tank index must be unique per fuel type",
+        });
+      } else {
+        seen.add(key);
+      }
+    });
+  });
 
 const steps = [
   { key: "station", title: "Station", icon: Building2 },
@@ -74,7 +165,7 @@ const steps = [
   { key: "tanks", title: "Tanks", icon: Droplets },
 ];
 
-// Small UI helpers (no extra files needed)
+// Small UI helpers
 function Card({ children, style }) {
   return (
     <div
@@ -118,23 +209,19 @@ function Button({ variant = "ghost", children, style, disabled, ...props }) {
   }[variant];
 
   return (
-    <button
-      style={{ ...base, ...theme, ...style }}
-      disabled={disabled}
-      {...props}
-    >
+    <button style={{ ...base, ...theme, ...style }} disabled={disabled} {...props}>
       {children}
     </button>
   );
 }
 
-function Input({ style, ...props }) {
+function Input({ invalid, style, ...props }) {
   return (
     <input
       style={{
         width: "100%",
         borderRadius: 14,
-        border: "1px solid rgba(0,0,0,0.12)",
+        border: invalid ? "1px solid rgba(180,35,24,0.55)" : "1px solid rgba(0,0,0,0.12)",
         padding: "10px 12px",
         outline: "none",
         background: "#fff",
@@ -145,12 +232,29 @@ function Input({ style, ...props }) {
   );
 }
 
+function Select({ invalid, style, children, ...props }) {
+  return (
+    <select
+      style={{
+        width: "100%",
+        borderRadius: 14,
+        border: invalid ? "1px solid rgba(180,35,24,0.55)" : "1px solid rgba(0,0,0,0.12)",
+        padding: "10px 12px",
+        outline: "none",
+        background: "#fff",
+        ...style,
+      }}
+      {...props}
+    >
+      {children}
+    </select>
+  );
+}
+
 function Label({ children, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>
-        {children}
-      </div>
+      <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>{children}</div>
       {right ? <div style={{ fontSize: 12, opacity: 0.55 }}>{right}</div> : null}
     </div>
   );
@@ -158,11 +262,7 @@ function Label({ children, right }) {
 
 function ErrorText({ children }) {
   if (!children) return null;
-  return (
-    <div style={{ fontSize: 12, color: "#b42318", marginTop: 4 }}>
-      {children}
-    </div>
-  );
+  return <div style={{ fontSize: 12, color: "#b42318", marginTop: 4 }}>{children}</div>;
 }
 
 function Badge({ children }) {
@@ -216,6 +316,29 @@ function StepChip({ active, done, icon: Icon, title, onClick }) {
   );
 }
 
+// Pretty validation status chip
+function ValidityChip({ ok, text }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 12,
+        padding: "6px 10px",
+        borderRadius: 999,
+        border: "1px solid rgba(0,0,0,0.10)",
+        background: ok ? "rgba(22,163,74,0.08)" : "rgba(180,35,24,0.08)",
+        color: ok ? "#166534" : "#7f1d1d",
+        fontWeight: 700,
+      }}
+    >
+      {ok ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+      {text}
+    </span>
+  );
+}
+
 export default function Portal() {
   const [activeStep, setActiveStep] = useState(0);
 
@@ -242,9 +365,7 @@ export default function Portal() {
         StartTime: "",
         EndTime: "",
       },
-      tanks: [
-        { fuel_type: "", number_of_tanks: 1, tank_index: 1, tank_capacity: 0 },
-      ],
+      tanks: [{ fuel_type: "", number_of_tanks: 1, tank_index: 1, tank_capacity: 500 }],
     }),
     []
   );
@@ -256,12 +377,14 @@ export default function Portal() {
     control,
     trigger,
     getValues,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
     watch,
+    setValue,
   } = useForm({
     defaultValues,
     resolver: zodResolver(schema),
     mode: "onChange",
+    reValidateMode: "onChange",
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "tanks" });
@@ -269,8 +392,7 @@ export default function Portal() {
   // autosave draft (only in create mode)
   useEffect(() => {
     const sub = watch((val) => {
-      if (!isEditing)
-        localStorage.setItem("fuelwatch_portal_draft", JSON.stringify(val));
+      if (!isEditing) localStorage.setItem("fuelwatch_portal_draft", JSON.stringify(val));
     });
     return () => sub.unsubscribe();
   }, [watch, isEditing]);
@@ -286,7 +408,6 @@ export default function Portal() {
     }
   }, [reset, isEditing]);
 
-  // ✅ UPDATED endpoint: /station
   async function fetchStations(nextPage = 1, nextQ = "") {
     setLoadingList(true);
     try {
@@ -349,16 +470,32 @@ export default function Portal() {
     toast.success("Form cleared");
   }
 
-  // ✅ UPDATED endpoint: /station
   async function onSubmit(payload) {
     try {
+      // normalize Station Id on frontend too (matches backend)
+      const normalized = {
+        ...payload,
+        Id: payload.Id.trim().toUpperCase(),
+        person: {
+          ...payload.person,
+          Id: payload.person.Id.trim().toUpperCase(),
+          PersonEmail: payload.person.PersonEmail.trim(),
+          ContactNumber: payload.person.ContactNumber.trim(),
+        },
+        tanks: payload.tanks.map((t) => ({
+          ...t,
+          fuel_type: t.fuel_type.trim(),
+        })),
+      };
+
       if (isEditing) {
-        await http.put(`/station/${editingId}`, payload);
+        await http.put(`/station/${editingId}`, normalized);
         toast.success("Station updated!");
       } else {
-        await http.post("/station", payload);
+        await http.post("/station", normalized);
         toast.success("Station registered!");
       }
+
       clearForm();
       setPage(1);
       fetchStations(1, q);
@@ -377,21 +514,18 @@ export default function Portal() {
       Name: row.Name || "",
       Location: row.Location || "",
       person: row.person || defaultValues.person,
-      tanks: (row.tanks?.length ? row.tanks : defaultValues.tanks).map(
-        (t) => ({
-          fuel_type: t.fuel_type ?? "",
-          number_of_tanks: t.number_of_tanks ?? 1,
-          tank_index: t.tank_index ?? 1,
-          tank_capacity: t.tank_capacity ?? 0,
-        })
-      ),
+      tanks: (row.tanks?.length ? row.tanks : defaultValues.tanks).map((t) => ({
+        fuel_type: t.fuel_type ?? "",
+        number_of_tanks: t.number_of_tanks ?? 1,
+        tank_index: t.tank_index ?? 1,
+        tank_capacity: t.tank_capacity ?? 500,
+      })),
     });
 
     toast("Editing mode enabled");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ✅ UPDATED endpoint: /station
   async function removeStation(id) {
     if (!window.confirm("Delete this station?")) return;
     try {
@@ -404,8 +538,7 @@ export default function Portal() {
     }
   }
 
-  const doneStation =
-    !!getValues("Id") && !!getValues("Name") && !!getValues("Location");
+  const doneStation = !!getValues("Id") && !!getValues("Name") && !!getValues("Location");
   const donePerson =
     !!getValues("person.Id") &&
     !!getValues("person.PersonName") &&
@@ -416,11 +549,24 @@ export default function Portal() {
     !!getValues("person.EndTime");
   const doneTanks = (getValues("tanks") || []).length > 0;
 
+  // Helpful “live validity” chips
+  const stationStepOk = !errors.Id && !errors.Name && !errors.Location && doneStation;
+  const personStepOk =
+    !errors?.person?.Id &&
+    !errors?.person?.PersonName &&
+    !errors?.person?.PersonDesignation &&
+    !errors?.person?.PersonEmail &&
+    !errors?.person?.ContactNumber &&
+    !errors?.person?.StartTime &&
+    !errors?.person?.EndTime &&
+    donePerson;
+
+  const tanksStepOk = !errors?.tanks && doneTanks;
+
   return (
     <>
       <Toaster position="top-right" />
 
-      {/* This component is designed to render INSIDE your dashboard content area */}
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 14 }}>
         {/* LEFT: Form */}
         <Card style={{ padding: 18 }}>
@@ -430,6 +576,12 @@ export default function Portal() {
               <div style={{ fontSize: 12, opacity: 0.6 }}>
                 Register filling stations • contact person • tank details
               </div>
+
+              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <ValidityChip ok={stationStepOk} text="Station Valid" />
+                <ValidityChip ok={personStepOk} text="Contact Valid" />
+                <ValidityChip ok={tanksStepOk} text="Tanks Valid" />
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -437,8 +589,17 @@ export default function Portal() {
               <Button type="button" onClick={clearForm}>
                 <X size={16} /> Clear
               </Button>
-              <Button type="button" variant="primary" onClick={handleSubmit(onSubmit)} disabled={isSubmitting}>
-                <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update" : "Register"}
+
+              {/* Disable save until whole form valid */}
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSubmit(onSubmit)}
+                disabled={isSubmitting || !isValid}
+                title={!isValid ? "Fix all validation errors before saving" : ""}
+              >
+                <Save size={16} />{" "}
+                {isSubmitting ? "Saving..." : isEditing ? "Update" : "Register"}
               </Button>
             </div>
           </div>
@@ -451,7 +612,7 @@ export default function Portal() {
                 title={s.title}
                 icon={s.icon}
                 active={idx === activeStep}
-                done={(idx === 0 && doneStation) || (idx === 1 && donePerson) || (idx === 2 && doneTanks)}
+                done={(idx === 0 && stationStepOk) || (idx === 1 && personStepOk) || (idx === 2 && tanksStepOk)}
                 onClick={() => setActiveStep(idx)}
               />
             ))}
@@ -466,26 +627,32 @@ export default function Portal() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                   <div>
                     <Label>Station Id</Label>
-                    <Input placeholder="e.g. ST-0001" {...register("Id")} />
+                    <Input
+                      placeholder="e.g. ST-0001"
+                      {...register("Id", {
+                        onChange: (e) => setValue("Id", e.target.value.toUpperCase()),
+                      })}
+                      invalid={!!errors?.Id}
+                    />
                     <ErrorText>{errors?.Id?.message}</ErrorText>
                   </div>
 
                   <div>
                     <Label>Station Name</Label>
-                    <Input placeholder="e.g. Lanka IOC - Borella" {...register("Name")} />
+                    <Input placeholder="e.g. Lanka IOC - Borella" {...register("Name")} invalid={!!errors?.Name} />
                     <ErrorText>{errors?.Name?.message}</ErrorText>
                   </div>
 
                   <div>
                     <Label>Location</Label>
-                    <Input placeholder="e.g. Colombo 08" {...register("Location")} />
+                    <Input placeholder="e.g. Colombo 08" {...register("Location")} invalid={!!errors?.Location} />
                     <ErrorText>{errors?.Location?.message}</ErrorText>
                   </div>
                 </div>
 
                 <Card style={{ background: "#fafafa" }}>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    Tip: Use a consistent Station Id format (ST-0001) so it’s easy to search later.
+                    Required format: <b>ST-0001</b> (A–Z, 0–9, hyphen). This must be unique in the system.
                   </div>
                 </Card>
               </div>
@@ -498,43 +665,53 @@ export default function Portal() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                   <div>
                     <Label>Person Id</Label>
-                    <Input placeholder="e.g. P-100" {...register("person.Id")} />
+                    <Input
+                      placeholder="e.g. P-100"
+                      {...register("person.Id", {
+                        onChange: (e) => setValue("person.Id", e.target.value.toUpperCase()),
+                      })}
+                      invalid={!!errors?.person?.Id}
+                    />
                     <ErrorText>{errors?.person?.Id?.message}</ErrorText>
                   </div>
 
                   <div>
                     <Label>Person Name</Label>
-                    <Input placeholder="e.g. Kumara Perera" {...register("person.PersonName")} />
+                    <Input placeholder="e.g. Kumara Perera" {...register("person.PersonName")} invalid={!!errors?.person?.PersonName} />
                     <ErrorText>{errors?.person?.PersonName?.message}</ErrorText>
                   </div>
 
                   <div>
                     <Label>Designation</Label>
-                    <Input placeholder="e.g. Station Manager" {...register("person.PersonDesignation")} />
+                    <Input placeholder="e.g. Station Manager" {...register("person.PersonDesignation")} invalid={!!errors?.person?.PersonDesignation} />
                     <ErrorText>{errors?.person?.PersonDesignation?.message}</ErrorText>
                   </div>
 
                   <div>
                     <Label>Email</Label>
-                    <Input placeholder="e.g. manager@station.com" {...register("person.PersonEmail")} />
+                    <Input placeholder="e.g. manager@station.com" {...register("person.PersonEmail")} invalid={!!errors?.person?.PersonEmail} />
                     <ErrorText>{errors?.person?.PersonEmail?.message}</ErrorText>
                   </div>
 
                   <div>
                     <Label>Contact Number</Label>
-                    <Input placeholder="e.g. 0771234567" {...register("person.ContactNumber")} />
+                    <Input
+                      placeholder="e.g. 0771234567 or +94771234567"
+                      {...register("person.ContactNumber")}
+                      invalid={!!errors?.person?.ContactNumber}
+                    />
                     <ErrorText>{errors?.person?.ContactNumber?.message}</ErrorText>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div>
                       <Label>Start Time</Label>
-                      <Input type="time" {...register("person.StartTime")} />
+                      <Input type="time" {...register("person.StartTime")} invalid={!!errors?.person?.StartTime} />
                       <ErrorText>{errors?.person?.StartTime?.message}</ErrorText>
                     </div>
                     <div>
                       <Label>End Time</Label>
-                      <Input type="time" {...register("person.EndTime")} />
+                      <Input type="time" {...register("person.EndTime")} invalid={!!errors?.person?.EndTime} />
                       <ErrorText>{errors?.person?.EndTime?.message}</ErrorText>
                     </div>
                   </div>
@@ -542,7 +719,7 @@ export default function Portal() {
 
                 <Card style={{ background: "#fafafa" }}>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    Tip: Start/End time can represent office hours for the station contact person.
+                    Validation rules: valid email • Sri Lanka phone • End time must be after start time.
                   </div>
                 </Card>
               </div>
@@ -559,7 +736,7 @@ export default function Portal() {
                         fuel_type: "",
                         number_of_tanks: 1,
                         tank_index: fields.length + 1,
-                        tank_capacity: 0,
+                        tank_capacity: 500,
                       })
                     }
                   >
@@ -586,27 +763,38 @@ export default function Portal() {
                       <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                         <div>
                           <Label>Fuel Type</Label>
-                          <Input placeholder="e.g. Lanka Auto Diesel" {...register(`tanks.${idx}.fuel_type`)} />
+                          <Select {...register(`tanks.${idx}.fuel_type`)} invalid={!!errors?.tanks?.[idx]?.fuel_type}>
+                            <option value="">Select fuel type...</option>
+                            {allowedFuelTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </Select>
                           <ErrorText>{errors?.tanks?.[idx]?.fuel_type?.message}</ErrorText>
                         </div>
 
                         <div>
                           <Label>No. of Tanks</Label>
-                          <Input type="number" min="1" {...register(`tanks.${idx}.number_of_tanks`)} />
+                          <Input type="number" min="1" max="50" {...register(`tanks.${idx}.number_of_tanks`)} invalid={!!errors?.tanks?.[idx]?.number_of_tanks} />
                           <ErrorText>{errors?.tanks?.[idx]?.number_of_tanks?.message}</ErrorText>
                         </div>
 
                         <div>
                           <Label>Tank Index</Label>
-                          <Input type="number" min="1" {...register(`tanks.${idx}.tank_index`)} />
+                          <Input type="number" min="1" max="200" {...register(`tanks.${idx}.tank_index`)} invalid={!!errors?.tanks?.[idx]?.tank_index} />
                           <ErrorText>{errors?.tanks?.[idx]?.tank_index?.message}</ErrorText>
                         </div>
 
                         <div>
                           <Label>Tank Capacity (L)</Label>
-                          <Input type="number" min="0" step="0.01" {...register(`tanks.${idx}.tank_capacity`)} />
+                          <Input type="number" min="500" max="100000" step="1" {...register(`tanks.${idx}.tank_capacity`)} invalid={!!errors?.tanks?.[idx]?.tank_capacity} />
                           <ErrorText>{errors?.tanks?.[idx]?.tank_capacity?.message}</ErrorText>
                         </div>
+                      </div>
+
+                      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.65 }}>
+                        Rule: Tank index must be unique per fuel type (no duplicates).
                       </div>
                     </Card>
                   ))}
@@ -614,7 +802,7 @@ export default function Portal() {
 
                 <Card style={{ background: "#fafafa" }}>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    Tip: Use tank_index to uniquely identify tanks per fuel type (e.g., Diesel tank 1, 2, etc.).
+                    Validation rules: choose fuel type • capacity min 500L • unique tank index per fuel type.
                   </div>
                 </Card>
               </div>
@@ -632,7 +820,13 @@ export default function Portal() {
                 Next
               </Button>
             ) : (
-              <Button type="button" variant="primary" onClick={handleSubmit(onSubmit)} disabled={isSubmitting}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSubmit(onSubmit)}
+                disabled={isSubmitting || !isValid}
+                title={!isValid ? "Fix all validation errors before saving" : ""}
+              >
                 <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update Station" : "Register Station"}
               </Button>
             )}
@@ -766,8 +960,12 @@ export default function Portal() {
           <Card style={{ padding: 18 }}>
             <div style={{ fontWeight: 900 }}>Included UI/UX Features</div>
             <ul style={{ marginTop: 8, paddingLeft: 18, opacity: 0.75, fontSize: 13, display: "grid", gap: 6 }}>
-              <li>Multi-step wizard (Station → Person → Tanks)</li>
-              <li>Live validation + clean errors</li>
+              <li>Multi-step wizard with strict validation (cannot save unless valid)</li>
+              <li>Station ID format validation + uppercase normalization</li>
+              <li>Person email + Sri Lanka phone validation</li>
+              <li>End time must be after start time</li>
+              <li>Fuel type dropdown (no free-text)</li>
+              <li>Tank index unique per fuel type + capacity bounds</li>
               <li>Create + Update + Delete</li>
               <li>Search + pagination</li>
               <li>Autosave draft for new registration</li>

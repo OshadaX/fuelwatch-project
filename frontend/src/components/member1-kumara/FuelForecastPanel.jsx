@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
@@ -18,35 +19,64 @@ export default function FuelForecastPanel() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  const totals = useMemo(() => result?.forecast?.totals || result?.totals || null, [result]);
-  const daily = useMemo(() => result?.forecast?.daily || result?.daily || [], [result]);
+  const totals = useMemo(
+    () => result?.forecast?.totals || result?.totals || null,
+    [result]
+  );
+  const daily = useMemo(
+    () => result?.forecast?.daily || result?.daily || [],
+    [result]
+  );
+
+  const fileError =
+    !file
+      ? "Please upload a PDF report to generate a forecast."
+      : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
+      ? "Only PDF files are allowed."
+      : file.size > 25 * 1024 * 1024
+      ? "PDF is too large (max 25MB)."
+      : "";
 
   async function onCheckHealth() {
     try {
       setError("");
       const data = await healthCheck();
       setHealth(data);
+      toast.success("Service is reachable");
     } catch (e) {
       setHealth(null);
       setError(e?.response?.data?.detail || e.message || "Health check failed");
+      toast.error("Health check failed");
     }
   }
 
   async function onGenerate() {
+    // ✅ HARD BLOCK: must upload a PDF
+    if (fileError) {
+      setError(fileError);
+      toast.error(fileError);
+      return;
+    }
+
     try {
       setError("");
       setResult(null);
       setLoading(true);
 
       const data = await forecastFuel({ mode, file });
+
       if (!data?.ok) {
         setError(data?.message || "Forecast failed");
         setResult(data);
+        toast.error(data?.message || "Forecast failed");
       } else {
         setResult(data);
+        toast.success("Forecast generated");
       }
     } catch (e) {
-      setError(e?.response?.data?.detail || e.message || "Forecast request failed");
+      const msg = e?.response?.data?.detail || e.message || "Forecast request failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -71,10 +101,12 @@ export default function FuelForecastPanel() {
 
   return (
     <div style={styles.container}>
+      <Toaster position="top-right" />
+
       <div style={styles.header}>
         <h2 style={styles.title}>Fuel Demand Forecast</h2>
         <p style={styles.subtitle}>
-          Upload a report PDF (optional) and generate weekly / monthly / annual predicted fuel quantities.
+          Upload a report PDF (required) and generate weekly / monthly / annual predicted fuel quantities.
         </p>
       </div>
 
@@ -82,7 +114,12 @@ export default function FuelForecastPanel() {
         <div style={styles.row}>
           <div style={styles.field}>
             <label style={styles.label}>Forecast Mode</label>
-            <select value={mode} onChange={(e) => setMode(e.target.value)} style={styles.select}>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+              style={styles.select}
+              disabled={loading}
+            >
               {MODE_OPTIONS.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -92,16 +129,28 @@ export default function FuelForecastPanel() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Optional PDF Report</label>
+            <label style={styles.label}>PDF Report (Required)</label>
             <input
               type="file"
-              accept=".pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              style={styles.input}
+              accept=".pdf,application/pdf"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setResult(null);
+                setHealth(null);
+                setError("");
+                setFile(f);
+              }}
+              style={{
+                ...styles.input,
+                border: fileError ? "1px solid #ff7a7a" : styles.input.border,
+              }}
+              disabled={loading}
             />
             <div style={styles.hint}>
-              {file ? `Selected: ${file.name}` : "No file selected (uses existing dataset)."}
+              {file ? `Selected: ${file.name}` : "No file selected."}
             </div>
+
+            {fileError ? <div style={styles.inlineError}>{fileError}</div> : null}
           </div>
         </div>
 
@@ -110,7 +159,16 @@ export default function FuelForecastPanel() {
             Check Service
           </button>
 
-          <button onClick={onGenerate} style={styles.primaryBtn} disabled={loading}>
+          <button
+            onClick={onGenerate}
+            style={{
+              ...styles.primaryBtn,
+              opacity: loading || !!fileError ? 0.55 : 1,
+              cursor: loading || !!fileError ? "not-allowed" : "pointer",
+            }}
+            disabled={loading || !!fileError}
+            title={fileError ? fileError : "Generate forecast"}
+          >
             {loading ? "Generating..." : "Generate Forecast"}
           </button>
         </div>
@@ -207,9 +265,7 @@ export default function FuelForecastPanel() {
                 </div>
 
                 {daily.length > 60 && (
-                  <div style={styles.hint}>
-                    Showing first 60 days only. Download CSV to view full data.
-                  </div>
+                  <div style={styles.hint}>Showing first 60 days only. Download CSV to view full data.</div>
                 )}
               </>
             )}
@@ -241,12 +297,18 @@ const styles = {
   input: { padding: 10, borderRadius: 8, border: "1px solid #ccc" },
   hint: { fontSize: 12, color: "#666", marginTop: 4 },
 
+  inlineError: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#9a1c1c",
+  },
+
   actions: { display: "flex", gap: 10, marginTop: 14, alignItems: "center" },
   primaryBtn: {
     padding: "10px 14px",
     borderRadius: 10,
     border: "none",
-    cursor: "pointer",
     background: "#111",
     color: "white",
     fontWeight: 700,
