@@ -1,0 +1,12 @@
+{
+  "lookback": 14,
+  "features": [
+    "txn_count",
+    "avg_txn",
+    "std_txn",
+    "balance_delta",
+    "qty_vs_balance_gap",
+    "dow",
+    "is_weekend"
+  ]
+}
