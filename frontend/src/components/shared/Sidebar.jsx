@@ -58,14 +58,12 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
     // Filter items based on user role
     const filteredMenuItems = menuItems.filter(item => {
         if (!user) return false;
-        if (user.role === 'admin') return true;
+        if (user.role === 'admin' || user.role === 'manager') return true;
         return item.roles?.includes(user.role);
     }).map(item => ({
         ...item,
         features: item.features.filter(feature => {
-            if (user.role === 'admin') {
-                // Admins see everything EXCEPT the employee portal if we want to be clean, 
-                // but user said "admin log show all the things".
+            if (user.role === 'admin' || user.role === 'manager') {
                 return true;
             }
             return feature.roles?.includes(user.role);
@@ -82,7 +80,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
                 {!isCollapsed && (
                     <div className="flex items-center gap-2">
                         <UserCircle className="text-blue-400" size={24} />
-                        <h1 className="text-lg font-bold tracking-wider uppercase">
+                        <h1 className="text-lg font-bold tracking-wider uppercase text-blue-100">
                             {user ? user.role : 'Guest'}
                         </h1>
                     </div>
@@ -99,7 +97,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             <nav className="flex-1 flex flex-col gap-2 px-2 overflow-y-auto custom-scrollbar">
                 {!user ? (
                     <div className="px-4 py-8 text-center text-slate-400 text-sm italic">
-                        Please login to access features
+                        Access Restricted
                     </div>
                 ) : (
                     filteredMenuItems.map((item, idx) => (
@@ -119,9 +117,11 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
                                     title={isCollapsed ? feature.name : ''}
                                 >
                                     {isCollapsed ? (
-                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                                     ) : (
-                                        feature.name
+                                        <span className="text-slate-300 hover:text-white transition-colors">
+                                            {feature.name}
+                                        </span>
                                     )}
                                 </div>
                             ))}
@@ -133,30 +133,30 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             {/* AUTH ACTIONS */}
             <div className="mt-auto px-2 pt-4 border-t border-slate-700/50">
                 {!user ? (
+                    <button
+                        onClick={() => navigate('/login')}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition-all text-sm font-semibold justify-center shadow-lg shadow-blue-900/20"
+                    >
+                        <LogIn size={18} /> {!isCollapsed && "Login to Portal"}
+                    </button>
+                ) : (
                     <div className="flex flex-col gap-2">
+                        {!isCollapsed && user && (
+                            <div className="px-4 py-2 mb-2 bg-slate-800/50 rounded-lg">
+                                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Logged in as</p>
+                                <p className="text-sm font-medium text-slate-200 truncate">{user.name || user.email || user.role}</p>
+                            </div>
+                        )}
                         <button
-                            onClick={() => login('admin')}
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition-all text-sm font-semibold justify-center"
+                            onClick={() => {
+                                logout();
+                                navigate('/');
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-sm font-semibold justify-center border border-red-500/20"
                         >
-                            <LogIn size={18} /> {!isCollapsed && "Login as Admin"}
-                        </button>
-                        <button
-                            onClick={() => login('employee')}
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 transition-all text-sm font-semibold justify-center"
-                        >
-                            <UserCircle size={18} /> {!isCollapsed && "Login as Employee"}
+                            <LogOut size={18} /> {!isCollapsed && "Logout Session"}
                         </button>
                     </div>
-                ) : (
-                    <button
-                        onClick={() => {
-                            logout();
-                            navigate('/');
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-sm font-semibold justify-center border border-red-500/20"
-                    >
-                        <LogOut size={18} /> {!isCollapsed && "Logout"}
-                    </button>
                 )}
             </div>
         </aside>
