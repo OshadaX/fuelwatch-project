@@ -4,40 +4,30 @@ import { User, LogIn, LogOut, History, MapPin, Loader2, QrCode, X } from 'lucide
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 
+import { useAuth } from '../../context/AuthContext';
+
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 
 const EmployeePortal = () => {
-    const [employees, setEmployees] = useState([]);
-    const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const { user } = useAuth();
     const [status, setStatus] = useState({ isClockedIn: false, record: null });
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
+    const [manualStationId, setManualStationId] = useState('');
+    const [showManualInput, setShowManualInput] = useState(false);
 
     useEffect(() => {
-        fetchEmployees();
-    }, []);
-
-    useEffect(() => {
-        if (selectedEmployee) {
+        if (user) {
             fetchStatus();
             fetchHistory();
-        }
-    }, [selectedEmployee]);
-
-    const fetchEmployees = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/employees`);
-            setEmployees(response.data);
             setLoading(false);
-        } catch (error) {
-            toast.error('Failed to load employee list');
         }
-    };
+    }, [user]);
 
     const fetchStatus = async () => {
         try {
-            const response = await axios.get(`${API_URL}/attendance/status/${selectedEmployee._id}`);
+            const response = await axios.get(`${API_URL}/attendance/status/${user._id || user.id}`);
             setStatus(response.data);
         } catch (error) {
             console.error('Status fetch error:', error);
@@ -46,7 +36,7 @@ const EmployeePortal = () => {
 
     const fetchHistory = async () => {
         try {
-            const response = await axios.get(`${API_URL}/attendance/history/${selectedEmployee._id}`);
+            const response = await axios.get(`${API_URL}/attendance/history/${user._id || user.id}`);
             setHistory(response.data);
         } catch (error) {
             console.error('History fetch error:', error);
@@ -81,12 +71,14 @@ const EmployeePortal = () => {
     const handleClockIn = async (stationId) => {
         try {
             await axios.post(`${API_URL}/attendance/clock-in`, {
-                employeeId: selectedEmployee._id,
+                employeeId: user._id || user.id,
                 stationId
             });
             toast.success('Successfully clocked in!');
             fetchStatus();
             fetchHistory();
+            setShowManualInput(false);
+            setManualStationId('');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Clock-in failed');
         }
@@ -95,7 +87,7 @@ const EmployeePortal = () => {
     const handleClockOut = async () => {
         try {
             await axios.post(`${API_URL}/attendance/clock-out`, {
-                employeeId: selectedEmployee._id
+                employeeId: user._id || user.id
             });
             toast.success('Successfully clocked out!');
             fetchStatus();
@@ -111,33 +103,17 @@ const EmployeePortal = () => {
         </div>
     );
 
-    if (!selectedEmployee) {
+    if (!user) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-                <div className="bg-white rounded-[40px] p-12 shadow-2xl border border-slate-100 max-w-lg w-full text-center">
-                    <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-8">
-                        <User className="text-blue-600" size={32} />
-                    </div>
-                    <h1 className="text-3xl font-semibold text-slate-900 mb-2">Employee Login</h1>
-                    <p className="text-slate-500 mb-10">Select your profile to access the portal</p>
-                    <div className="space-y-3">
-                        {employees.map(emp => (
-                            <button
-                                key={emp._id}
-                                onClick={() => setSelectedEmployee(emp)}
-                                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4 hover:border-blue-500 hover:bg-white transition-all group"
-                            >
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: emp.color }}>
-                                    {emp.avatar}
-                                </div>
-                                <div className="text-left flex-1">
-                                    <div className="text-sm font-bold text-slate-800 tracking-tight group-hover:text-blue-600">{emp.name}</div>
-                                    <div className="text-xs text-slate-400">{emp.role}</div>
-                                </div>
-                                <LogIn size={18} className="text-slate-300 group-hover:text-blue-600" />
-                            </button>
-                        ))}
-                    </div>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
+                <div className="bg-white rounded-[40px] p-12 shadow-2xl border border-slate-100 max-w-lg w-full">
+                    <p className="text-slate-500 mb-4">Please login to access the Employee Portal</p>
+                    <button
+                        onClick={() => window.location.href = '/login'}
+                        className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold"
+                    >
+                        Go to Login
+                    </button>
                 </div>
             </div>
         );
@@ -155,13 +131,13 @@ const EmployeePortal = () => {
                             <div className=" absolute top-0 right-0 w-32 h-32 bg-blue-600/5 rounded-full -mr-16 -mt-16"></div>
 
                             <div className="flex items-center gap-6 mb-8">
-                                <div className="w-20 h-20 rounded-[28px] flex items-center justify-center text-white text-2xl font-bold shadow-lg" style={{ backgroundColor: selectedEmployee.color }}>
-                                    {selectedEmployee.avatar}
+                                <div className="w-20 h-20 rounded-[28px] flex items-center justify-center text-white text-2xl font-bold shadow-lg" style={{ backgroundColor: user.color || '#3b82f6' }}>
+                                    {user.avatar || user.name?.charAt(0) || 'U'}
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedEmployee.name}</h2>
+                                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{user.name}</h2>
                                     <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold inline-block mt-1">
-                                        {selectedEmployee.role}
+                                        {user.role}
                                     </div>
                                 </div>
                             </div>
@@ -169,11 +145,11 @@ const EmployeePortal = () => {
                             <div className="space-y-4 pt-4 border-t border-slate-50">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-400">Employee ID</span>
-                                    <span className="font-bold text-slate-700">{selectedEmployee.employeeId}</span>
+                                    <span className="font-bold text-slate-700">{user.employeeId}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-400">Fixed Shift</span>
-                                    <span className="font-bold text-slate-700">{selectedEmployee.shift}</span>
+                                    <span className="font-bold text-slate-700">{user.shift || 'N/A'}</span>
                                 </div>
                             </div>
                         </div>
@@ -203,22 +179,58 @@ const EmployeePortal = () => {
                                     </div>
                                     <h3 className="text-xl font-bold text-slate-900 mb-2">Ready to Start?</h3>
                                     <p className="text-slate-400 text-sm mb-8 px-4">Find the station QR code and scan to automatically check-in</p>
-                                    <button
-                                        onClick={startScanner}
-                                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <QrCode size={18} /> Scan Station QR
-                                    </button>
+
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={startScanner}
+                                            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            <QrCode size={18} /> Scan Station QR
+                                        </button>
+
+                                        <p className="text-xs text-slate-400">or</p>
+
+                                        {!showManualInput ? (
+                                            <button
+                                                onClick={() => setShowManualInput(true)}
+                                                className="w-full py-3 bg-slate-100 text-slate-600 rounded-2xl font-semibold hover:bg-slate-200 transition-all"
+                                            >
+                                                Manual Check-in
+                                            </button>
+                                        ) : (
+                                            <div className="space-y-3 p-4 bg-slate-50 rounded-2xl animate-in fade-in zoom-in duration-300">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter Station ID"
+                                                    value={manualStationId}
+                                                    onChange={(e) => setManualStationId(e.target.value)}
+                                                    className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setShowManualInput(false)}
+                                                        className="flex-1 py-2 bg-slate-200 text-slate-600 font-bold rounded-xl"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleClockIn(manualStationId)}
+                                                        disabled={!manualStationId}
+                                                        className="flex-[2] py-2 bg-slate-900 text-white font-bold rounded-xl disabled:opacity-50"
+                                                    >
+                                                        Submit
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </div>
 
-                        <button
-                            onClick={() => setSelectedEmployee(null)}
-                            className="w-full py-3 text-slate-400 text-sm font-medium hover:text-red-500 transition-colors"
-                        >
-                            Log Out from Device
-                        </button>
+                        <div className="p-4 text-center">
+                            <p className="text-xs text-slate-400 italic">Secure location verified check-in enforced.</p>
+                        </div>
                     </div>
 
                     {/* Right: History */}
