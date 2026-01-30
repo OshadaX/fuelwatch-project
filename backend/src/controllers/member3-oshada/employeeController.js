@@ -1,4 +1,6 @@
 const Employee = require('../../models/member3-oshada/EmployeeModel');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // Get all employees
 const getEmployees = async (req, res) => {
@@ -10,12 +12,64 @@ const getEmployees = async (req, res) => {
     }
 };
 
+// Login an employee
+const loginEmployee = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Find employee by email
+        const employee = await Employee.findOne({ email });
+        if (!employee) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+
+        // Check password
+        const isMatch = await bcrypt.compare(password, employee.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+
+        // Create JWT token
+        const token = jwt.sign(
+            { id: employee._id, role: employee.role },
+            process.env.JWT_SECRET || 'your_jwt_secret',
+            { expiresIn: '1d' }
+        );
+
+        // Remove password from response
+        const employeeObj = employee.toObject();
+        delete employeeObj.password;
+
+        res.status(200).json({
+            token,
+            user: employeeObj
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // Create an employee
 const createEmployee = async (req, res) => {
     try {
-        const employee = new Employee(req.body);
+        const { password, ...rest } = req.body;
+
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const employee = new Employee({
+            ...rest,
+            password: hashedPassword
+        });
+
         const savedEmployee = await employee.save();
-        res.status(201).json(savedEmployee);
+
+        // Remove password from response
+        const employeeObj = savedEmployee.toObject();
+        delete employeeObj.password;
+
+        res.status(201).json(employeeObj);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -51,6 +105,7 @@ const deleteEmployee = async (req, res) => {
 
 module.exports = {
     getEmployees,
+    loginEmployee,
     createEmployee,
     updateEmployee,
     deleteEmployee
