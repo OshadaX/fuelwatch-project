@@ -1,23 +1,36 @@
-const Sensor = require('../models/Sensor.model');
-const { calculateVolumeLitres } = require('../utils/volumeCalculator');
+const Sensor = require('../../models/member1-kumara/SensorModel');
+const { calculateVolumeLitres } = require('../../utils/volumeCalculator');
 
-exports.createSensorReading = async (req, res) => {
-  const { reading } = req.body;
-  const volume = calculateVolumeLitres(reading);
+const createSensorReading = async (req, res) => {
+  try {
+    const { reading } = req.body;
+    const volume = calculateVolumeLitres(reading);
 
-  const sensor = await Sensor.create({
-    reading,
-    volume,
-    sensor_type: 'JSN-SR04T-V3',
-    location: 'Tank-1-Octane-92'
-  });
+    const sensor = await Sensor.create({
+      reading,
+      volume,
+      sensor_type: 'JSN-SR04T-V3',
+      location: 'Tank-1-Octane-92'
+    });
 
-  res.json(sensor);
+    res.json(sensor);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
-exports.getLatestReadings = async (_, res) => {
-  const readings = await Sensor.find()
-    .sort({ reading_time: -1 })
-    .limit(10);
-  res.json(readings);
+const getLatestReadings = async (_, res) => {
+  try {
+    const readings = await Sensor.find()
+      .sort({ reading_time: -1 })
+      .limit(10);
+    res.json(readings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  createSensorReading,
+  getLatestReadings
 };

@@ -14,6 +14,8 @@ const fuelRoutes = require("./src/routes/member1-kumara/fuel.routes");
 const sensorRoutes = require("./src/routes/member1-kumara/sensor.routes");
 const anomalyRoutes = require("./src/routes/member1-kumara/anomaly.routes");
 const uploadRoutes = require("./src/routes/member1-kumara/upload.routes");
+const employeeRoutes = require("./src/routes/member3-oshada/employee.routes");
+const attendanceRoutes = require("./src/routes/member3-oshada/attendance.routes");
 
 // (Optional) Models: only needed if you rely on auto-index creation or model side-effects.
 // Safe to keep.
@@ -54,6 +56,8 @@ app.use("/api/fuel", fuelRoutes);
 app.use("/api/sensor", sensorRoutes);
 app.use("/api/anomaly", anomalyRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/attendance", attendanceRoutes);
 
 /* ===========================
    Health + Root
