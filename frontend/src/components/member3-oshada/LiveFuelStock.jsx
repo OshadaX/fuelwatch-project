@@ -1,71 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Flame, Droplet, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Flame, Droplet, Zap, AlertCircle, RefreshCw } from 'lucide-react';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 
 const LiveFuelStock = () => {
     const [fuelData, setFuelData] = useState([
         {
             id: 1,
             type: '92 Octane',
-            level: 65,
+            level: 0,
             capacity: 10000,
-            consumption: 245,
+            consumption: 0,
             color: '#3b82f6',
             bgColor: 'bg-blue-50',
-            prevLevel: 65,
+            prevLevel: 0,
+            sensorId: 'Tank-1-Octane-92'
         },
         {
             id: 2,
             type: '95 Octane',
-            level: 42,
+            level: 0,
             capacity: 8000,
-            consumption: 180,
+            consumption: 0,
             color: '#8b5cf6',
             bgColor: 'bg-purple-50',
-            prevLevel: 42,
+            prevLevel: 0,
+            sensorId: 'Tank-2-Octane-95'
         },
         {
             id: 3,
             type: 'Auto Diesel',
-            level: 18,
+            level: 0,
             capacity: 15000,
-            consumption: 420,
+            consumption: 0,
             color: '#f59e0b',
             bgColor: 'bg-amber-50',
-            prevLevel: 18,
+            prevLevel: 0,
+            sensorId: 'Tank-3-Diesel'
         },
         {
             id: 4,
             type: 'Super Diesel',
-            level: 88,
+            level: 0,
             capacity: 12000,
-            consumption: 310,
+            consumption: 0,
             color: '#10b981',
             bgColor: 'bg-emerald-50',
-            prevLevel: 88,
+            prevLevel: 0,
+            sensorId: 'Tank-4-Super-Diesel'
         }
     ]);
 
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [isDark, setIsDark] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const fetchSensorData = async () => {
+        try {
+            const response = await axios.get(`${API_URL}/sensor`);
+            const readings = response.data;
+
+            if (readings && readings.length > 0) {
+                setFuelData(prevData => prevData.map(fuel => {
+                    // Find the latest reading for this specific tank/sensor
+                    const latestReading = readings.find(r => r.location === fuel.sensorId);
+
+                    if (latestReading) {
+                        // Calculate percentage based on volume and capacity
+                        const percentage = (latestReading.volume / fuel.capacity) * 100;
+                        return {
+                            ...fuel,
+                            prevLevel: fuel.level || percentage,
+                            level: parseFloat(percentage.toFixed(2)),
+                            // Using a mock consumption for now if backend doesn't provide it
+                            consumption: fuel.consumption || Math.floor(Math.random() * 200) + 100
+                        };
+                    }
+                    return fuel;
+                }));
+            }
+            setLastUpdated(new Date());
+            setError(null);
+        } catch (err) {
+            console.error('Error fetching sensor data:', err);
+            setError('Failed to fetch real-time data');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setFuelData(prevData => prevData.map(fuel => {
-                const baseChange = fuel.consumption / 1000;
-                const randomFactor = (Math.random() - 0.5) * 0.2;
-                const change = -baseChange + randomFactor;
-                const newLevel = Math.max(0, Math.min(100, fuel.level + change));
-
-                return {
-                    ...fuel,
-                    prevLevel: fuel.level,
-                    level: parseFloat(newLevel.toFixed(2)),
-                };
-            }));
-
-            setLastUpdated(new Date());
-        }, 3000);
-
+        fetchSensorData();
+        const interval = setInterval(fetchSensorData, 5000); // Update every 5 seconds
         return () => clearInterval(interval);
     }, []);
 
@@ -100,13 +128,27 @@ const LiveFuelStock = () => {
                             <h1 className={`text-4xl md:text-5xl font-light tracking-tight ${isDark ? 'text-white' : 'text-slate-900'} mb-2`}>
                                 Live Fuel Stock
                             </h1>
-                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Real-time fuel monitoring across stations
-                            </p>
+                            <div className="flex items-center gap-2">
+                                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    Real-time fuel monitoring across stations
+                                </p>
+                                {error && (
+                                    <span className="flex items-center gap-1 text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+                                        <AlertCircle className="w-3 h-3" /> {error}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="flex items-center gap-4">
+                            <button
+                                onClick={fetchSensorData}
+                                className={`p-2 rounded-xl transition-all ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-white text-slate-500'}`}
+                                title="Refresh data"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                            </button>
                             <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                <div className={`w-2 h-2 ${error ? 'bg-red-500' : 'bg-emerald-500'} rounded-full animate-pulse`}></div>
                                 <span className={`text-sm font-light ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatTime(lastUpdated)}</span>
                             </div>
                             <button
@@ -126,9 +168,9 @@ const LiveFuelStock = () => {
                         const radius = 42;
                         const circumference = 2 * Math.PI * radius;
                         const progress = (fuel.level / 100) * circumference;
-                        const trend = fuel.level > fuel.prevLevel ? 'up' : 'down';
+                        const trend = fuel.level >= fuel.prevLevel ? 'up' : 'down';
                         const statusColor = getStatusColor(fuel.level);
-                        const isLowFuel = fuel.level < 15;
+                        const isLowFuel = fuel.level > 0 && fuel.level < 15;
 
                         return (
                             <div
@@ -172,7 +214,7 @@ const LiveFuelStock = () => {
                                             strokeLinecap="round"
                                             strokeDasharray={`${progress} ${circumference}`}
                                             className="transition-all duration-1000 ease-out group-hover:brightness-110"
-                                            style={isDark ? { filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))' } : {}}
+                                            style={isDark ? { filter: `drop-shadow(0 0 8px ${fuel.color}80)` } : {}}
                                         />
                                     </svg>
 
@@ -197,7 +239,8 @@ const LiveFuelStock = () => {
                                         <span className="text-sm font-light">{fuel.consumption}/hr</span>
                                     </div>
                                     <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                        {isLowFuel && `Empty in ${((currentLitres / fuel.consumption) * 60).toFixed(0)}m`}
+                                        {isLowFuel && fuel.consumption > 0 && `Empty in ${((currentLitres / fuel.consumption) * 60).toFixed(0)}m`}
+                                        {fuel.level === 0 && !loading && "No Data"}
                                     </div>
                                 </div>
                             </div>
@@ -242,7 +285,7 @@ const LiveFuelStock = () => {
                     </div>
                 </div>
 
-                <style jsx>{`
+                <style>{`
                     @keyframes pulseRed {
                         0%, 100% { 
                             box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);

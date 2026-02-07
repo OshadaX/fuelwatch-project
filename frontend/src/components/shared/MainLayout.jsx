@@ -2,7 +2,7 @@ import React from 'react';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 
-const MainLayout = ({ children, onViewChange, onBrandClick }) => {
+const MainLayout = ({ children, onBrandClick }) => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
     const toggleSidebar = () => {
@@ -14,7 +14,6 @@ const MainLayout = ({ children, onViewChange, onBrandClick }) => {
             <Sidebar
                 isCollapsed={isSidebarCollapsed}
                 onToggle={toggleSidebar}
-                onViewChange={onViewChange}
             />
             <div className={`flex-1 transition-all duration-300 pt-16 ${isSidebarCollapsed ? 'ml-20' : 'ml-[280px]'}`}>
                 <div
