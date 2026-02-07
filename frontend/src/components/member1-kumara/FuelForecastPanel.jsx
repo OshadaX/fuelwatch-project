@@ -23,10 +23,19 @@ export default function FuelForecastPanel() {
     () => result?.forecast?.totals || result?.totals || null,
     [result]
   );
+
   const daily = useMemo(
     () => result?.forecast?.daily || result?.daily || [],
     [result]
   );
+
+  // ✅ NEW: month-wise rows for annual
+  const monthly = useMemo(
+    () => result?.forecast?.monthly || result?.monthly || [],
+    [result]
+  );
+
+  const isAnnual = mode === "annual";
 
   const fileError =
     !file
@@ -51,7 +60,6 @@ export default function FuelForecastPanel() {
   }
 
   async function onGenerate() {
-    // ✅ HARD BLOCK: must upload a PDF
     if (fileError) {
       setError(fileError);
       toast.error(fileError);
@@ -87,6 +95,11 @@ export default function FuelForecastPanel() {
     downloadCsv(`fuel_forecast_${mode}_daily.csv`, daily);
   }
 
+  function onDownloadMonthly() {
+    if (!monthly || monthly.length === 0) return;
+    downloadCsv(`fuel_forecast_${mode}_monthly.csv`, monthly);
+  }
+
   function onDownloadTotals() {
     if (!totals) return;
     const rows = Object.entries(totals).map(([fuel, qty]) => ({
@@ -97,6 +110,48 @@ export default function FuelForecastPanel() {
       to: result?.forecast?.to || result?.to_date || result?.to,
     }));
     downloadCsv(`fuel_forecast_${mode}_totals.csv`, rows);
+  }
+
+  // ✅ helper to render a generic table from rows
+  function DataTable({ rows, limit, emptyText }) {
+    if (!rows || rows.length === 0) {
+      return <div style={styles.hint}>{emptyText || "No data to display."}</div>;
+    }
+
+    const keys = Object.keys(rows[0]);
+
+    return (
+      <div style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              {keys.map((k) => (
+                <th key={k} style={styles.th}>
+                  {k}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(limit ? rows.slice(0, limit) : rows).map((row, idx) => (
+              <tr key={idx}>
+                {keys.map((k) => (
+                  <td key={k} style={styles.td}>
+                    {typeof row[k] === "number" ? row[k].toFixed(3) : String(row[k])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {limit && rows.length > limit && (
+          <div style={styles.hint}>
+            Showing first {limit} rows only. Download CSV to view full data.
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -116,7 +171,11 @@ export default function FuelForecastPanel() {
             <label style={styles.label}>Forecast Mode</label>
             <select
               value={mode}
-              onChange={(e) => setMode(e.target.value)}
+              onChange={(e) => {
+                setMode(e.target.value);
+                setResult(null);
+                setError("");
+              }}
               style={styles.select}
               disabled={loading}
             >
@@ -204,15 +263,34 @@ export default function FuelForecastPanel() {
               </div>
             </div>
 
+            {/* Totals */}
             {totals && (
               <>
                 <div style={styles.downloadRow}>
                   <button onClick={onDownloadTotals} style={styles.secondaryBtn}>
                     Download Totals CSV
                   </button>
-                  <button onClick={onDownloadDaily} style={styles.secondaryBtn} disabled={!daily.length}>
-                    Download Daily CSV
-                  </button>
+
+                  {/* ✅ Annual -> Monthly download, Weekly/Monthly -> Daily download */}
+                  {isAnnual ? (
+                    <button
+                      onClick={onDownloadMonthly}
+                      style={styles.secondaryBtn}
+                      disabled={!monthly.length}
+                      title={!monthly.length ? "No monthly data returned" : "Download month-wise CSV"}
+                    >
+                      Download Monthly CSV
+                    </button>
+                  ) : (
+                    <button
+                      onClick={onDownloadDaily}
+                      style={styles.secondaryBtn}
+                      disabled={!daily.length}
+                      title={!daily.length ? "No daily data returned" : "Download daily CSV"}
+                    >
+                      Download Daily CSV
+                    </button>
+                  )}
                 </div>
 
                 <div style={styles.tableWrap}>
@@ -236,38 +314,28 @@ export default function FuelForecastPanel() {
               </>
             )}
 
-            {daily && daily.length > 0 && (
+            {/* ✅ Annual: Month-wise breakdown (Jan..Dec) */}
+            {isAnnual && monthly && monthly.length > 0 && (
+              <>
+                <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Month-wise Breakdown (Annual)</h3>
+                <DataTable rows={monthly} emptyText="No month-wise data returned for annual forecast." />
+              </>
+            )}
+
+            {/* ✅ Weekly/Monthly: Daily breakdown */}
+            {!isAnnual && daily && daily.length > 0 && (
               <>
                 <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Daily Breakdown</h3>
-                <div style={styles.tableWrap}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        {Object.keys(daily[0]).map((k) => (
-                          <th key={k} style={styles.th}>
-                            {k}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {daily.slice(0, 60).map((row, idx) => (
-                        <tr key={idx}>
-                          {Object.keys(daily[0]).map((k) => (
-                            <td key={k} style={styles.td}>
-                              {typeof row[k] === "number" ? row[k].toFixed(3) : String(row[k])}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {daily.length > 60 && (
-                  <div style={styles.hint}>Showing first 60 days only. Download CSV to view full data.</div>
-                )}
+                <DataTable rows={daily} limit={60} emptyText="No daily data returned." />
               </>
+            )}
+
+            {/* ✅ Annual but backend still returned daily (if old backend) - show a warning */}
+            {isAnnual && (!monthly || monthly.length === 0) && daily && daily.length > 0 && (
+              <div style={styles.hint}>
+                Annual mode should return month-wise totals. Your backend is still returning daily rows.
+                Update the predictor API to include <strong>monthly</strong> output.
+              </div>
             )}
           </div>
         </div>
@@ -295,7 +363,7 @@ const styles = {
   label: { fontWeight: 700, fontSize: 13 },
   select: { padding: 10, borderRadius: 8, border: "1px solid #ccc" },
   input: { padding: 10, borderRadius: 8, border: "1px solid #ccc" },
-  hint: { fontSize: 12, color: "#666", marginTop: 4 },
+  hint: { fontSize: 12, color: "#666", marginTop: 10 },
 
   inlineError: {
     marginTop: 6,
