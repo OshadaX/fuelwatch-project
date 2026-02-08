@@ -919,7 +919,7 @@ export default function FuelForecastPanel() {
                       </div>
                       <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/60 px-3 py-1 text-[10px] font-black text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-200">
                         <Info className="h-3.5 w-3.5" />
-                        Better PDF = better forecast (clean station data pages)
+                         PDF
                       </div>
                     </div>
                   </div>
@@ -962,7 +962,7 @@ export default function FuelForecastPanel() {
                   </motion.div>
                 ) : (
                   <div className="rounded-2xl border border-white/10 bg-white/50 p-4 text-sm text-zinc-600 dark:bg-zinc-950/30 dark:text-zinc-300">
-                    Tip: Click <span className="font-black">Check Service</span> to verify your ML API before generating.
+                    Tip: Click <span className="font-black">Check Service</span> Regularly.
                   </div>
                 )}
               </AnimatePresence>
@@ -1438,7 +1438,7 @@ export default function FuelForecastPanel() {
                     <div className="text-sm font-black">Generating forecast…</div>
                     <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/60 px-3 py-1 text-[10px] font-black text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-200">
                       <Sparkles className="h-3.5 w-3.5" />
-                      Analyzing PDF + Running model
+                      Analyzing PDF & Running model
                     </span>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1456,7 +1456,7 @@ export default function FuelForecastPanel() {
         </AnimatePresence>
 
         <div className="mt-10 text-center text-xs text-zinc-500 dark:text-zinc-400">
-          FuelWatch Forecast UI • Enhanced premium dashboard view
+          FuelWatch Fuel Quantity Predictions • Enhanced Premium Experience
         </div>
       </div>
     </div>

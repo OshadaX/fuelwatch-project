@@ -19,11 +19,209 @@ import {
   TableContainer,
   Chip,
   Divider,
+  IconButton,
+  Tooltip,
+  Stack,
+  Tabs,
+  Tab,
+  InputAdornment,
+  LinearProgress,
+  Switch,
+  FormControlLabel,
+  Badge,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
+import WhatshotRoundedIcon from "@mui/icons-material/WhatshotRounded";
 
 const ML_API = "http://127.0.0.1:8090/ml/score-report";
 
+// ==============================
+// Small utilities
+// ==============================
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function safeFixed(v, d = 3) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return (0).toFixed(d);
+  return n.toFixed(d);
+}
+
+function downloadJSON(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCSV(filename, rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return;
+
+  // Collect keys safely from first row
+  const keys = Object.keys(rows[0] || {});
+  const escape = (val) => {
+    const s = val == null ? "" : String(val);
+    const needsQuotes = /[",\n]/.test(s);
+    const escaped = s.replace(/"/g, '""');
+    return needsQuotes ? `"${escaped}"` : escaped;
+  };
+
+  const csv = [
+    keys.join(","),
+    ...rows.map((r) => keys.map((k) => escape(r?.[k])).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==============================
+// Styled “premium” card
+// ==============================
+function GlassCard({ children, sx }) {
+  const theme = useTheme();
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 3,
+        border: `1px solid ${alpha(theme.palette.common.white, 0.08)}`,
+        background:
+          theme.palette.mode === "dark"
+            ? `linear-gradient(180deg, ${alpha("#0b1220", 0.9)}, ${alpha("#0b1220", 0.6)})`
+            : `linear-gradient(180deg, ${alpha("#ffffff", 0.9)}, ${alpha("#ffffff", 0.65)})`,
+        backdropFilter: "blur(14px)",
+        boxShadow:
+          theme.palette.mode === "dark"
+            ? "0 18px 55px -35px rgba(0,0,0,0.9)"
+            : "0 18px 55px -35px rgba(0,0,0,0.35)",
+        ...sx,
+      }}
+    >
+      {/* subtle gradient aura */}
+      <Box
+        sx={{
+          pointerEvents: "none",
+          position: "absolute",
+          inset: 0,
+          opacity: theme.palette.mode === "dark" ? 0.5 : 0.7,
+          background:
+            "radial-gradient(900px 220px at 10% 0%, rgba(37,99,235,0.20), transparent 60%)," +
+            "radial-gradient(700px 220px at 80% 10%, rgba(16,185,129,0.16), transparent 60%)," +
+            "radial-gradient(800px 300px at 55% 110%, rgba(139,92,246,0.14), transparent 55%)",
+        }}
+      />
+      <Box sx={{ position: "relative" }}>{children}</Box>
+    </Paper>
+  );
+}
+
+function MetricCard({ label, value, sub, tone = "primary", icon, sx }) {
+  const theme = useTheme();
+  const palette =
+    tone === "danger"
+      ? theme.palette.error
+      : tone === "success"
+      ? theme.palette.success
+      : tone === "warning"
+      ? theme.palette.warning
+      : theme.palette.primary;
+
+  return (
+    <GlassCard
+      sx={{
+        p: 2,
+        ...sx,
+      }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            borderRadius: 2,
+            display: "grid",
+            placeItems: "center",
+            color: palette.contrastText,
+            background: `linear-gradient(135deg, ${palette.main}, ${alpha(palette.main, 0.65)})`,
+            boxShadow: `0 10px 30px -18px ${alpha(palette.main, 0.7)}`,
+          }}
+        >
+          {icon}
+        </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: 0.5 }}>
+            {label}
+          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+            {value}
+          </Typography>
+          {sub ? (
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {sub}
+            </Typography>
+          ) : null}
+        </Box>
+      </Stack>
+    </GlassCard>
+  );
+}
+
+function SeverityChip({ pred }) {
+  const flagged = pred === 1 || pred === true;
+  return flagged ? (
+    <Chip
+      label="FLAG"
+      size="small"
+      icon={<WarningAmberRoundedIcon />}
+      sx={{
+        fontWeight: 900,
+        bgcolor: (t) => alpha(t.palette.error.main, t.palette.mode === "dark" ? 0.22 : 0.12),
+        color: "error.main",
+        border: (t) => `1px solid ${alpha(t.palette.error.main, 0.3)}`,
+      }}
+    />
+  ) : (
+    <Chip
+      label="OK"
+      size="small"
+      icon={<CheckCircleRoundedIcon />}
+      sx={{
+        fontWeight: 900,
+        bgcolor: (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.22 : 0.12),
+        color: "success.main",
+        border: (t) => `1px solid ${alpha(t.palette.success.main, 0.25)}`,
+      }}
+    />
+  );
+}
+
 export default function Anomaly() {
+  const theme = useTheme();
+
   // -----------------------------
   // UI State
   // -----------------------------
@@ -45,6 +243,12 @@ export default function Anomaly() {
   const [scoredDays, setScoredDays] = useState([]);
   const [events, setEvents] = useState([]);
 
+  // UX state
+  const [tab, setTab] = useState(0); // 0: Overview, 1: Events, 2: Scored Days
+  const [search, setSearch] = useState("");
+  const [showOnlyFlagged, setShowOnlyFlagged] = useState(false);
+  const [dense, setDense] = useState(false);
+
   // Track last scanned file so threshold dropdown can rerun automatically
   const lastFileNameRef = useRef(null);
 
@@ -57,7 +261,6 @@ export default function Anomaly() {
 
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
-  // KPI: flagged days detection (supports multiple backend field names)
   const flaggedDays = useMemo(() => {
     return scoredDays.filter((r) => {
       const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
@@ -65,8 +268,52 @@ export default function Anomaly() {
     });
   }, [scoredDays]);
 
+  const avgScore = useMemo(() => {
+    if (!scoredDays.length) return 0;
+    const sum = scoredDays.reduce((acc, r) => {
+      const score = r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0;
+      return acc + (Number(score) || 0);
+    }, 0);
+    return sum / scoredDays.length;
+  }, [scoredDays]);
+
+  const maxScoreRow = useMemo(() => {
+    if (!scoredDays.length) return null;
+    let best = null;
+    for (const r of scoredDays) {
+      const s = Number(r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0) || 0;
+      if (!best || s > best._score) best = { ...r, _score: s };
+    }
+    return best;
+  }, [scoredDays]);
+
+  const filteredScoredDays = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return scoredDays.filter((r) => {
+      const day = String(r.day || r.date || r.timestamp || "").toLowerCase();
+      const station =
+        String(
+          r.station_name ||
+            r.stationName ||
+            r.site_name ||
+            r.site ||
+            r.tank_name ||
+            r.tankName ||
+            r.station_id ||
+            r.stationId ||
+            ""
+        ).toLowerCase();
+      const fuel = String(r.fuel_type || r.fuelType || r.item || "").toLowerCase();
+      const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+
+      const matchesQuery = !q || day.includes(q) || station.includes(q) || fuel.includes(q);
+      const matchesFlag = !showOnlyFlagged || pred === 1 || pred === true;
+      return matchesQuery && matchesFlag;
+    });
+  }, [scoredDays, search, showOnlyFlagged]);
+
   // -----------------------------
-  // ✅ RUN ML SCAN (functional threshold)
+  // ✅ RUN ML SCAN
   // -----------------------------
   const handleRunScan = useCallback(async () => {
     if (!file) {
@@ -81,19 +328,15 @@ export default function Anomaly() {
       const form = new FormData();
       form.append("file", file);
 
-      // IMPORTANT: threshold affects pred on backend
       const url = `${ML_API}?threshold=${decisionThreshold}`;
       const res = await fetch(url, { method: "POST", body: form });
       const data = await res.json();
-
-      console.log("✅ ML RESPONSE:", data);
 
       if (!res.ok) {
         const msg = data?.detail?.message || data?.detail || "Scan failed";
         throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
       }
 
-      // Defensive extraction (supports many backend response shapes)
       const scored =
         data?.scored_days ||
         data?.scoredDays ||
@@ -114,12 +357,10 @@ export default function Anomaly() {
       setScoredDays(Array.isArray(scored) ? scored : []);
       setEvents(Array.isArray(grouped) ? grouped : []);
 
-      // mark last scanned file for threshold auto-rerun
       lastFileNameRef.current = file?.name || null;
-
       openSnack("✅ ML Scan Completed Successfully", "success");
+      setTab(0);
     } catch (e) {
-      console.error("❌ Scan error:", e);
       const msg = e?.message || "Unknown error";
       setError(msg);
       setScoredDays([]);
@@ -130,266 +371,703 @@ export default function Anomaly() {
     }
   }, [file, decisionThreshold]);
 
-  // -----------------------------
-  // ✅ AUTO re-run scan when threshold changes (if same file already scanned)
-  // -----------------------------
+  // Auto re-run scan when threshold changes (same file already scanned)
   useEffect(() => {
     if (!file) return;
-
-    // only auto rerun if this file was already scanned at least once
     if (lastFileNameRef.current === file.name) {
-      const t = setTimeout(() => {
-        handleRunScan();
-      }, 350);
+      const t = setTimeout(() => handleRunScan(), 350);
       return () => clearTimeout(t);
     }
   }, [decisionThreshold, file, handleRunScan]);
 
-  // If user picks a new file, clear old results & allow a fresh scan
   const onPickFile = (f) => {
     setFile(f);
     setError("");
     setScoredDays([]);
     setEvents([]);
-    lastFileNameRef.current = null; // new file not scanned yet
+    setSearch("");
+    setShowOnlyFlagged(false);
+    lastFileNameRef.current = null;
+  };
+
+  const onReset = () => {
+    onPickFile(null);
+    openSnack("Reset completed", "info");
+  };
+
+  // -----------------------------
+  // Row mapper (keeps your defensive keys)
+  // -----------------------------
+  const mapRow = (r) => {
+    const day = r.day || r.date || r.timestamp || "-";
+    const station =
+      r.station_name ||
+      r.stationName ||
+      r.site_name ||
+      r.site ||
+      r.tank_name ||
+      r.tankName ||
+      r.station_id ||
+      r.stationId ||
+      "-";
+    const fuel = r.fuel_type || r.fuelType || r.item || "-";
+    const score = r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0;
+    const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+    const reason = r.reason || r.modelReason || r.note || "";
+    return { day, station, fuel, score, pred, reason };
   };
 
   // -----------------------------
   // Render
   // -----------------------------
   return (
-    <Box sx={{ p: 3, maxWidth: 1400 }}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Fuel Dispensing Irregularities
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        Upload monthly report → run ML scan → view scored days + grouped events (threshold dropdown updates results)
-      </Typography>
+    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1500, mx: "auto" }}>
+      {/* Hero header */}
+      <GlassCard sx={{ mb: 2 }}>
+        <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between">
+            <Box sx={{ minWidth: 0 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 2.5,
+                    display: "grid",
+                    placeItems: "center",
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.08),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                  }}
+                >
+                  <InsightsRoundedIcon sx={{ color: "primary.main" }} />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="overline" sx={{ letterSpacing: 0.8, fontWeight: 900, color: "text.secondary" }}>
+                    FuelWatch • Anomaly Detection
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 950, lineHeight: 1.15 }}>
+                    Fuel Dispensing Irregularities
+                  </Typography>
+                </Box>
+              </Stack>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mt: 1, color: "text.secondary", maxWidth: 860 }}>
+                Upload monthly report → run ML scan → review scored days + grouped events. Adjust threshold to see
+                results update automatically for the same file.
+              </Typography>
+            </Box>
+
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Tooltip title="Export current results (JSON)">
+                <span>
+                  <IconButton
+                    onClick={() => downloadJSON("anomaly_results.json", { scoredDays, events, threshold: decisionThreshold })}
+                    disabled={!scoredDays.length && !events.length}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${alpha(theme.palette.common.white, 0.12)}`,
+                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                    }}
+                  >
+                    <DownloadRoundedIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              <Tooltip title="Reset page state">
+                <IconButton
+                  onClick={onReset}
+                  sx={{
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.common.white, 0.12)}`,
+                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                  }}
+                >
+                  <RestartAltRoundedIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Button
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <PlayArrowRoundedIcon />}
+                onClick={handleRunScan}
+                disabled={loading || !file}
+                sx={{
+                  borderRadius: 2,
+                  px: 2.2,
+                  py: 1.05,
+                  fontWeight: 950,
+                  textTransform: "none",
+                  boxShadow: `0 18px 45px -30px ${alpha(theme.palette.primary.main, 0.85)}`,
+                }}
+              >
+                {loading ? "Scanning…" : "Run ML Scan"}
+              </Button>
+            </Stack>
+          </Stack>
+
+          {loading ? (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgress
+                sx={{
+                  height: 10,
+                  borderRadius: 999,
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.08),
+                  "& .MuiLinearProgress-bar": {
+                    borderRadius: 999,
+                  },
+                }}
+              />
+              <Typography variant="caption" sx={{ display: "block", mt: 0.8, color: "text.secondary" }}>
+                Upload parsing + model scoring in progress…
+              </Typography>
+            </Box>
+          ) : null}
+        </Box>
+      </GlassCard>
+
+      {error ? (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
           {error}
         </Alert>
-      )}
+      ) : null}
 
-      {/* Upload + Threshold */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={8}>
-            <Button variant="outlined" component="label" fullWidth>
-              {file ? `SELECTED: ${file.name}` : "UPLOAD CSV / XLSX"}
-              <input
-                hidden
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={(e) => onPickFile(e.target.files?.[0] || null)}
-              />
-            </Button>
+      {/* Upload + Threshold + Filters */}
+      <GlassCard sx={{ mb: 2 }}>
+        <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <Button
+                variant="outlined"
+                fullWidth
+                component="label"
+                startIcon={<UploadFileRoundedIcon />}
+                sx={{
+                  borderRadius: 2,
+                  py: 1.25,
+                  fontWeight: 900,
+                  textTransform: "none",
+                  borderColor: alpha(theme.palette.primary.main, 0.35),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.08 : 0.03),
+                  "&:hover": {
+                    borderColor: alpha(theme.palette.primary.main, 0.55),
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.05),
+                  },
+                }}
+              >
+                {file ? `Selected: ${file.name}` : "Upload CSV / XLSX"}
+                <input
+                  hidden
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+                />
+              </Button>
+
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                <InfoOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Tip: Use clean monthly exports; threshold changes auto-rerun after first scan.
+                </Typography>
+              </Stack>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <TextField
+                select
+                label="Decision Threshold"
+                size="medium"
+                fullWidth
+                value={decisionThreshold}
+                onChange={(e) => setDecisionThreshold(parseFloat(e.target.value))}
+                helperText={file && lastFileNameRef.current === file.name ? "Auto updates after scan" : "Run scan after change"}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <TuneRoundedIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                  },
+                }}
+              >
+                {[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85].map((v) => (
+                  <MenuItem key={v} value={v}>
+                    {v}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <Stack spacing={1}>
+                <TextField
+                  label="Search (day / station / fuel)"
+                  size="medium"
+                  fullWidth
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: search ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearch("")}>
+                          <RestartAltRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                    },
+                  }}
+                />
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                  <FormControlLabel
+                    control={<Switch checked={showOnlyFlagged} onChange={(e) => setShowOnlyFlagged(e.target.checked)} />}
+                    label="Only flagged"
+                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13 } }}
+                  />
+                  <FormControlLabel
+                    control={<Switch checked={dense} onChange={(e) => setDense(e.target.checked)} />}
+                    label="Dense"
+                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13 } }}
+                  />
+                </Stack>
+              </Stack>
+            </Grid>
           </Grid>
+        </Box>
+      </GlassCard>
 
-          <Grid item xs={12} md={2}>
-            <TextField
-              select
-              label="Decision Threshold"
-              size="small"
-              fullWidth
-              value={decisionThreshold}
-              onChange={(e) => setDecisionThreshold(parseFloat(e.target.value))}
-              helperText={file && lastFileNameRef.current === file.name ? "Auto updates" : "Run scan after change"}
-            >
-              {[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85].map((v) => (
-                <MenuItem key={v} value={v}>
-                  {v}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleRunScan}
-              disabled={loading}
-              sx={{ height: 40 }}
-            >
-              {loading ? (
-                <>
-                  <CircularProgress size={18} sx={{ mr: 1 }} />
-                  Scanning...
-                </>
-              ) : (
-                "RUN ML SCAN"
-              )}
-            </Button>
-          </Grid>
+      {/* KPI cards */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            label="Scored Days"
+            value={scoredDays.length}
+            sub="Rows processed by model"
+            tone="primary"
+            icon={<TableChartRoundedIcon />}
+          />
         </Grid>
-      </Paper>
-
-      {/* KPI Cards */}
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, borderLeft: "5px solid #351B65" }}>
-            <Typography variant="body2" color="text.secondary">
-              Scored Days
-            </Typography>
-            <Typography variant="h4" fontWeight="bold">
-              {scoredDays.length}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            label="Flagged Days"
+            value={flaggedDays.length}
+            sub="Predicted irregularities"
+            tone="danger"
+            icon={<WarningAmberRoundedIcon />}
+          />
         </Grid>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, borderLeft: "5px solid #D32F2F" }}>
-            <Typography variant="body2" color="text.secondary">
-              Flagged Days
-            </Typography>
-            <Typography variant="h4" fontWeight="bold" color="error.main">
-              {flaggedDays.length}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            label="Threshold"
+            value={decisionThreshold}
+            sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set then scan"}
+            tone="success"
+            icon={<TuneRoundedIcon />}
+          />
         </Grid>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, borderLeft: "5px solid #2E7D32" }}>
-            <Typography variant="body2" color="text.secondary">
-              Threshold
-            </Typography>
-            <Typography variant="h4" fontWeight="bold" color="success.main">
-              {decisionThreshold}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            label="Avg Score"
+            value={safeFixed(avgScore)}
+            sub={maxScoreRow ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})` : "No data yet"}
+            tone="warning"
+            icon={<WhatshotRoundedIcon />}
+          />
         </Grid>
       </Grid>
 
-      {/* Top Events */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" fontWeight="bold">
-          Top Events (Grouped)
-        </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          Consecutive flagged days grouped into events.
-        </Typography>
+      {/* Tabs */}
+      <GlassCard sx={{ mb: 2 }}>
+        <Box sx={{ px: 2, pt: 1.5 }}>
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              "& .MuiTab-root": { fontWeight: 950, textTransform: "none" },
+              "& .MuiTabs-indicator": { height: 4, borderRadius: 999 },
+            }}
+          >
+            <Tab
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <InsightsRoundedIcon fontSize="small" />
+                  <span>Overview</span>
+                </Stack>
+              }
+            />
+            <Tab
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Badge color="error" badgeContent={events.length} max={999}>
+                    <WarningAmberRoundedIcon fontSize="small" />
+                  </Badge>
+                  <span>Events</span>
+                </Stack>
+              }
+            />
+            <Tab
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Badge color="primary" badgeContent={filteredScoredDays.length} max={9999}>
+                    <TableChartRoundedIcon fontSize="small" />
+                  </Badge>
+                  <span>Scored Days</span>
+                </Stack>
+              }
+            />
+          </Tabs>
+        </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider sx={{ opacity: 0.6 }} />
 
-        {events.length === 0 ? (
-          <Typography color="text.secondary">
-            No events yet. Upload a report and run scan.
-          </Typography>
-        ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Event</TableCell>
-                  <TableCell>Start Day</TableCell>
-                  <TableCell>End Day</TableCell>
-                  <TableCell>Days</TableCell>
-                  <TableCell>Max Score</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {events.slice(0, 10).map((ev, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>#{idx + 1}</TableCell>
-                    <TableCell>{ev.start_day || ev.start || ev.startDay || "-"}</TableCell>
-                    <TableCell>{ev.end_day || ev.end || ev.endDay || "-"}</TableCell>
-                    <TableCell>{ev.days || ev.length || "-"}</TableCell>
-                    <TableCell>
-                      {String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+        {/* Overview */}
+        {tab === 0 ? (
+          <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={7}>
+                <GlassCard sx={{ p: 2.25 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <InsightsRoundedIcon color="primary" />
+                    <Typography variant="h6" fontWeight={950}>
+                      What you’re seeing
+                    </Typography>
+                  </Stack>
 
-      {/* Scored Days Table */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          Scored Days
-        </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                    This scanner flags days that look abnormal based on the uploaded station report. Increase the
+                    threshold to reduce false positives; decrease it to catch more anomalies.
+                  </Typography>
 
-        {scoredDays.length === 0 ? (
-          <Typography color="text.secondary">
-            No scored days yet. Upload a report and run scan.
-          </Typography>
-        ) : (
-          <TableContainer sx={{ maxHeight: 500 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Day</TableCell>
-                  <TableCell>Station</TableCell>
-                  <TableCell>Fuel</TableCell>
-                  <TableCell align="right">Score</TableCell>
-                  <TableCell>Pred</TableCell>
-                  <TableCell>Reason</TableCell>
-                </TableRow>
-              </TableHead>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
+                    <Chip
+                      icon={<TuneRoundedIcon />}
+                      label={`Threshold: ${decisionThreshold}`}
+                      sx={{
+                        fontWeight: 900,
+                        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.08),
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                      }}
+                    />
+                    <Chip
+                      icon={<WarningAmberRoundedIcon />}
+                      label={`Flagged: ${flaggedDays.length}`}
+                      color="error"
+                      variant="outlined"
+                      sx={{ fontWeight: 900 }}
+                    />
+                    <Chip
+                      icon={<TableChartRoundedIcon />}
+                      label={`Scored: ${scoredDays.length}`}
+                      color="primary"
+                      variant="outlined"
+                      sx={{ fontWeight: 900 }}
+                    />
+                  </Stack>
 
-              <TableBody>
-                {scoredDays.slice(0, 300).map((r, idx) => {
-                  const day = r.day || r.date || r.timestamp || "-";
+                  <Divider sx={{ my: 2, opacity: 0.6 }} />
 
-                  // ✅ FIX nan station mapping: support many possible backend keys
-                  const station =
-                    r.station_name ||
-                    r.stationName ||
-                    r.site_name ||
-                    r.site ||
-                    r.tank_name ||
-                    r.tankName ||
-                    r.station_id ||
-                    r.stationId ||
-                    "-";
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadRoundedIcon />}
+                      disabled={!filteredScoredDays.length}
+                      onClick={() => downloadCSV("scored_days_filtered.csv", filteredScoredDays.map(mapRow))}
+                      sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                    >
+                      Export filtered scored days (CSV)
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadRoundedIcon />}
+                      disabled={!events.length}
+                      onClick={() => downloadCSV("events.csv", events)}
+                      sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                    >
+                      Export events (CSV)
+                    </Button>
+                  </Stack>
+                </GlassCard>
+              </Grid>
 
-                  const fuel = r.fuel_type || r.fuelType || r.item || "-";
+              <Grid item xs={12} md={5}>
+                <GlassCard sx={{ p: 2.25 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <WarningAmberRoundedIcon color="error" />
+                    <Typography variant="h6" fontWeight={950}>
+                      Highest score snapshot
+                    </Typography>
+                  </Stack>
 
-                  // ✅ FIX score always 0.000: backend often returns "prob"
-                  const score =
-                    r.prob ??
-                    r.prob_irregular ??
-                    r.score ??
-                    r.irregularity_score ??
-                    0;
+                  {!maxScoreRow ? (
+                    <Typography color="text.secondary">
+                      No data yet. Upload a report and run scan.
+                    </Typography>
+                  ) : (
+                    (() => {
+                      const row = mapRow(maxScoreRow);
+                      return (
+                        <Stack spacing={1.2}>
+                          <Chip
+                            icon={<WhatshotRoundedIcon />}
+                            label={`Max score: ${safeFixed(row.score)} `}
+                            sx={{
+                              width: "fit-content",
+                              fontWeight: 900,
+                              bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.2 : 0.12),
+                              border: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`,
+                            }}
+                          />
+                          <Typography variant="body2">
+                            <b>Day:</b> {String(row.day)}
+                          </Typography>
+                          <Typography variant="body2">
+                            <b>Station:</b> {String(row.station)}
+                          </Typography>
+                          <Typography variant="body2">
+                            <b>Fuel:</b> {String(row.fuel)}
+                          </Typography>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 900 }}>
+                              Prediction:
+                            </Typography>
+                            <SeverityChip pred={row.pred} />
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary">
+                            {row.reason ? String(row.reason).slice(0, 180) : "—"}
+                          </Typography>
+                        </Stack>
+                      );
+                    })()
+                  )}
+                </GlassCard>
+              </Grid>
+            </Grid>
+          </Box>
+        ) : null}
 
-                  const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+        {/* Events tab */}
+        {tab === 1 ? (
+          <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <WarningAmberRoundedIcon color="error" />
+              <Typography variant="h6" fontWeight={950}>
+                Top Events (Grouped)
+              </Typography>
+              <Chip
+                label={`${events.length} total`}
+                size="small"
+                sx={{
+                  ml: 1,
+                  fontWeight: 900,
+                  bgcolor: alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.2 : 0.12),
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.25)}`,
+                }}
+              />
+            </Stack>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Consecutive flagged days grouped into events.
+            </Typography>
 
-                  // backend may return reason or not
-                  const reason = r.reason || r.modelReason || r.note || "";
+            <Divider sx={{ mb: 2, opacity: 0.6 }} />
 
-                  return (
-                    <TableRow key={idx} hover>
-                      <TableCell>{String(day)}</TableCell>
-                      <TableCell>{String(station)}</TableCell>
-                      <TableCell>{String(fuel)}</TableCell>
-                      <TableCell align="right">{Number(score || 0).toFixed(3)}</TableCell>
-                      <TableCell>
-                        {pred === 1 || pred === true ? (
-                          <Chip label="FLAG" color="error" size="small" />
-                        ) : (
-                          <Chip label="OK" color="success" size="small" />
-                        )}
-                      </TableCell>
-                      <TableCell>{String(reason).slice(0, 180)}</TableCell>
+            {events.length === 0 ? (
+              <Typography color="text.secondary">No events yet. Upload a report and run scan.</Typography>
+            ) : (
+              <TableContainer
+                component={Paper}
+                elevation={0}
+                sx={{
+                  borderRadius: 3,
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
+                  bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
+                }}
+              >
+                <Table size={dense ? "small" : "medium"}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 950 }}>Event</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Start Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>End Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Days</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Max Score</TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+                  </TableHead>
+                  <TableBody>
+                    {events.slice(0, 20).map((ev, idx) => (
+                      <TableRow key={idx} hover>
+                        <TableCell sx={{ fontWeight: 900 }}>#{idx + 1}</TableCell>
+                        <TableCell>{ev.start_day || ev.start || ev.startDay || "-"}</TableCell>
+                        <TableCell>{ev.end_day || ev.end || ev.endDay || "-"}</TableCell>
+                        <TableCell>{ev.days || ev.length || "-"}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
+                            sx={{
+                              fontWeight: 900,
+                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
+                              border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        ) : null}
 
+        {/* Scored days tab */}
+        {tab === 2 ? (
+          <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <TableChartRoundedIcon color="primary" />
+              <Typography variant="h6" fontWeight={950}>
+                Scored Days
+              </Typography>
+
+              <Chip
+                label={`${filteredScoredDays.length} shown`}
+                size="small"
+                sx={{
+                  ml: 1,
+                  fontWeight: 900,
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                }}
+              />
+              {showOnlyFlagged ? (
+                <Chip
+                  label="Flagged only"
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  sx={{ fontWeight: 900 }}
+                />
+              ) : null}
+
+              <Box sx={{ flex: 1 }} />
+
+              <Tooltip title="Export currently shown rows">
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<DownloadRoundedIcon />}
+                    disabled={!filteredScoredDays.length}
+                    onClick={() => downloadCSV("scored_days_view.csv", filteredScoredDays.map(mapRow))}
+                    sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                  >
+                    Export view
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+
+            <Divider sx={{ mb: 2, opacity: 0.6 }} />
+
+            {filteredScoredDays.length === 0 ? (
+              <Typography color="text.secondary">No scored days yet. Upload a report and run scan.</Typography>
+            ) : (
+              <TableContainer
+                component={Paper}
+                elevation={0}
+                sx={{
+                  maxHeight: 560,
+                  borderRadius: 3,
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
+                  bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
+                }}
+              >
+                <Table stickyHeader size={dense ? "small" : "medium"}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 950 }}>Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Station</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Fuel</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 950 }}>
+                        Score
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Pred</TableCell>
+                      <TableCell sx={{ fontWeight: 950 }}>Reason</TableCell>
+                    </TableRow>
+                  </TableHead>
+
+                  <TableBody>
+                    {filteredScoredDays.slice(0, 500).map((r, idx) => {
+                      const row = mapRow(r);
+                      return (
+                        <TableRow key={idx} hover>
+                          <TableCell sx={{ whiteSpace: "nowrap" }}>{String(row.day)}</TableCell>
+                          <TableCell sx={{ maxWidth: 280 }}>
+                            <Typography noWrap fontWeight={800}>
+                              {String(row.station)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={String(row.fuel)}
+                              size="small"
+                              sx={{
+                                fontWeight: 900,
+                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.16 : 0.10),
+                                border: `1px solid ${alpha(theme.palette.secondary.main, 0.18)}`,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontWeight: 900 }}>
+                            {safeFixed(row.score)}
+                          </TableCell>
+                          <TableCell>
+                            <SeverityChip pred={row.pred} />
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 520 }}>
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              {String(row.reason || "").slice(0, 220) || "—"}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {filteredScoredDays.length > 500 ? (
+              <Typography variant="caption" sx={{ display: "block", mt: 1.2, color: "text.secondary" }}>
+                Showing first 500 rows only. Use Export to download full filtered data.
+              </Typography>
+            ) : null}
+          </Box>
+        ) : null}
+      </GlassCard>
+
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3500}
         onClose={closeSnack}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%" }}>
+        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%", borderRadius: 2 }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
