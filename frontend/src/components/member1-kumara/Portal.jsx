@@ -1,5 +1,5 @@
 // src/pages/member1-kumara/Portal.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
@@ -53,6 +53,29 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// ===== Theme: match your homepage (FuelWatch blue + deep navy) =====
+const THEME = {
+  // Brand
+  brand: "#2563EB", // FuelWatch blue
+  brand2: "#1D4ED8",
+  navy: "#0B1220", // deep sidebar-like navy
+  navy2: "#0F172A",
+  ink: "#0F172A",
+  text: "#0B1220",
+  muted: "rgba(15, 23, 42, 0.65)",
+  // Surfaces
+  pageBg: "#F5F8FF",
+  card: "rgba(255,255,255,0.92)",
+  card2: "rgba(255,255,255,0.80)",
+  stroke: "rgba(15, 23, 42, 0.10)",
+  strokeStrong: "rgba(15, 23, 42, 0.16)",
+  shadow: "0 18px 55px -40px rgba(15, 23, 42, 0.55)",
+  // Status
+  success: "#16A34A",
+  danger: "#DC2626",
+  warn: "#F59E0B",
+};
+
 // ====== Strict validations (100% user input validations) ======
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:mm
 const stationIdRegex = /^[A-Z0-9-]{3,20}$/; // e.g. ST-0001
@@ -100,11 +123,7 @@ const schema = z
         .min(3, "Person name required (min 3 chars)")
         .max(60, "Max 60 characters")
         .regex(/^[A-Za-z\s.'-]+$/, "Name can contain letters, spaces, . ' -"),
-      PersonDesignation: z
-        .string()
-        .trim()
-        .min(2, "Designation is required")
-        .max(50, "Max 50 characters"),
+      PersonDesignation: z.string().trim().min(2, "Designation is required").max(50, "Max 50 characters"),
       PersonEmail: z.string().trim().email("Valid email required"),
       ContactNumber: z.string().trim().regex(phoneRegex, "Use 0XXXXXXXXX or +94XXXXXXXXX"),
       StartTime: z.string().trim().regex(timeRegex, "Time must be HH:mm (24-hour)"),
@@ -142,6 +161,7 @@ const schema = z
         });
       }
     }
+
     // Tank index must be unique inside this station
     const seen = new Set();
     data.tanks.forEach((t, i) => {
@@ -165,22 +185,18 @@ const steps = [
 ];
 
 // -----------------------------
-// UI Helpers (Premium)
+// UI Helpers (FuelWatch Theme)
 // -----------------------------
-function cx(...c) {
-  return c.filter(Boolean).join(" ");
-}
-
 function GlassCard({ children, style }) {
   return (
     <div
       style={{
         position: "relative",
         borderRadius: 22,
-        background: "rgba(255,255,255,0.70)",
-        border: "1px solid rgba(255,255,255,0.35)",
-        boxShadow: "0 18px 55px -40px rgba(0,0,0,0.45)",
-        backdropFilter: "blur(14px)",
+        background: THEME.card,
+        border: `1px solid ${THEME.stroke}`,
+        boxShadow: THEME.shadow,
+        backdropFilter: "blur(12px)",
         overflow: "hidden",
         ...style,
       }}
@@ -191,9 +207,9 @@ function GlassCard({ children, style }) {
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(900px 240px at 12% 0%, rgba(37,99,235,0.20), transparent 60%)," +
-            "radial-gradient(780px 220px at 85% 10%, rgba(16,185,129,0.16), transparent 60%)," +
-            "radial-gradient(860px 300px at 50% 110%, rgba(139,92,246,0.14), transparent 55%)",
+            `radial-gradient(900px 240px at 10% 0%, rgba(37,99,235,0.16), transparent 60%),` +
+            `radial-gradient(780px 240px at 92% 12%, rgba(37,99,235,0.10), transparent 60%),` +
+            `radial-gradient(860px 260px at 50% 110%, rgba(15,23,42,0.10), transparent 55%)`,
         }}
       />
       <div style={{ position: "relative" }}>{children}</div>
@@ -203,11 +219,11 @@ function GlassCard({ children, style }) {
 
 function Pill({ children, tone = "neutral", icon: Icon }) {
   const tones = {
-    neutral: { bg: "rgba(0,0,0,0.04)", bd: "rgba(0,0,0,0.10)", fg: "#111" },
-    success: { bg: "rgba(22,163,74,0.10)", bd: "rgba(22,163,74,0.25)", fg: "#166534" },
-    danger: { bg: "rgba(180,35,24,0.10)", bd: "rgba(180,35,24,0.25)", fg: "#7f1d1d" },
-    info: { bg: "rgba(37,99,235,0.10)", bd: "rgba(37,99,235,0.25)", fg: "#1d4ed8" },
-    warn: { bg: "rgba(245,158,11,0.12)", bd: "rgba(245,158,11,0.25)", fg: "#92400e" },
+    neutral: { bg: "rgba(15,23,42,0.04)", bd: "rgba(15,23,42,0.10)", fg: THEME.ink },
+    success: { bg: "rgba(22,163,74,0.10)", bd: "rgba(22,163,74,0.22)", fg: "#166534" },
+    danger: { bg: "rgba(220,38,38,0.10)", bd: "rgba(220,38,38,0.22)", fg: "#7F1D1D" },
+    info: { bg: "rgba(37,99,235,0.10)", bd: "rgba(37,99,235,0.22)", fg: THEME.brand2 },
+    warn: { bg: "rgba(245,158,11,0.12)", bd: "rgba(245,158,11,0.22)", fg: "#92400E" },
   }[tone];
 
   return (
@@ -222,7 +238,7 @@ function Pill({ children, tone = "neutral", icon: Icon }) {
         background: tones.bg,
         color: tones.fg,
         fontSize: 12,
-        fontWeight: 800,
+        fontWeight: 850,
         whiteSpace: "nowrap",
       }}
     >
@@ -236,41 +252,56 @@ function SoftButton({ variant = "ghost", children, disabled, style, ...props }) 
   const base = {
     borderRadius: 14,
     padding: "10px 14px",
-    border: "1px solid rgba(0,0,0,0.10)",
+    border: `1px solid ${THEME.stroke}`,
     cursor: disabled ? "not-allowed" : "pointer",
-    fontWeight: 800,
+    fontWeight: 900,
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    transition: "all .15s ease",
+    transition: "transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease",
     opacity: disabled ? 0.6 : 1,
     userSelect: "none",
     background: "#fff",
-    color: "#111",
+    color: THEME.ink,
   };
 
   const variants = {
     primary: {
-      background: "linear-gradient(135deg, #111, #0b1220)",
+      background: `linear-gradient(135deg, ${THEME.brand}, ${THEME.brand2})`,
       color: "#fff",
-      border: "1px solid rgba(0,0,0,0.15)",
-      boxShadow: "0 18px 40px -30px rgba(0,0,0,0.85)",
+      border: "1px solid rgba(37,99,235,0.35)",
+      boxShadow: "0 18px 40px -30px rgba(37,99,235,0.95)",
     },
     ghost: {
-      background: "rgba(255,255,255,0.85)",
+      background: THEME.card2,
     },
     subtle: {
-      background: "rgba(255,255,255,0.55)",
+      background: "rgba(255,255,255,0.65)",
     },
     danger: {
-      background: "rgba(255,255,255,0.85)",
-      color: "#b42318",
-      border: "1px solid rgba(180,35,24,0.25)",
+      background: THEME.card2,
+      color: THEME.danger,
+      border: "1px solid rgba(220,38,38,0.25)",
     },
   }[variant];
 
   return (
-    <button style={{ ...base, ...variants, ...style }} disabled={disabled} {...props}>
+    <button
+      style={{
+        ...base,
+        ...variants,
+        ...style,
+      }}
+      disabled={disabled}
+      onMouseDown={(e) => {
+        // tiny “press” effect without breaking logic
+        if (disabled) return;
+        e.currentTarget.style.transform = "scale(0.98)";
+      }}
+      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      {...props}
+    >
       {children}
     </button>
   );
@@ -279,8 +310,8 @@ function SoftButton({ variant = "ghost", children, disabled, style, ...props }) 
 function Label({ children, right }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
-      <div style={{ fontSize: 13, fontWeight: 900, opacity: 0.9 }}>{children}</div>
-      {right ? <div style={{ fontSize: 12, opacity: 0.6 }}>{right}</div> : null}
+      <div style={{ fontSize: 13, fontWeight: 950, color: THEME.ink }}>{children}</div>
+      {right ? <div style={{ fontSize: 12, color: THEME.muted }}>{right}</div> : null}
     </div>
   );
 }
@@ -294,13 +325,13 @@ function Hint({ children, icon: Icon }) {
         alignItems: "flex-start",
         padding: "10px 12px",
         borderRadius: 16,
-        border: "1px solid rgba(0,0,0,0.08)",
-        background: "rgba(0,0,0,0.03)",
+        border: `1px solid ${THEME.stroke}`,
+        background: "rgba(37,99,235,0.06)",
         fontSize: 12,
-        opacity: 0.8,
+        color: "rgba(15,23,42,0.75)",
       }}
     >
-      {Icon ? <Icon size={16} style={{ marginTop: 1 }} /> : null}
+      {Icon ? <Icon size={16} style={{ marginTop: 1, color: THEME.brand }} /> : null}
       <div>{children}</div>
     </div>
   );
@@ -308,7 +339,7 @@ function Hint({ children, icon: Icon }) {
 
 function ErrorText({ children }) {
   if (!children) return null;
-  return <div style={{ fontSize: 12, color: "#b42318", marginTop: 6, fontWeight: 700 }}>{children}</div>;
+  return <div style={{ fontSize: 12, color: THEME.danger, marginTop: 6, fontWeight: 800 }}>{children}</div>;
 }
 
 function Field({ invalid, children }) {
@@ -316,10 +347,10 @@ function Field({ invalid, children }) {
     <div
       style={{
         borderRadius: 16,
-        border: invalid ? "1px solid rgba(180,35,24,0.45)" : "1px solid rgba(0,0,0,0.10)",
+        border: invalid ? "1px solid rgba(220,38,38,0.45)" : `1px solid ${THEME.stroke}`,
         background: "#fff",
         padding: "10px 12px",
-        boxShadow: "0 1px 0 rgba(0,0,0,0.04)",
+        boxShadow: "0 1px 0 rgba(15,23,42,0.05)",
       }}
     >
       {children}
@@ -331,7 +362,7 @@ function Input({ invalid, style, leftIcon: LeftIcon, ...props }) {
   return (
     <Field invalid={invalid}>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        {LeftIcon ? <LeftIcon size={18} style={{ opacity: 0.55 }} /> : null}
+        {LeftIcon ? <LeftIcon size={18} style={{ opacity: 0.55, color: THEME.brand2 }} /> : null}
         <input
           style={{
             width: "100%",
@@ -339,6 +370,7 @@ function Input({ invalid, style, leftIcon: LeftIcon, ...props }) {
             outline: "none",
             background: "transparent",
             fontSize: 14,
+            color: THEME.ink,
             ...style,
           }}
           {...props}
@@ -352,7 +384,7 @@ function Select({ invalid, children, leftIcon: LeftIcon, ...props }) {
   return (
     <Field invalid={invalid}>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        {LeftIcon ? <LeftIcon size={18} style={{ opacity: 0.55 }} /> : null}
+        {LeftIcon ? <LeftIcon size={18} style={{ opacity: 0.55, color: THEME.brand2 }} /> : null}
         <select
           style={{
             width: "100%",
@@ -360,6 +392,7 @@ function Select({ invalid, children, leftIcon: LeftIcon, ...props }) {
             outline: "none",
             background: "transparent",
             fontSize: 14,
+            color: THEME.ink,
           }}
           {...props}
         >
@@ -387,15 +420,17 @@ function StepPill({ active, done, icon: Icon, title, subtitle, onClick }) {
         width: "100%",
         borderRadius: 18,
         padding: "12px 12px",
-        border: active ? "1px solid rgba(0,0,0,0.16)" : "1px solid rgba(0,0,0,0.10)",
-        background: active ? "linear-gradient(135deg, rgba(0,0,0,0.92), rgba(11,18,32,0.92))" : "rgba(255,255,255,0.85)",
-        color: active ? "#fff" : "#111",
+        border: active ? `1px solid rgba(37,99,235,0.35)` : `1px solid ${THEME.stroke}`,
+        background: active
+          ? `linear-gradient(135deg, ${THEME.navy}, ${THEME.navy2})`
+          : "rgba(255,255,255,0.85)",
+        color: active ? "#fff" : THEME.ink,
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
         gap: 12,
         textAlign: "left",
-        boxShadow: active ? "0 18px 45px -35px rgba(0,0,0,0.9)" : "none",
+        boxShadow: active ? "0 18px 45px -35px rgba(15,23,42,0.95)" : "none",
         transition: "all .18s ease",
       }}
     >
@@ -406,7 +441,8 @@ function StepPill({ active, done, icon: Icon, title, subtitle, onClick }) {
           borderRadius: 16,
           display: "grid",
           placeItems: "center",
-          background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.05)",
+          background: active ? "rgba(255,255,255,0.12)" : "rgba(37,99,235,0.08)",
+          border: active ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(37,99,235,0.14)",
         }}
       >
         <Icon size={18} />
@@ -415,9 +451,13 @@ function StepPill({ active, done, icon: Icon, title, subtitle, onClick }) {
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontWeight: 950, fontSize: 14 }}>{title}</div>
-          {done ? <Pill tone="success" icon={CheckCircle2}>Done</Pill> : null}
+          {done && !active ? (
+            <Pill tone="success" icon={CheckCircle2}>
+              Done
+            </Pill>
+          ) : null}
         </div>
-        <div style={{ fontSize: 12, opacity: active ? 0.8 : 0.65, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 12, opacity: active ? 0.85 : 0.65, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {subtitle}
         </div>
       </div>
@@ -428,13 +468,13 @@ function StepPill({ active, done, icon: Icon, title, subtitle, onClick }) {
 function ProgressBar({ value }) {
   const v = Math.max(0, Math.min(100, value));
   return (
-    <div style={{ height: 10, borderRadius: 999, background: "rgba(0,0,0,0.08)", overflow: "hidden" }}>
+    <div style={{ height: 10, borderRadius: 999, background: "rgba(15,23,42,0.10)", overflow: "hidden" }}>
       <div
         style={{
           height: "100%",
           width: `${v}%`,
           borderRadius: 999,
-          background: "linear-gradient(90deg, rgba(37,99,235,0.95), rgba(16,185,129,0.85), rgba(139,92,246,0.85))",
+          background: `linear-gradient(90deg, ${THEME.brand}, ${THEME.brand2})`,
           transition: "width .2s ease",
         }}
       />
@@ -701,17 +741,24 @@ export default function Portal() {
     <>
       <Toaster position="top-right" />
 
-      {/* Global background */}
-      <div style={{ position: "fixed", inset: 0, zIndex: -1, background: "linear-gradient(180deg, #f6f8ff, #ffffff 40%, #f8fafc)" }} />
+      {/* Global background to match homepage (clean light + blue glow) */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: -2,
+          background: `linear-gradient(180deg, ${THEME.pageBg}, #ffffff 38%, #F8FAFC)`,
+        }}
+      />
       <div
         style={{
           position: "fixed",
           inset: 0,
           zIndex: -1,
           background:
-            "radial-gradient(900px 260px at 12% 0%, rgba(37,99,235,0.18), transparent 60%)," +
-            "radial-gradient(760px 220px at 86% 10%, rgba(16,185,129,0.14), transparent 60%)," +
-            "radial-gradient(900px 280px at 50% 110%, rgba(139,92,246,0.12), transparent 55%)",
+            `radial-gradient(900px 260px at 15% 0%, rgba(37,99,235,0.18), transparent 60%),` +
+            `radial-gradient(780px 240px at 92% 10%, rgba(37,99,235,0.12), transparent 60%),` +
+            `radial-gradient(900px 280px at 55% 110%, rgba(15,23,42,0.10), transparent 55%)`,
         }}
       />
 
@@ -720,7 +767,7 @@ export default function Portal() {
         <GlassCard style={{ padding: 18, marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div
                   style={{
                     width: 46,
@@ -728,15 +775,20 @@ export default function Portal() {
                     borderRadius: 18,
                     display: "grid",
                     placeItems: "center",
-                    background: "rgba(0,0,0,0.06)",
-                    border: "1px solid rgba(0,0,0,0.08)",
+                    background: "rgba(37,99,235,0.10)",
+                    border: "1px solid rgba(37,99,235,0.18)",
+                    color: THEME.brand2,
                   }}
                 >
                   <Sparkles size={20} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 20, fontWeight: 950, letterSpacing: -0.3 }}>FuelWatch Portal</div>
-                  <div style={{ fontSize: 12, opacity: 0.65 }}>Station registry • contacts • tank inventory structure</div>
+                  <div style={{ fontSize: 20, fontWeight: 980, letterSpacing: -0.4, color: THEME.ink }}>
+                    FuelWatch <span style={{ color: THEME.brand }}>Portal</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: THEME.muted }}>
+                    Station registry • contacts • tank inventory structure
+                  </div>
                 </div>
               </div>
 
@@ -758,8 +810,8 @@ export default function Portal() {
 
             <div style={{ minWidth: 280, width: "min(460px, 100%)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, opacity: 0.75 }}>
-                  Setup completion: <span style={{ color: "#111" }}>{completion}%</span>
+                <div style={{ fontSize: 12, fontWeight: 950, color: THEME.muted }}>
+                  Setup completion: <span style={{ color: THEME.ink }}>{completion}%</span>
                 </div>
                 <Pill tone={isValid ? "success" : "danger"} icon={isValid ? CheckCircle2 : AlertTriangle}>
                   {isValid ? "Ready to save" : "Fix validation"}
@@ -792,7 +844,7 @@ export default function Portal() {
         <div style={{ display: "grid", gridTemplateColumns: "1.08fr 0.92fr", gap: 14 }}>
           {/* LEFT: Wizard */}
           <GlassCard style={{ padding: 18 }}>
-            {/* Stepper sidebar-like pills */}
+            {/* Stepper */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {steps.map((s, idx) => (
                 <StepPill
@@ -808,7 +860,7 @@ export default function Portal() {
             </div>
 
             <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <Pill tone="neutral" icon={ClipboardList}>
+              <Pill tone="info" icon={ClipboardList}>
                 Step {activeStep + 1} / {steps.length}
               </Pill>
 
@@ -842,9 +894,9 @@ export default function Portal() {
                   <motion.div key="station" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.18 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <div>
-                        <div style={{ fontWeight: 950, fontSize: 16 }}>Station Details</div>
-                        <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>
-                          Use a unique Station ID format. We’ll enforce strict rules.
+                        <div style={{ fontWeight: 980, fontSize: 16, color: THEME.ink }}>Station Details</div>
+                        <div style={{ fontSize: 12, color: THEME.muted, marginTop: 3 }}>
+                          Use a unique Station ID format. FuelWatch will enforce strict rules.
                         </div>
                       </div>
                       <Pill tone={stationStepOk ? "success" : "danger"} icon={stationStepOk ? CheckCircle2 : AlertTriangle}>
@@ -892,8 +944,10 @@ export default function Portal() {
                   <motion.div key="person" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.18 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <div>
-                        <div style={{ fontWeight: 950, fontSize: 16 }}>Contact Person</div>
-                        <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>Validated email • Sri Lanka phone • proper time window</div>
+                        <div style={{ fontWeight: 980, fontSize: 16, color: THEME.ink }}>Contact Person</div>
+                        <div style={{ fontSize: 12, color: THEME.muted, marginTop: 3 }}>
+                          Validated email • Sri Lanka phone • proper time window
+                        </div>
                       </div>
                       <Pill tone={personStepOk ? "success" : "danger"} icon={personStepOk ? CheckCircle2 : AlertTriangle}>
                         {personStepOk ? "Valid" : "Incomplete"}
@@ -965,8 +1019,10 @@ export default function Portal() {
                   <motion.div key="tanks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.18 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <div>
-                        <div style={{ fontWeight: 950, fontSize: 16 }}>Tank Details</div>
-                        <div style={{ fontSize: 12, opacity: 0.65, marginTop: 3 }}>Fuel type locked list • capacity bounds • unique tank index</div>
+                        <div style={{ fontWeight: 980, fontSize: 16, color: THEME.ink }}>Tank Details</div>
+                        <div style={{ fontSize: 12, color: THEME.muted, marginTop: 3 }}>
+                          Fuel type locked list • capacity bounds • unique tank index
+                        </div>
                       </div>
 
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -976,6 +1032,7 @@ export default function Portal() {
 
                         <SoftButton
                           type="button"
+                          variant="primary"
                           onClick={() =>
                             append({
                               fuel_type: "",
@@ -994,7 +1051,7 @@ export default function Portal() {
                       {fields.map((f, idx) => (
                         <GlassCard key={f.id} style={{ padding: 14 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                            <div style={{ fontWeight: 950 }}>Tank #{idx + 1}</div>
+                            <div style={{ fontWeight: 980, color: THEME.ink }}>Tank #{idx + 1}</div>
                             <SoftButton
                               type="button"
                               variant="danger"
@@ -1039,7 +1096,7 @@ export default function Portal() {
                             </div>
                           </div>
 
-                          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+                          <div style={{ marginTop: 10, fontSize: 12, color: THEME.muted }}>
                             Rule: Tank index must be unique per fuel type (no duplicates).
                           </div>
                         </GlassCard>
@@ -1056,14 +1113,22 @@ export default function Portal() {
               </AnimatePresence>
             </div>
 
-            {/* Bottom sticky actions */}
+            {/* Bottom actions */}
             <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Pill tone="neutral" icon={Sparkles}>
+              <Pill tone="info" icon={Sparkles}>
                 Autosave draft enabled (create mode)
               </Pill>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <SoftButton type="button" variant="subtle" onClick={() => { localStorage.removeItem("fuelwatch_portal_draft"); toast.success("Draft cleared"); }} disabled={isEditing}>
+                <SoftButton
+                  type="button"
+                  variant="subtle"
+                  onClick={() => {
+                    localStorage.removeItem("fuelwatch_portal_draft");
+                    toast.success("Draft cleared");
+                  }}
+                  disabled={isEditing}
+                >
                   <Trash2 size={16} /> Clear draft
                 </SoftButton>
                 <SoftButton type="button" onClick={clearForm}>
@@ -1078,8 +1143,8 @@ export default function Portal() {
             <GlassCard style={{ padding: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                 <div>
-                  <div style={{ fontWeight: 950, fontSize: 16 }}>Registered Stations</div>
-                  <div style={{ fontSize: 12, opacity: 0.65 }}>{total} total</div>
+                  <div style={{ fontWeight: 980, fontSize: 16, color: THEME.ink }}>Registered Stations</div>
+                  <div style={{ fontSize: 12, color: THEME.muted }}>{total} total</div>
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -1090,11 +1155,7 @@ export default function Portal() {
                     <Download size={16} /> Export JSON
                   </SoftButton>
 
-                  <SoftButton
-                    type="button"
-                    onClick={() => setView((v) => (v === "cards" ? "compact" : "cards"))}
-                    title="Toggle view"
-                  >
+                  <SoftButton type="button" onClick={() => setView((v) => (v === "cards" ? "compact" : "cards"))} title="Toggle view">
                     {view === "cards" ? <LayoutGrid size={16} /> : <List size={16} />} {view === "cards" ? "Cards" : "Compact"}
                   </SoftButton>
                 </div>
@@ -1103,17 +1164,18 @@ export default function Portal() {
               {/* Search + quick filter */}
               <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 220px auto", gap: 10 }}>
                 <div style={{ position: "relative" }}>
-                  <span style={{ position: "absolute", left: 12, top: 13, opacity: 0.5 }}>
+                  <span style={{ position: "absolute", left: 12, top: 13, opacity: 0.55, color: THEME.brand2 }}>
                     <Search size={16} />
                   </span>
                   <input
                     style={{
                       width: "100%",
                       borderRadius: 16,
-                      border: "1px solid rgba(0,0,0,0.10)",
+                      border: `1px solid ${THEME.stroke}`,
                       padding: "12px 12px 12px 38px",
                       outline: "none",
-                      background: "rgba(255,255,255,0.85)",
+                      background: THEME.card2,
+                      color: THEME.ink,
                     }}
                     placeholder="Search by Id / Name / Location / Person..."
                     value={q}
@@ -1131,12 +1193,13 @@ export default function Portal() {
                   style={{
                     width: "100%",
                     borderRadius: 16,
-                    border: "1px solid rgba(0,0,0,0.10)",
+                    border: `1px solid ${THEME.stroke}`,
                     padding: "12px 12px",
                     outline: "none",
-                    background: "rgba(255,255,255,0.85)",
-                    fontWeight: 800,
+                    background: THEME.card2,
+                    fontWeight: 900,
                     fontSize: 13,
+                    color: THEME.ink,
                   }}
                   value={quickFuel}
                   onChange={(e) => setQuickFuel(e.target.value)}
@@ -1152,6 +1215,7 @@ export default function Portal() {
 
                 <SoftButton
                   type="button"
+                  variant="primary"
                   onClick={() => {
                     setPage(1);
                     fetchStations(1, q);
@@ -1166,7 +1230,7 @@ export default function Portal() {
               {loadingList ? (
                 <div style={{ marginTop: 10 }}>
                   <ProgressBar value={65} />
-                  <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>Loading stations…</div>
+                  <div style={{ fontSize: 12, color: THEME.muted, marginTop: 6 }}>Loading stations…</div>
                 </div>
               ) : null}
 
@@ -1177,9 +1241,13 @@ export default function Portal() {
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                          <div style={{ fontWeight: 950 }}>{s.Name}</div>
-                          <Pill tone="neutral" icon={Building2}>{s.Id}</Pill>
-                          <Pill tone="info" icon={MapPin}>{s.Location}</Pill>
+                          <div style={{ fontWeight: 980, color: THEME.ink }}>{s.Name}</div>
+                          <Pill tone="info" icon={Building2}>
+                            {s.Id}
+                          </Pill>
+                          <Pill tone="neutral" icon={MapPin}>
+                            {s.Location}
+                          </Pill>
                         </div>
 
                         <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1187,10 +1255,14 @@ export default function Portal() {
                             {s.person?.PersonName || "—"} • {s.person?.PersonDesignation || "—"}
                           </Pill>
                           {s.person?.PersonEmail ? (
-                            <Pill tone="neutral" icon={Mail}>{s.person.PersonEmail}</Pill>
+                            <Pill tone="neutral" icon={Mail}>
+                              {s.person.PersonEmail}
+                            </Pill>
                           ) : null}
                           {s.person?.ContactNumber ? (
-                            <Pill tone="neutral" icon={Phone}>{s.person.ContactNumber}</Pill>
+                            <Pill tone="neutral" icon={Phone}>
+                              {s.person.ContactNumber}
+                            </Pill>
                           ) : null}
                         </div>
 
@@ -1201,9 +1273,7 @@ export default function Portal() {
                                 {t.fuel_type} • idx {t.tank_index} • {t.tank_capacity}L
                               </Pill>
                             ))}
-                            {(s.tanks || []).length > 6 ? (
-                              <Pill tone="neutral">+{(s.tanks || []).length - 6} more</Pill>
-                            ) : null}
+                            {(s.tanks || []).length > 6 ? <Pill tone="neutral">+{(s.tanks || []).length - 6} more</Pill> : null}
                           </div>
                         ) : null}
                       </div>
@@ -1220,9 +1290,7 @@ export default function Portal() {
                   </GlassCard>
                 ))}
 
-                {shownStations.length === 0 ? (
-                  <Hint icon={AlertTriangle}>No stations found. Try clearing filters or searching again.</Hint>
-                ) : null}
+                {shownStations.length === 0 ? <Hint icon={AlertTriangle}>No stations found. Try clearing filters or searching again.</Hint> : null}
               </div>
 
               {/* Pagination */}
@@ -1239,8 +1307,8 @@ export default function Portal() {
                   <ChevronLeft size={16} /> Prev
                 </SoftButton>
 
-                <div style={{ fontSize: 13, opacity: 0.75 }}>
-                  Page <b>{page}</b> / {pages}
+                <div style={{ fontSize: 13, color: THEME.muted }}>
+                  Page <b style={{ color: THEME.ink }}>{page}</b> / {pages}
                 </div>
 
                 <SoftButton
@@ -1259,16 +1327,12 @@ export default function Portal() {
 
             {/* Feature card */}
             <GlassCard style={{ padding: 18 }}>
-              <div style={{ fontWeight: 950, fontSize: 16 }}>Included UI/UX Features</div>
-              <ul style={{ marginTop: 10, paddingLeft: 18, opacity: 0.8, fontSize: 13, display: "grid", gap: 7 }}>
-                <li>Premium glass UI with FuelWatch theme gradients</li>
-                <li>Step wizard with animated transitions</li>
-                <li>Completion progress bar + “Ready to save” status</li>
-                <li>Strict validations + helpful hints</li>
-                <li>Autosave draft (create mode) + clear draft button</li>
-                <li>Stations list: cards/compact view toggle + quick fuel filter</li>
-                <li>Export stations list (JSON)</li>
-                <li>Search + pagination</li>
+              <div style={{ fontWeight: 980, fontSize: 16, color: THEME.ink }}>Required Registration Details</div>
+              <ul style={{ marginTop: 10, paddingLeft: 18, color: THEME.muted, fontSize: 13, display: "grid", gap: 7 }}>
+                <li>Filling Station General Details</li>
+                <li>Filling Station Contact Details</li>
+                <li>Filling Station Tank Details</li>
+                
               </ul>
             </GlassCard>
           </div>

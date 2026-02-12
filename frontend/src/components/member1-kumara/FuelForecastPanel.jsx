@@ -123,8 +123,7 @@ function NeonButton({ icon: Icon, children, onClick, disabled, variant = "primar
   const base =
     "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-extrabold shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60";
   const variants = {
-    primary:
-      "bg-zinc-900 text-white hover:opacity-95 dark:bg-white dark:text-zinc-900",
+    primary: "bg-zinc-900 text-white hover:opacity-95 dark:bg-white dark:text-zinc-900",
     ghost:
       "border border-white/10 bg-white/70 text-zinc-900 hover:bg-white dark:bg-zinc-950/40 dark:text-zinc-50 dark:hover:bg-white/5",
     subtle:
@@ -146,8 +145,7 @@ function NeonButton({ icon: Icon, children, onClick, disabled, variant = "primar
 
 function StatPill({ icon: Icon, label, value, sub, tone = "default" }) {
   const toneMap = {
-    default:
-      "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900",
+    default: "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900",
     success: "bg-emerald-600 text-white",
     danger: "bg-rose-600 text-white",
     info: "bg-blue-600 text-white",
@@ -161,9 +159,7 @@ function StatPill({ icon: Icon, label, value, sub, tone = "default" }) {
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
-            {label}
-          </div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">{label}</div>
           <div className="truncate text-lg font-black text-zinc-900 dark:text-zinc-50">{value}</div>
           {sub ? <div className="truncate text-xs text-zinc-500 dark:text-zinc-400">{sub}</div> : null}
         </div>
@@ -225,13 +221,13 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    function onDoc(e) {
-      if (!ref.current) return;
-      if (!ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  function onDoc(e) {
+    if (!ref.current) return;
+    if (!ref.current.contains(e.target)) setOpen(false);
+  }
+  document.addEventListener("mousedown", onDoc);
+  return () => document.removeEventListener("mousedown", onDoc);
+}, []);
 
   return (
     <div ref={ref} className="relative">
@@ -392,6 +388,7 @@ export default function FuelForecastPanel() {
   const headerTo = forecastObj?.to || result?.to_date || result?.to || "-";
   const ingested = String(result?.ingest?.ingested ?? false);
 
+  // ✅ keep your existing memo validation too
   const fileError = useMemo(() => {
     if (!file) return "Please upload a PDF report to generate a forecast.";
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -527,16 +524,39 @@ export default function FuelForecastPanel() {
     downloadCsv(`fuel_forecast_${mode}_totals.csv`, rows);
   }
 
-  // drag drop
+  // ✅ drag drop with SAME validation as input
   function handleDrop(e) {
     e.preventDefault();
     e.stopPropagation();
-    const f = e.dataTransfer.files?.[0];
-    if (!f) return;
+    const f = e.dataTransfer.files?.[0] || null;
+
     setResult(null);
     setHealth(null);
     setError("");
+
+    if (!f) return;
+
+    const isPdfByMime = f.type === "application/pdf";
+    const isPdfByExt = f.name.toLowerCase().endsWith(".pdf");
+
+    if (!isPdfByMime && !isPdfByExt) {
+      setFile(null);
+      const msg = "Only PDF files are allowed. Please upload a .pdf report.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (f.size > MAX_FILE_MB * 1024 * 1024) {
+      setFile(null);
+      const msg = `PDF is too large (max ${MAX_FILE_MB}MB).`;
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
     setFile(f);
+    toast.success("PDF selected");
   }
 
   // fuel selection toggles
@@ -557,7 +577,7 @@ export default function FuelForecastPanel() {
     setSelectedFuels(new Set());
   }
 
-  // chart options (slightly different visual vibe)
+  // chart options
   const gridDash = chartStyle === "modern" ? "2 10" : "3 3";
   const lineWidth = chartStyle === "modern" ? 3.25 : 2.75;
 
@@ -619,29 +639,16 @@ export default function FuelForecastPanel() {
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-xs text-zinc-600 dark:text-zinc-400">
-                    Upload → Generate → Analyze → Export
-                  </div>
+                  <div className="truncate text-xs text-zinc-600 dark:text-zinc-400">Upload → Generate → Analyze → Export</div>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <NeonButton
-                  variant="ghost"
-                  icon={dark ? Moon : Sun}
-                  onClick={() => setDark((v) => !v)}
-                  title="Toggle theme"
-                >
+                <NeonButton variant="ghost" icon={dark ? Moon : Sun} onClick={() => setDark((v) => !v)} title="Toggle theme">
                   {dark ? "Dark" : "Light"}
                 </NeonButton>
 
-                <NeonButton
-                  variant="subtle"
-                  icon={RefreshCw}
-                  onClick={onCheckHealth}
-                  disabled={loading}
-                  title="Check ML service"
-                >
+                <NeonButton variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading} title="Check ML service">
                   Check Service
                 </NeonButton>
 
@@ -661,12 +668,7 @@ export default function FuelForecastPanel() {
                   ]}
                 />
 
-                <NeonButton
-                  icon={TrendingUp}
-                  onClick={onGenerate}
-                  disabled={loading || !!fileError}
-                  title={fileError ? fileError : "Generate forecast"}
-                >
+                <NeonButton icon={TrendingUp} onClick={onGenerate} disabled={loading || !!fileError} title={fileError ? fileError : "Generate forecast"}>
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" /> Processing…
@@ -686,9 +688,7 @@ export default function FuelForecastPanel() {
             <Activity className="h-4 w-4" />
             Forecasting • Charts • Exports
           </div>
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-            Fuelwatch - Fuel Quantity Predictions
-          </h1>
+          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Fuelwatch - Fuel Quantity Predictions</h1>
           <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
             Weekly | Monthly | Annually Fuel Demand Analyzer With The Premium Enginnering Features
           </p>
@@ -721,13 +721,7 @@ export default function FuelForecastPanel() {
             icon={TrendingUp}
             label="Grand Total (L)"
             value={totals ? formatNumber(grandTotal) : "—"}
-            sub={
-              totals
-                ? topFuel
-                  ? `Top: ${topFuel.fuel} (${formatNumber(topFuel.value)} L)`
-                  : `Fuel types: ${fuelKeys.length}`
-                : "Generate forecast to view"
-            }
+            sub={totals ? (topFuel ? `Top: ${topFuel.fuel} (${formatNumber(topFuel.value)} L)` : `Fuel types: ${fuelKeys.length}`) : "Generate forecast to view"}
             tone={totals ? "default" : "warn"}
           />
         </div>
@@ -798,9 +792,7 @@ export default function FuelForecastPanel() {
                         onClick={() => setShowGrid((v) => !v)}
                         className={cx(
                           "rounded-full border border-white/10 px-3 py-1 font-black transition",
-                          showGrid
-                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
-                            : "bg-white/60 text-zinc-700 dark:bg-zinc-950/30 dark:text-zinc-200"
+                          showGrid ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200" : "bg-white/60 text-zinc-700 dark:bg-zinc-950/30 dark:text-zinc-200"
                         )}
                       >
                         {showGrid ? "On" : "Off"}
@@ -822,9 +814,7 @@ export default function FuelForecastPanel() {
                         onChange={(e) => setTableLimit(Number(e.target.value))}
                         className="w-full"
                       />
-                      <span className="w-12 text-right text-xs font-black text-zinc-700 dark:text-zinc-200">
-                        {tableLimit}
-                      </span>
+                      <span className="w-12 text-right text-xs font-black text-zinc-700 dark:text-zinc-200">{tableLimit}</span>
                     </div>
 
                     <div className="mt-3 flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
@@ -834,9 +824,7 @@ export default function FuelForecastPanel() {
                         onClick={() => setCompactTables((v) => !v)}
                         className={cx(
                           "rounded-full border border-white/10 px-3 py-1 font-black transition",
-                          compactTables
-                            ? "bg-blue-500/15 text-blue-700 dark:text-blue-200"
-                            : "bg-white/60 text-zinc-700 dark:bg-zinc-950/30 dark:text-zinc-200"
+                          compactTables ? "bg-blue-500/15 text-blue-700 dark:text-blue-200" : "bg-white/60 text-zinc-700 dark:bg-zinc-950/30 dark:text-zinc-200"
                         )}
                       >
                         {compactTables ? "Yes" : "No"}
@@ -880,6 +868,7 @@ export default function FuelForecastPanel() {
                   <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-600/10 blur-3xl dark:bg-blue-500/10" />
                   <div className="pointer-events-none absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl dark:bg-emerald-400/10" />
 
+                  {/* ✅ UPDATED INPUT: embedded your validation version */}
                   <input
                     id="fuel-forecast-file"
                     type="file"
@@ -888,12 +877,44 @@ export default function FuelForecastPanel() {
                     disabled={loading}
                     onChange={(e) => {
                       const f = e.target.files?.[0] || null;
+
                       setResult(null);
                       setHealth(null);
                       setError("");
+
+                      // also reset local filters (optional but nice)
                       setFuelSearch("");
                       setSelectedFuels(new Set());
+
+                      if (!f) {
+                        setFile(null);
+                        return;
+                      }
+
+                      const isPdfByMime = f.type === "application/pdf";
+                      const isPdfByExt = f.name.toLowerCase().endsWith(".pdf");
+
+                      if (!isPdfByMime && !isPdfByExt) {
+                        setFile(null);
+                        e.target.value = ""; // clear chosen file
+                        const msg = "Only PDF files are allowed. Please upload a .pdf report.";
+                        setError(msg);
+                        toast.error(msg);
+                        return;
+                      }
+
+                      // optional size limit
+                      if (f.size > MAX_FILE_MB * 1024 * 1024) {
+                        setFile(null);
+                        e.target.value = "";
+                        const msg = `PDF is too large (max ${MAX_FILE_MB}MB).`;
+                        setError(msg);
+                        toast.error(msg);
+                        return;
+                      }
+
                       setFile(f);
+                      toast.success("PDF selected");
                     }}
                   />
 
@@ -912,14 +933,13 @@ export default function FuelForecastPanel() {
                           </>
                         ) : (
                           <>
-                            Or click to browse. Max size{" "}
-                            <span className="font-black">{MAX_FILE_MB}MB</span>.
+                            Or click to browse. Max size <span className="font-black">{MAX_FILE_MB}MB</span>.
                           </>
                         )}
                       </div>
                       <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/60 px-3 py-1 text-[10px] font-black text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-200">
                         <Info className="h-3.5 w-3.5" />
-                         PDF
+                        PDF
                       </div>
                     </div>
                   </div>
@@ -991,15 +1011,13 @@ export default function FuelForecastPanel() {
           </div>
         </GlassCard>
 
+        {/* Results + Loading + Footer (unchanged from your code) */}
+        {/* ... KEEP THE REST OF YOUR FILE EXACTLY THE SAME BELOW THIS POINT ... */}
+
         {/* Results */}
         <AnimatePresence>
           {forecastObj && totals ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-6 space-y-5"
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mt-6 space-y-5">
               {/* Summary strip + Tabs */}
               <GlassCard>
                 <div className="p-5 sm:p-6">
@@ -1150,7 +1168,6 @@ export default function FuelForecastPanel() {
                     }
                   >
                     <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-white/10 bg-white/50 p-3 dark:bg-zinc-950/30">
-                      <div className="pointer-events-none absolute inset-0 opacity-100" />
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={totalsChartData}>
                           {showGrid ? <CartesianGrid strokeDasharray={gridDash} /> : null}
@@ -1158,12 +1175,7 @@ export default function FuelForecastPanel() {
                           <YAxis />
                           <Tooltip />
                           <Legend />
-                          <Bar
-                            dataKey="value"
-                            name="Predicted Total (L)"
-                            fill={BRAND.primary}
-                            radius={[12, 12, 0, 0]}
-                          />
+                          <Bar dataKey="value" name="Predicted Total (L)" fill={BRAND.primary} radius={[12, 12, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1266,7 +1278,6 @@ export default function FuelForecastPanel() {
               {/* TABLES */}
               {activeTab === "tables" ? (
                 <div className="grid gap-5 lg:grid-cols-2">
-                  {/* Totals table */}
                   <GlassCard>
                     <div className="p-5 sm:p-6">
                       <div className="mb-3 flex items-center justify-between">
@@ -1288,17 +1299,11 @@ export default function FuelForecastPanel() {
                             {totalsChartData.map((row, idx) => (
                               <tr
                                 key={row.fuel}
-                                className={cx(
-                                  "border-t border-white/10",
-                                  idx % 2 === 0 ? "bg-white/30 dark:bg-white/5" : "bg-transparent"
-                                )}
+                                className={cx("border-t border-white/10", idx % 2 === 0 ? "bg-white/30 dark:bg-white/5" : "bg-transparent")}
                               >
                                 <td className={cx("px-4 py-3 font-black", compactTables ? "py-2" : "")}>
                                   <div className="flex items-center gap-2">
-                                    <span
-                                      className="h-2.5 w-2.5 rounded-full"
-                                      style={{ background: FUEL_COLORS[idx % FUEL_COLORS.length] }}
-                                    />
+                                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: FUEL_COLORS[idx % FUEL_COLORS.length] }} />
                                     {row.fuel}
                                   </div>
                                 </td>
@@ -1317,13 +1322,10 @@ export default function FuelForecastPanel() {
                     </div>
                   </GlassCard>
 
-                  {/* Daily/Monthly table */}
                   <GlassCard>
                     <div className="p-5 sm:p-6">
                       <div className="mb-3 flex items-center justify-between">
-                        <div className="text-lg font-black tracking-tight">
-                          {isAnnual ? "Month-wise Table (Annual)" : "Daily Breakdown"}
-                        </div>
+                        <div className="text-lg font-black tracking-tight">{isAnnual ? "Month-wise Table (Annual)" : "Daily Breakdown"}</div>
                         <span className="rounded-full border border-white/10 bg-white/60 px-3 py-1 text-[10px] font-black text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-200">
                           Showing up to {tableLimit} rows
                         </span>
@@ -1346,18 +1348,11 @@ export default function FuelForecastPanel() {
                                 {daily.slice(0, tableLimit).map((row, idx) => (
                                   <tr
                                     key={idx}
-                                    className={cx(
-                                      "border-t border-white/10",
-                                      idx % 2 === 0 ? "bg-white/30 dark:bg-white/5" : "bg-transparent"
-                                    )}
+                                    className={cx("border-t border-white/10", idx % 2 === 0 ? "bg-white/30 dark:bg-white/5" : "bg-transparent")}
                                   >
                                     {Object.keys(daily[0]).map((k) => (
                                       <td key={k} className={cx("px-4 py-3 tabular-nums", compactTables ? "py-2" : "")}>
-                                        {k === "Date"
-                                          ? shortDate(row[k])
-                                          : typeof row[k] === "number"
-                                          ? formatNumber(row[k])
-                                          : String(row[k])}
+                                        {k === "Date" ? shortDate(row[k]) : typeof row[k] === "number" ? formatNumber(row[k]) : String(row[k])}
                                       </td>
                                     ))}
                                   </tr>
@@ -1365,9 +1360,7 @@ export default function FuelForecastPanel() {
                               </tbody>
                             </table>
                           ) : (
-                            <div className="grid h-[260px] place-items-center text-sm text-zinc-600 dark:text-zinc-300">
-                              No daily breakdown for this mode/run.
-                            </div>
+                            <div className="grid h-[260px] place-items-center text-sm text-zinc-600 dark:text-zinc-300">No daily breakdown for this mode/run.</div>
                           )}
                         </div>
                       ) : (
@@ -1387,10 +1380,7 @@ export default function FuelForecastPanel() {
                                 {monthly.slice(0, tableLimit).map((row, idx) => (
                                   <tr
                                     key={idx}
-                                    className={cx(
-                                      "border-t border-white/10",
-                                      idx % 2 === 0 ? "bg-white/30 dark:bg-white/5" : "bg-transparent"
-                                    )}
+                                    className={cx("border-t border-white/10", idx % 2 === 0 ? "bg-white/30 dark:bg-white/5" : "bg-transparent")}
                                   >
                                     {Object.keys(monthly[0]).map((k) => (
                                       <td key={k} className={cx("px-4 py-3 tabular-nums", compactTables ? "py-2" : "")}>
@@ -1402,9 +1392,7 @@ export default function FuelForecastPanel() {
                               </tbody>
                             </table>
                           ) : (
-                            <div className="grid h-[260px] place-items-center text-sm text-zinc-600 dark:text-zinc-300">
-                              No month-wise breakdown for this annual run.
-                            </div>
+                            <div className="grid h-[260px] place-items-center text-sm text-zinc-600 dark:text-zinc-300">No month-wise breakdown for this annual run.</div>
                           )}
                         </div>
                       )}
@@ -1425,12 +1413,7 @@ export default function FuelForecastPanel() {
         {/* Loading skeleton */}
         <AnimatePresence>
           {loading ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-6 grid gap-5"
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mt-6 grid gap-5">
               <GlassCard>
                 <div className="p-5 sm:p-6">
                   <div className="flex items-center gap-3">
@@ -1455,9 +1438,7 @@ export default function FuelForecastPanel() {
           ) : null}
         </AnimatePresence>
 
-        <div className="mt-10 text-center text-xs text-zinc-500 dark:text-zinc-400">
-          FuelWatch Fuel Quantity Predictions • Enhanced Premium Experience
-        </div>
+        <div className="mt-10 text-center text-xs text-zinc-500 dark:text-zinc-400">FuelWatch Fuel Quantity Predictions • Enhanced Premium Experience</div>
       </div>
     </div>
   );
