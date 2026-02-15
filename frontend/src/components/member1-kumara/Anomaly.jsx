@@ -46,6 +46,9 @@ import WhatshotRoundedIcon from "@mui/icons-material/WhatshotRounded";
 
 const ML_API = "http://127.0.0.1:8090/ml/score-report";
 
+// ✅ Notification backend endpoint
+const NOTIFY_API = "http://localhost:8081/api/notifications/from-scan";
+
 // ==============================
 // Small utilities
 // ==============================
@@ -81,10 +84,7 @@ function downloadCSV(filename, rows) {
     return needsQuotes ? `"${escaped}"` : escaped;
   };
 
-  const csv = [
-    keys.join(","),
-    ...rows.map((r) => keys.map((k) => escape(r?.[k])).join(",")),
-  ].join("\n");
+  const csv = [keys.join(","), ...rows.map((r) => keys.map((k) => escape(r?.[k])).join(","))].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -230,6 +230,9 @@ export default function Anomaly() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ✅ notification sending UI state
+  const [notifying, setNotifying] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -396,6 +399,62 @@ export default function Anomaly() {
   };
 
   // -----------------------------
+  // ✅ NOTIFY RESPONSIBLE STAFF (safe notification module)
+  // -----------------------------
+  const handleNotifyResponsible = useCallback(async () => {
+    if (!file) {
+      openSnack("Please upload a file first.", "warning");
+      return;
+    }
+    if (!scoredDays.length) {
+      openSnack("Run ML scan first.", "warning");
+      return;
+    }
+
+    // Only notify if there is at least one flagged anomaly
+    const flagged = scoredDays.filter((r) => {
+      const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+      return pred === 1 || pred === true;
+    });
+
+    if (!flagged.length) {
+      openSnack("No flagged anomalies found. Nothing to notify.", "info");
+      return;
+    }
+
+    setNotifying(true);
+    try {
+      const payload = {
+        triggeredBy: "manual",
+        fileName: file?.name || "",
+        threshold: decisionThreshold,
+        params: {}, // optional (later you can pass gap_tol/reset_tol/no_sales_drop_tol)
+        rows: scoredDays, // backend expects rows[]
+        events: events,
+      };
+
+      const res = await fetch(NOTIFY_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.message || "Notification failed");
+      }
+
+      const level = data?.level ?? "?";
+      const suppressed = data?.suppressed ? " (suppressed by cooldown)" : "";
+      openSnack(`✅ Notification processed (Alert Level ${level})${suppressed}`, "success");
+    } catch (e) {
+      openSnack(`❌ ${e?.message || "Notify failed"}`, "error");
+    } finally {
+      setNotifying(false);
+    }
+  }, [file, scoredDays, events, decisionThreshold]);
+
+  // -----------------------------
   // Row mapper (keeps your defensive keys)
   // -----------------------------
   const mapRow = (r) => {
@@ -425,7 +484,12 @@ export default function Anomaly() {
       {/* Hero header */}
       <GlassCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between">
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={2}
+            alignItems={{ md: "center" }}
+            justifyContent="space-between"
+          >
             <Box sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box
@@ -452,8 +516,8 @@ export default function Anomaly() {
               </Stack>
 
               <Typography variant="body2" sx={{ mt: 1, color: "text.secondary", maxWidth: 860 }}>
-                Upload monthly report → run ML scan → review scored days + grouped events. Adjust threshold to see
-                results update automatically for the same file.
+                Upload monthly report → run ML scan → review scored days + grouped events. Adjust threshold to see results
+                update automatically for the same file.
               </Typography>
             </Box>
 
@@ -683,7 +747,11 @@ export default function Anomaly() {
           <MetricCard
             label="Avg Score"
             value={safeFixed(avgScore)}
-            sub={maxScoreRow ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})` : "No data yet"}
+            sub={
+              maxScoreRow
+                ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})`
+                : "No data yet"
+            }
             tone="warning"
             icon={<WhatshotRoundedIcon />}
           />
@@ -750,8 +818,8 @@ export default function Anomaly() {
                   </Stack>
 
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    This scanner flags days that look abnormal based on the uploaded station report. Increase the
-                    threshold to reduce false positives; decrease it to catch more anomalies.
+                    This scanner flags days that look abnormal based on the uploaded station report. Increase the threshold
+                    to reduce false positives; decrease it to catch more anomalies.
                   </Typography>
 
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
@@ -782,7 +850,7 @@ export default function Anomaly() {
 
                   <Divider sx={{ my: 2, opacity: 0.6 }} />
 
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center" flexWrap="wrap">
                     <Button
                       variant="outlined"
                       startIcon={<DownloadRoundedIcon />}
@@ -792,6 +860,7 @@ export default function Anomaly() {
                     >
                       Export filtered scored days (CSV)
                     </Button>
+
                     <Button
                       variant="outlined"
                       startIcon={<DownloadRoundedIcon />}
@@ -801,7 +870,25 @@ export default function Anomaly() {
                     >
                       Export events (CSV)
                     </Button>
+
+                    {/* ✅ NEW: Notify button */}
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={
+                        notifying ? <CircularProgress size={18} color="inherit" /> : <WarningAmberRoundedIcon />
+                      }
+                      disabled={notifying || !scoredDays.length || flaggedDays.length === 0}
+                      onClick={handleNotifyResponsible}
+                      sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                    >
+                      {notifying ? "Notifying..." : "Notify Responsible Staff"}
+                    </Button>
                   </Stack>
+
+                  <Typography variant="caption" sx={{ display: "block", mt: 1.2, color: "text.secondary" }}>
+                    Safety: Notifications are deduplicated + cooldown-controlled by the backend policy.
+                  </Typography>
                 </GlassCard>
               </Grid>
 
@@ -815,9 +902,7 @@ export default function Anomaly() {
                   </Stack>
 
                   {!maxScoreRow ? (
-                    <Typography color="text.secondary">
-                      No data yet. Upload a report and run scan.
-                    </Typography>
+                    <Typography color="text.secondary">No data yet. Upload a report and run scan.</Typography>
                   ) : (
                     (() => {
                       const row = mapRow(maxScoreRow);
@@ -894,7 +979,7 @@ export default function Anomaly() {
                 elevation={0}
                 sx={{
                   borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
                   bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
                 }}
               >
@@ -921,7 +1006,7 @@ export default function Anomaly() {
                             label={String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
                             sx={{
                               fontWeight: 900,
-                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
+                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.1),
                               border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
                             }}
                           />
@@ -950,18 +1035,12 @@ export default function Anomaly() {
                 sx={{
                   ml: 1,
                   fontWeight: 900,
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.1),
                   border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
                 }}
               />
               {showOnlyFlagged ? (
-                <Chip
-                  label="Flagged only"
-                  size="small"
-                  color="error"
-                  variant="outlined"
-                  sx={{ fontWeight: 900 }}
-                />
+                <Chip label="Flagged only" size="small" color="error" variant="outlined" sx={{ fontWeight: 900 }} />
               ) : null}
 
               <Box sx={{ flex: 1 }} />
@@ -992,7 +1071,7 @@ export default function Anomaly() {
                 sx={{
                   maxHeight: 560,
                   borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
                   bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
                 }}
               >
@@ -1027,12 +1106,18 @@ export default function Anomaly() {
                               size="small"
                               sx={{
                                 fontWeight: 900,
-                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.16 : 0.10),
+                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.16 : 0.1),
                                 border: `1px solid ${alpha(theme.palette.secondary.main, 0.18)}`,
                               }}
                             />
                           </TableCell>
-                          <TableCell align="right" sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontWeight: 900 }}>
+                          <TableCell
+                            align="right"
+                            sx={{
+                              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                              fontWeight: 900,
+                            }}
+                          >
                             {safeFixed(row.score)}
                           </TableCell>
                           <TableCell>

@@ -16,6 +16,8 @@ const anomalyRoutes = require("./src/routes/member1-kumara/anomaly.routes");
 const uploadRoutes = require("./src/routes/member1-kumara/upload.routes");
 const employeeRoutes = require("./src/routes/member3-oshada/employee.routes");
 const attendanceRoutes = require("./src/routes/member3-oshada/attendance.routes");
+const notificationRoutes = require("./src/routes/member1-kumara/notificationRoutes");
+
 
 // (Optional) Models: only needed if you rely on auto-index creation or model side-effects.
 // Safe to keep.
@@ -58,6 +60,8 @@ app.use("/api/anomaly", anomalyRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/notifications", notificationRoutes);
+
 
 /* ===========================
    Health + Root
