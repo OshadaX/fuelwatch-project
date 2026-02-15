@@ -19,6 +19,36 @@ def make_time_features_for_date(date: pd.Timestamp) -> dict:
     }
 
 
+def compute_floor_from_history(series: np.ndarray) -> float:
+    """
+    Compute a realistic minimum floor for a fuel type using recent history.
+    Prevents recursive multi-step forecast from collapsing to zeros.
+
+    Logic:
+    - If demand is mostly zero in history, allow floor=0.
+    - Otherwise use robust stats: max(p10(nonzero), 0.2 * median(nonzero)).
+    """
+    s = np.asarray(series, dtype=float)
+    s = s[np.isfinite(s)]
+    if s.size == 0:
+        return 0.0
+
+    s = np.clip(s, 0, None)
+
+    # if mostly zeros in history, allow floor=0
+    if np.mean(s > 0) < 0.2:
+        return 0.0
+
+    nonzero = s[s > 0]
+    if nonzero.size == 0:
+        return 0.0
+
+    p10 = float(np.percentile(nonzero, 10))
+    med = float(np.median(nonzero))
+
+    return max(p10, 0.2 * med)
+
+
 class FuelDemandPredictor:
     """
     Loads notebook-trained artifacts:
@@ -26,11 +56,15 @@ class FuelDemandPredictor:
     - models/scaler_X.pkl
     - models/scaler_y.pkl
     - models/model_meta.json
-    and provides weekly/monthly/annual forecasts.
+
+    Provides weekly/monthly/annual forecasts.
+    Supports returning only selected fuel types (fuel_filter).
+    Fixes: zero-cascade in multi-step forecasts.
 
     NEW:
-    - Supports filtering output to selected fuel types (fuel_filter)
+    - Annual mode returns month-wise totals (12 rows) instead of 365 daily rows.
     """
+
     def __init__(self):
         base_dir = Path(__file__).resolve().parents[1]
         models_dir = base_dir / "models"
@@ -75,7 +109,6 @@ class FuelDemandPredictor:
         if not fuel_filter:
             return None
 
-        # make unique, preserve order
         seen = set()
         cleaned = []
         for f in fuel_filter:
@@ -90,20 +123,41 @@ class FuelDemandPredictor:
 
         return cleaned if cleaned else None
 
+    def _compute_floors(self, hist: pd.DataFrame) -> dict:
+        """
+        Compute per-fuel floors from recent history.
+        """
+        recent_hist = hist.tail(max(self.lookback * 2, 30)).copy()
+        floors = {}
+        for fc in self.fuel_cols:
+            if fc in recent_hist.columns:
+                floors[fc] = compute_floor_from_history(recent_hist[fc].values)
+            else:
+                floors[fc] = 0.0
+        return floors
+
     def forecast_days(self, history_df: pd.DataFrame, days: int, fuel_filter=None) -> pd.DataFrame:
         """
         history_df must contain: Date + feature_cols (fuel cols + time cols)
         fuel_filter: optional list of fuel names to return in output
         """
-        selected_fuels = self._normalize_fuel_filter(fuel_filter)  # None or list
+        selected_fuels = self._normalize_fuel_filter(fuel_filter)
 
         hist = history_df.copy()
         hist["Date"] = pd.to_datetime(hist["Date"])
         hist = hist.sort_values("Date").reset_index(drop=True)
 
+        # compute floors BEFORE forecasting
+        floors = self._compute_floors(hist)
+
         hist_tail = hist.tail(self.lookback).copy()
         if len(hist_tail) < self.lookback:
             raise ValueError(f"Need at least {self.lookback} days of history for prediction.")
+
+        # Ensure required columns exist
+        missing_cols = [c for c in self.feature_cols if c not in hist_tail.columns]
+        if missing_cols:
+            raise ValueError(f"History is missing required columns: {missing_cols}")
 
         feats = hist_tail[self.feature_cols].values.astype(np.float32)
         feats_scaled = self.scaler_X.transform(feats)
@@ -113,6 +167,9 @@ class FuelDemandPredictor:
 
         last_fuel_vals = {fc: float(hist_tail[fc].iloc[-1]) for fc in self.fuel_cols}
         seq = feats_scaled.copy()  # (lookback, n_features)
+
+        # smoothing factor
+        ALPHA = 0.7  # 70% new prediction, 30% yesterday
 
         for i in range(1, days + 1):
             next_date = last_date + pd.Timedelta(days=i)
@@ -125,8 +182,27 @@ class FuelDemandPredictor:
 
             # produce all fuels internally
             all_pred = {}
+
             for j, fc in enumerate(self.fuel_cols):
-                all_pred[fc] = float(max(0.0, yhat[j]))  # non-negative
+                raw_pred = float(yhat[j])
+                last_val = float(last_fuel_vals.get(fc, 0.0))
+
+                # Safety: NaN/Inf
+                if not np.isfinite(raw_pred):
+                    raw_pred = last_val
+
+                # enforce non-negative
+                safe_pred = max(raw_pred, 0.0)
+
+                # apply dynamic floor
+                floor = float(floors.get(fc, 0.0))
+                if floor > 0:
+                    safe_pred = max(safe_pred, floor)
+
+                # smoothing to avoid collapse/spikes
+                safe_pred = ALPHA * safe_pred + (1.0 - ALPHA) * last_val
+
+                all_pred[fc] = float(safe_pred)
 
             # output only selected fuels if provided
             out_fuels = selected_fuels if selected_fuels is not None else self.fuel_cols
@@ -135,7 +211,7 @@ class FuelDemandPredictor:
 
             preds.append(pred_row)
 
-            # update state for next day input (must use all fuels for internal consistency)
+            # update state (use ALL fuels)
             last_fuel_vals = all_pred
             next_feat_row = self._row_features_from_state(next_date, last_fuel_vals)
 
@@ -161,15 +237,30 @@ class FuelDemandPredictor:
         selected_fuels = self._normalize_fuel_filter(fuel_filter)
         daily_preds = self.forecast_days(history_df, days=days, fuel_filter=selected_fuels)
 
-        # totals must be only for returned fuels
         fuels_in_output = [c for c in daily_preds.columns if c != "Date"]
         totals = daily_preds[fuels_in_output].sum().to_dict()
 
+        # ✅ Annual month-wise totals (Jan..Dec)
+        monthly = []
+        if mode == "annual":
+            dfm = daily_preds.copy()
+            dfm["Date"] = pd.to_datetime(dfm["Date"])
+            dfm["Month"] = dfm["Date"].dt.strftime("%b")  # Jan, Feb, Mar...
+            dfm["MonthNo"] = dfm["Date"].dt.month
+
+            g = dfm.groupby(["MonthNo", "Month"])[fuels_in_output].sum().reset_index()
+            g = g.sort_values("MonthNo").drop(columns=["MonthNo"])
+
+            monthly = g.to_dict(orient="records")
+
         return {
             "mode": mode,
-            "fuel_types_used": fuels_in_output,  # ✅ important for frontend
+            "fuel_types_used": fuels_in_output,
             "from": str(pd.to_datetime(daily_preds["Date"].min()).date()),
             "to": str(pd.to_datetime(daily_preds["Date"].max()).date()),
             "totals": {k: float(v) for k, v in totals.items()},
-            "daily": daily_preds.to_dict(orient="records"),
+            # ✅ for annual: hide daily rows to avoid 365 rows in UI
+            "daily": daily_preds.to_dict(orient="records") if mode != "annual" else [],
+            # ✅ month-wise output for annual
+            "monthly": monthly,
         }

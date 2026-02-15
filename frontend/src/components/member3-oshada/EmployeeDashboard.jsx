@@ -16,6 +16,8 @@ const EmployeeDashboard = () => {
     const [formData, setFormData] = useState({
         employeeId: '',
         name: '',
+        email: '',
+        password: '',
         role: '',
         status: 'active',
         shift: 'Morning',
@@ -50,6 +52,8 @@ const EmployeeDashboard = () => {
             setFormData({
                 employeeId: `FW${String(employees.length + 1).padStart(3, '0')}`,
                 name: '',
+                email: '',
+                password: '',
                 role: 'Pump Operator',
                 status: 'active',
                 shift: 'Morning',
@@ -66,6 +70,8 @@ const EmployeeDashboard = () => {
         setFormData({
             employeeId: '',
             name: '',
+            email: '',
+            password: '',
             role: '',
             status: 'active',
             shift: 'Morning',
@@ -372,12 +378,38 @@ const EmployeeDashboard = () => {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
+                                        <label className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Email</label>
+                                        <input
+                                            type="email"
+                                            required
+                                            className={`w-full px-4 py-3 rounded-2xl text-sm ${isDark ? 'bg-slate-900/60 border-slate-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500'} border outline-none transition-all`}
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            placeholder="Enter email"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Password</label>
+                                        <input
+                                            type="password"
+                                            required={!isEditing}
+                                            className={`w-full px-4 py-3 rounded-2xl text-sm ${isDark ? 'bg-slate-900/60 border-slate-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500'} border outline-none transition-all`}
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            placeholder={isEditing ? "Leave blank to keep current" : "Enter password"}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
                                         <label className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Role</label>
                                         <select
                                             className={`w-full px-4 py-3 rounded-2xl text-sm ${isDark ? 'bg-slate-900/60 border-slate-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500'} border outline-none transition-all`}
                                             value={formData.role}
                                             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                         >
+                                            <option value="admin">Admin</option>
                                             <option value="Pump Operator">Pump Operator</option>
                                             <option value="Station Manager">Station Manager</option>
                                             <option value="Inventory Specialist">Inventory Specialist</option>

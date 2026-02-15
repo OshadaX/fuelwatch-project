@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
@@ -18,35 +19,72 @@ export default function FuelForecastPanel() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  const totals = useMemo(() => result?.forecast?.totals || result?.totals || null, [result]);
-  const daily = useMemo(() => result?.forecast?.daily || result?.daily || [], [result]);
+  const totals = useMemo(
+    () => result?.forecast?.totals || result?.totals || null,
+    [result]
+  );
+
+  const daily = useMemo(
+    () => result?.forecast?.daily || result?.daily || [],
+    [result]
+  );
+
+  // ✅ NEW: month-wise rows for annual
+  const monthly = useMemo(
+    () => result?.forecast?.monthly || result?.monthly || [],
+    [result]
+  );
+
+  const isAnnual = mode === "annual";
+
+  const fileError =
+    !file
+      ? "Please upload a PDF report to generate a forecast."
+      : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
+      ? "Only PDF files are allowed."
+      : file.size > 25 * 1024 * 1024
+      ? "PDF is too large (max 25MB)."
+      : "";
 
   async function onCheckHealth() {
     try {
       setError("");
       const data = await healthCheck();
       setHealth(data);
+      toast.success("Service is reachable");
     } catch (e) {
       setHealth(null);
       setError(e?.response?.data?.detail || e.message || "Health check failed");
+      toast.error("Health check failed");
     }
   }
 
   async function onGenerate() {
+    if (fileError) {
+      setError(fileError);
+      toast.error(fileError);
+      return;
+    }
+
     try {
       setError("");
       setResult(null);
       setLoading(true);
 
       const data = await forecastFuel({ mode, file });
+
       if (!data?.ok) {
         setError(data?.message || "Forecast failed");
         setResult(data);
+        toast.error(data?.message || "Forecast failed");
       } else {
         setResult(data);
+        toast.success("Forecast generated");
       }
     } catch (e) {
-      setError(e?.response?.data?.detail || e.message || "Forecast request failed");
+      const msg = e?.response?.data?.detail || e.message || "Forecast request failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -55,6 +93,11 @@ export default function FuelForecastPanel() {
   function onDownloadDaily() {
     if (!daily || daily.length === 0) return;
     downloadCsv(`fuel_forecast_${mode}_daily.csv`, daily);
+  }
+
+  function onDownloadMonthly() {
+    if (!monthly || monthly.length === 0) return;
+    downloadCsv(`fuel_forecast_${mode}_monthly.csv`, monthly);
   }
 
   function onDownloadTotals() {
@@ -69,12 +112,56 @@ export default function FuelForecastPanel() {
     downloadCsv(`fuel_forecast_${mode}_totals.csv`, rows);
   }
 
+  // ✅ helper to render a generic table from rows
+  function DataTable({ rows, limit, emptyText }) {
+    if (!rows || rows.length === 0) {
+      return <div style={styles.hint}>{emptyText || "No data to display."}</div>;
+    }
+
+    const keys = Object.keys(rows[0]);
+
+    return (
+      <div style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              {keys.map((k) => (
+                <th key={k} style={styles.th}>
+                  {k}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(limit ? rows.slice(0, limit) : rows).map((row, idx) => (
+              <tr key={idx}>
+                {keys.map((k) => (
+                  <td key={k} style={styles.td}>
+                    {typeof row[k] === "number" ? row[k].toFixed(3) : String(row[k])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {limit && rows.length > limit && (
+          <div style={styles.hint}>
+            Showing first {limit} rows only. Download CSV to view full data.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
+      <Toaster position="top-right" />
+
       <div style={styles.header}>
         <h2 style={styles.title}>Fuel Demand Forecast</h2>
         <p style={styles.subtitle}>
-          Upload a report PDF (optional) and generate weekly / monthly / annual predicted fuel quantities.
+          Upload a report PDF (required) and generate weekly / monthly / annual predicted fuel quantities.
         </p>
       </div>
 
@@ -82,7 +169,16 @@ export default function FuelForecastPanel() {
         <div style={styles.row}>
           <div style={styles.field}>
             <label style={styles.label}>Forecast Mode</label>
-            <select value={mode} onChange={(e) => setMode(e.target.value)} style={styles.select}>
+            <select
+              value={mode}
+              onChange={(e) => {
+                setMode(e.target.value);
+                setResult(null);
+                setError("");
+              }}
+              style={styles.select}
+              disabled={loading}
+            >
               {MODE_OPTIONS.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -92,16 +188,28 @@ export default function FuelForecastPanel() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Optional PDF Report</label>
+            <label style={styles.label}>PDF Report (Required)</label>
             <input
               type="file"
-              accept=".pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              style={styles.input}
+              accept=".pdf,application/pdf"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setResult(null);
+                setHealth(null);
+                setError("");
+                setFile(f);
+              }}
+              style={{
+                ...styles.input,
+                border: fileError ? "1px solid #ff7a7a" : styles.input.border,
+              }}
+              disabled={loading}
             />
             <div style={styles.hint}>
-              {file ? `Selected: ${file.name}` : "No file selected (uses existing dataset)."}
+              {file ? `Selected: ${file.name}` : "No file selected."}
             </div>
+
+            {fileError ? <div style={styles.inlineError}>{fileError}</div> : null}
           </div>
         </div>
 
@@ -110,7 +218,16 @@ export default function FuelForecastPanel() {
             Check Service
           </button>
 
-          <button onClick={onGenerate} style={styles.primaryBtn} disabled={loading}>
+          <button
+            onClick={onGenerate}
+            style={{
+              ...styles.primaryBtn,
+              opacity: loading || !!fileError ? 0.55 : 1,
+              cursor: loading || !!fileError ? "not-allowed" : "pointer",
+            }}
+            disabled={loading || !!fileError}
+            title={fileError ? fileError : "Generate forecast"}
+          >
             {loading ? "Generating..." : "Generate Forecast"}
           </button>
         </div>
@@ -146,15 +263,34 @@ export default function FuelForecastPanel() {
               </div>
             </div>
 
+            {/* Totals */}
             {totals && (
               <>
                 <div style={styles.downloadRow}>
                   <button onClick={onDownloadTotals} style={styles.secondaryBtn}>
                     Download Totals CSV
                   </button>
-                  <button onClick={onDownloadDaily} style={styles.secondaryBtn} disabled={!daily.length}>
-                    Download Daily CSV
-                  </button>
+
+                  {/* ✅ Annual -> Monthly download, Weekly/Monthly -> Daily download */}
+                  {isAnnual ? (
+                    <button
+                      onClick={onDownloadMonthly}
+                      style={styles.secondaryBtn}
+                      disabled={!monthly.length}
+                      title={!monthly.length ? "No monthly data returned" : "Download month-wise CSV"}
+                    >
+                      Download Monthly CSV
+                    </button>
+                  ) : (
+                    <button
+                      onClick={onDownloadDaily}
+                      style={styles.secondaryBtn}
+                      disabled={!daily.length}
+                      title={!daily.length ? "No daily data returned" : "Download daily CSV"}
+                    >
+                      Download Daily CSV
+                    </button>
+                  )}
                 </div>
 
                 <div style={styles.tableWrap}>
@@ -178,40 +314,28 @@ export default function FuelForecastPanel() {
               </>
             )}
 
-            {daily && daily.length > 0 && (
+            {/* ✅ Annual: Month-wise breakdown (Jan..Dec) */}
+            {isAnnual && monthly && monthly.length > 0 && (
+              <>
+                <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Month-wise Breakdown (Annual)</h3>
+                <DataTable rows={monthly} emptyText="No month-wise data returned for annual forecast." />
+              </>
+            )}
+
+            {/* ✅ Weekly/Monthly: Daily breakdown */}
+            {!isAnnual && daily && daily.length > 0 && (
               <>
                 <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Daily Breakdown</h3>
-                <div style={styles.tableWrap}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        {Object.keys(daily[0]).map((k) => (
-                          <th key={k} style={styles.th}>
-                            {k}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {daily.slice(0, 60).map((row, idx) => (
-                        <tr key={idx}>
-                          {Object.keys(daily[0]).map((k) => (
-                            <td key={k} style={styles.td}>
-                              {typeof row[k] === "number" ? row[k].toFixed(3) : String(row[k])}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {daily.length > 60 && (
-                  <div style={styles.hint}>
-                    Showing first 60 days only. Download CSV to view full data.
-                  </div>
-                )}
+                <DataTable rows={daily} limit={60} emptyText="No daily data returned." />
               </>
+            )}
+
+            {/* ✅ Annual but backend still returned daily (if old backend) - show a warning */}
+            {isAnnual && (!monthly || monthly.length === 0) && daily && daily.length > 0 && (
+              <div style={styles.hint}>
+                Annual mode should return month-wise totals. Your backend is still returning daily rows.
+                Update the predictor API to include <strong>monthly</strong> output.
+              </div>
             )}
           </div>
         </div>
@@ -239,14 +363,20 @@ const styles = {
   label: { fontWeight: 700, fontSize: 13 },
   select: { padding: 10, borderRadius: 8, border: "1px solid #ccc" },
   input: { padding: 10, borderRadius: 8, border: "1px solid #ccc" },
-  hint: { fontSize: 12, color: "#666", marginTop: 4 },
+  hint: { fontSize: 12, color: "#666", marginTop: 10 },
+
+  inlineError: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#9a1c1c",
+  },
 
   actions: { display: "flex", gap: 10, marginTop: 14, alignItems: "center" },
   primaryBtn: {
     padding: "10px 14px",
     borderRadius: 10,
     border: "none",
-    cursor: "pointer",
     background: "#111",
     color: "white",
     fontWeight: 700,

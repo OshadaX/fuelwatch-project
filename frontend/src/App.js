@@ -11,6 +11,7 @@ import Hero from './components/shared/Hero';
 import AdminQRView from './components/member3-oshada/AdminQRView';
 import EmployeePortal from './components/member3-oshada/EmployeePortal';
 import LoginPage from './components/member3-oshada/LoginPage';
+import StaffPrediction from './components/member3-oshada/StaffPrediction';
 
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
@@ -51,6 +52,7 @@ function App() {
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
               <Route path="/admin-qr" element={<AdminQRView />} />
               <Route path="/employee-portal" element={<EmployeePortal />} />
+              <Route path="/staff-prediction" element={<StaffPrediction />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />
             </Routes>
