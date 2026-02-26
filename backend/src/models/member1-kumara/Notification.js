@@ -1,50 +1,26 @@
 const mongoose = require("mongoose");
 
-const RecipientSchema = new mongoose.Schema(
-  {
-    user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    email: { type: String, default: "" },
-    role: { type: String, default: "" },
-  },
-  { _id: false }
-);
-
 const NotificationSchema = new mongoose.Schema(
   {
-    source: { type: String, default: "misbehavior_scan", index: true },
+    source: { type: String, default: "misbehavior_scan" },
+    triggered_by: { type: String, default: "manual" },
 
-    // Deduplication key so same alert doesn't spam
-    dedupe_key: { type: String, required: true, unique: true, index: true },
+    station_id: { type: String, default: "UNKNOWN", index: true },
 
-    // Trigger metadata
-    triggered_by: { type: String, default: "manual" }, // manual | auto
-    file_name: { type: String, default: "" },
-    threshold: { type: Number, default: null },
-    params: { type: Object, default: {} },
+    alert_level: { type: Number, default: 0 }, // 0..3
+    severity: { type: String, default: "NORMAL" },
 
-    station_id: { type: String, default: "" },
+    channel: { type: String, default: "email" }, // email/system
+    recipients: { type: [String], default: [] },
 
-    // Alert levels (no-harm)
-    alert_level: { type: Number, enum: [0, 1, 2, 3], required: true, index: true },
-    severity: { type: String, enum: ["Normal", "Advisory", "Warning", "Critical"], required: true, index: true },
+    dedupe_key: { type: String, default: "" },
 
-    counts: {
-      flagged: { type: Number, default: 0 },
-      critical: { type: Number, default: 0 },
-      warning: { type: Number, default: 0 },
-    },
-
-    // Keep only top N to avoid huge docs
-    anomalies: { type: Array, default: [] }, // top flagged rows
-    events: { type: Array, default: [] }, // top grouped events
-
-    channel: { type: String, enum: ["email"], default: "email" },
-    recipients: { type: [RecipientSchema], default: [] },
-
-    // Delivery status
-    status: { type: String, enum: ["suppressed", "queued", "sent", "failed"], default: "queued", index: true },
-    sent_at: { type: Date, default: null },
+    status: { type: String, default: "sent" }, // sent/suppressed/failed
     error: { type: String, default: "" },
+    sent_at: { type: Date, default: null },
+
+    payload: { type: Object, default: {} },
+    mail_result: { type: Object, default: null },
   },
   { timestamps: true }
 );

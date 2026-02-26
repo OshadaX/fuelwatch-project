@@ -1,4 +1,3 @@
-// src/components/member1-kumara/Anomaly.jsx
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
@@ -29,6 +28,12 @@ import {
   Switch,
   FormControlLabel,
   Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
@@ -45,17 +50,11 @@ import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import WhatshotRoundedIcon from "@mui/icons-material/WhatshotRounded";
 
 const ML_API = "http://127.0.0.1:8090/ml/score-report";
-
-// ✅ Notification backend endpoint
-const NOTIFY_API = "http://localhost:8081/api/notifications/from-scan";
+const BACKEND = "http://localhost:8081"; // ✅ your node backend
 
 // ==============================
 // Small utilities
 // ==============================
-function clamp(n, a, b) {
-  return Math.max(a, Math.min(b, n));
-}
-
 function safeFixed(v, d = 3) {
   const n = Number(v);
   if (!Number.isFinite(n)) return (0).toFixed(d);
@@ -75,7 +74,6 @@ function downloadJSON(filename, obj) {
 function downloadCSV(filename, rows) {
   if (!Array.isArray(rows) || rows.length === 0) return;
 
-  // Collect keys safely from first row
   const keys = Object.keys(rows[0] || {});
   const escape = (val) => {
     const s = val == null ? "" : String(val);
@@ -120,7 +118,6 @@ function GlassCard({ children, sx }) {
         ...sx,
       }}
     >
-      {/* subtle gradient aura */}
       <Box
         sx={{
           pointerEvents: "none",
@@ -150,12 +147,7 @@ function MetricCard({ label, value, sub, tone = "primary", icon, sx }) {
       : theme.palette.primary;
 
   return (
-    <GlassCard
-      sx={{
-        p: 2,
-        ...sx,
-      }}
-    >
+    <GlassCard sx={{ p: 2, ...sx }}>
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Box
           sx={{
@@ -231,9 +223,6 @@ export default function Anomaly() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ notification sending UI state
-  const [notifying, setNotifying] = useState(false);
-
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -246,22 +235,26 @@ export default function Anomaly() {
   const [scoredDays, setScoredDays] = useState([]);
   const [events, setEvents] = useState([]);
 
-  // UX state
-  const [tab, setTab] = useState(0); // 0: Overview, 1: Events, 2: Scored Days
+  const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
   const [showOnlyFlagged, setShowOnlyFlagged] = useState(false);
   const [dense, setDense] = useState(false);
 
-  // Track last scanned file so threshold dropdown can rerun automatically
   const lastFileNameRef = useRef(null);
 
   // -----------------------------
-  // Helpers
+  // ✅ Notification Form State
   // -----------------------------
-  const openSnack = (message, severity = "success") => {
-    setSnackbar({ open: true, message, severity });
-  };
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyStation, setNotifyStation] = useState("UNKNOWN");
+  const [notifySeverity, setNotifySeverity] = useState("Warning"); // Advisory/Warning/Critical
+  const [notifyChannel, setNotifyChannel] = useState("email");
+  const [notifyRoles, setNotifyRoles] = useState(["SUPERVISOR", "MANAGER"]); // default
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [recipientOptions, setRecipientOptions] = useState([]);
+  const [notifySending, setNotifySending] = useState(false);
 
+  const openSnack = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
   const flaggedDays = useMemo(() => {
@@ -294,18 +287,7 @@ export default function Anomaly() {
     const q = search.trim().toLowerCase();
     return scoredDays.filter((r) => {
       const day = String(r.day || r.date || r.timestamp || "").toLowerCase();
-      const station =
-        String(
-          r.station_name ||
-            r.stationName ||
-            r.site_name ||
-            r.site ||
-            r.tank_name ||
-            r.tankName ||
-            r.station_id ||
-            r.stationId ||
-            ""
-        ).toLowerCase();
+      const station = String(r.station_name || r.stationName || r.site_name || r.site || r.tank_name || r.tankName || r.station_id || r.stationId || "").toLowerCase();
       const fuel = String(r.fuel_type || r.fuelType || r.item || "").toLowerCase();
       const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
 
@@ -374,7 +356,6 @@ export default function Anomaly() {
     }
   }, [file, decisionThreshold]);
 
-  // Auto re-run scan when threshold changes (same file already scanned)
   useEffect(() => {
     if (!file) return;
     if (lastFileNameRef.current === file.name) {
@@ -399,76 +380,11 @@ export default function Anomaly() {
   };
 
   // -----------------------------
-  // ✅ NOTIFY RESPONSIBLE STAFF (safe notification module)
-  // -----------------------------
-  const handleNotifyResponsible = useCallback(async () => {
-    if (!file) {
-      openSnack("Please upload a file first.", "warning");
-      return;
-    }
-    if (!scoredDays.length) {
-      openSnack("Run ML scan first.", "warning");
-      return;
-    }
-
-    // Only notify if there is at least one flagged anomaly
-    const flagged = scoredDays.filter((r) => {
-      const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
-      return pred === 1 || pred === true;
-    });
-
-    if (!flagged.length) {
-      openSnack("No flagged anomalies found. Nothing to notify.", "info");
-      return;
-    }
-
-    setNotifying(true);
-    try {
-      const payload = {
-        triggeredBy: "manual",
-        fileName: file?.name || "",
-        threshold: decisionThreshold,
-        params: {}, // optional (later you can pass gap_tol/reset_tol/no_sales_drop_tol)
-        rows: scoredDays, // backend expects rows[]
-        events: events,
-      };
-
-      const res = await fetch(NOTIFY_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.message || "Notification failed");
-      }
-
-      const level = data?.level ?? "?";
-      const suppressed = data?.suppressed ? " (suppressed by cooldown)" : "";
-      openSnack(`✅ Notification processed (Alert Level ${level})${suppressed}`, "success");
-    } catch (e) {
-      openSnack(`❌ ${e?.message || "Notify failed"}`, "error");
-    } finally {
-      setNotifying(false);
-    }
-  }, [file, scoredDays, events, decisionThreshold]);
-
-  // -----------------------------
-  // Row mapper (keeps your defensive keys)
+  // Row mapper
   // -----------------------------
   const mapRow = (r) => {
     const day = r.day || r.date || r.timestamp || "-";
-    const station =
-      r.station_name ||
-      r.stationName ||
-      r.site_name ||
-      r.site ||
-      r.tank_name ||
-      r.tankName ||
-      r.station_id ||
-      r.stationId ||
-      "-";
+    const station = r.station_name || r.stationName || r.site_name || r.site || r.tank_name || r.tankName || r.station_id || r.stationId || "-";
     const fuel = r.fuel_type || r.fuelType || r.item || "-";
     const score = r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0;
     const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
@@ -477,19 +393,92 @@ export default function Anomaly() {
   };
 
   // -----------------------------
+  // ✅ Open notify form
+  // -----------------------------
+  const openNotifyForm = async () => {
+    // try best station
+    const stationGuess =
+      maxScoreRow?.stationId ||
+      maxScoreRow?.station_id ||
+      maxScoreRow?.station_name ||
+      maxScoreRow?.site ||
+      "UNKNOWN";
+
+    setNotifyStation(String(stationGuess || "UNKNOWN"));
+    setNotifyMessage(
+      maxScoreRow?.reason
+        ? `Detected anomaly: ${String(maxScoreRow.reason).slice(0, 180)}`
+        : "Please review the detected anomalies and take action."
+    );
+    setNotifyOpen(true);
+
+    // load recipient options
+    try {
+      const url = `${BACKEND}/api/notifications/recipients?station_id=${encodeURIComponent(String(stationGuess || ""))}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (res.ok && data?.ok) {
+        setRecipientOptions(Array.isArray(data.recipients) ? data.recipients : []);
+      }
+    } catch {
+      // ignore - UI still works
+    }
+  };
+
+  // -----------------------------
+  // ✅ Send manual notification
+  // -----------------------------
+  const handleSendManual = async () => {
+    if (!notifyRoles.length) {
+      openSnack("Select at least one role.", "warning");
+      return;
+    }
+
+    setNotifySending(true);
+    try {
+      const payload = {
+        station_id: notifyStation,
+        severity: notifySeverity, // Advisory/Warning/Critical
+        channel: notifyChannel,   // email
+        roles: notifyRoles,       // ["SUPERVISOR","MANAGER"]
+        message: notifyMessage,
+
+        // attach scan context (for audit + email preview)
+        threshold: decisionThreshold,
+        file_name: file?.name || "",
+        rows: scoredDays,
+        events: events,
+      };
+
+      const res = await fetch(`${BACKEND}/api/notifications/send-manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to send alert");
+      }
+
+      openSnack(data?.message || "Alert sent", data?.status === "sent" ? "success" : "warning");
+      setNotifyOpen(false);
+    } catch (e) {
+      openSnack(`❌ ${e?.message || "Error"}`, "error");
+    } finally {
+      setNotifySending(false);
+    }
+  };
+
+  // -----------------------------
   // Render
   // -----------------------------
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1500, mx: "auto" }}>
-      {/* Hero header */}
       <GlassCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            alignItems={{ md: "center" }}
-            justifyContent="space-between"
-          >
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between">
             <Box sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box
@@ -516,8 +505,7 @@ export default function Anomaly() {
               </Stack>
 
               <Typography variant="body2" sx={{ mt: 1, color: "text.secondary", maxWidth: 860 }}>
-                Upload monthly report → run ML scan → review scored days + grouped events. Adjust threshold to see results
-                update automatically for the same file.
+                Upload monthly report → run ML scan → review scored days + grouped events. Adjust threshold to see results update automatically for the same file.
               </Typography>
             </Box>
 
@@ -577,9 +565,7 @@ export default function Anomaly() {
                   height: 10,
                   borderRadius: 999,
                   bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.08),
-                  "& .MuiLinearProgress-bar": {
-                    borderRadius: 999,
-                  },
+                  "& .MuiLinearProgress-bar": { borderRadius: 999 },
                 }}
               />
               <Typography variant="caption" sx={{ display: "block", mt: 0.8, color: "text.secondary" }}>
@@ -596,7 +582,6 @@ export default function Anomaly() {
         </Alert>
       ) : null}
 
-      {/* Upload + Threshold + Filters */}
       <GlassCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
           <Grid container spacing={2} alignItems="center">
@@ -620,12 +605,7 @@ export default function Anomaly() {
                 }}
               >
                 {file ? `Selected: ${file.name}` : "Upload CSV / XLSX"}
-                <input
-                  hidden
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  onChange={(e) => onPickFile(e.target.files?.[0] || null)}
-                />
+                <input hidden type="file" accept=".csv,.xlsx,.xls" onChange={(e) => onPickFile(e.target.files?.[0] || null)} />
               </Button>
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
@@ -714,51 +694,27 @@ export default function Anomaly() {
         </Box>
       </GlassCard>
 
-      {/* KPI cards */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard
-            label="Scored Days"
-            value={scoredDays.length}
-            sub="Rows processed by model"
-            tone="primary"
-            icon={<TableChartRoundedIcon />}
-          />
+          <MetricCard label="Scored Days" value={scoredDays.length} sub="Rows processed by model" tone="primary" icon={<TableChartRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard
-            label="Flagged Days"
-            value={flaggedDays.length}
-            sub="Predicted irregularities"
-            tone="danger"
-            icon={<WarningAmberRoundedIcon />}
-          />
+          <MetricCard label="Flagged Days" value={flaggedDays.length} sub="Predicted irregularities" tone="danger" icon={<WarningAmberRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard
-            label="Threshold"
-            value={decisionThreshold}
-            sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set then scan"}
-            tone="success"
-            icon={<TuneRoundedIcon />}
-          />
+          <MetricCard label="Threshold" value={decisionThreshold} sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set then scan"} tone="success" icon={<TuneRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             label="Avg Score"
             value={safeFixed(avgScore)}
-            sub={
-              maxScoreRow
-                ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})`
-                : "No data yet"
-            }
+            sub={maxScoreRow ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})` : "No data yet"}
             tone="warning"
             icon={<WhatshotRoundedIcon />}
           />
         </Grid>
       </Grid>
 
-      {/* Tabs */}
       <GlassCard sx={{ mb: 2 }}>
         <Box sx={{ px: 2, pt: 1.5 }}>
           <Tabs
@@ -804,7 +760,6 @@ export default function Anomaly() {
 
         <Divider sx={{ opacity: 0.6 }} />
 
-        {/* Overview */}
         {tab === 0 ? (
           <Box sx={{ p: { xs: 2.25, md: 3 } }}>
             <Grid container spacing={2}>
@@ -818,8 +773,7 @@ export default function Anomaly() {
                   </Stack>
 
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    This scanner flags days that look abnormal based on the uploaded station report. Increase the threshold
-                    to reduce false positives; decrease it to catch more anomalies.
+                    This scanner flags days that look abnormal based on the uploaded station report. Increase the threshold to reduce false positives; decrease it to catch more anomalies.
                   </Typography>
 
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
@@ -832,25 +786,13 @@ export default function Anomaly() {
                         border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
                       }}
                     />
-                    <Chip
-                      icon={<WarningAmberRoundedIcon />}
-                      label={`Flagged: ${flaggedDays.length}`}
-                      color="error"
-                      variant="outlined"
-                      sx={{ fontWeight: 900 }}
-                    />
-                    <Chip
-                      icon={<TableChartRoundedIcon />}
-                      label={`Scored: ${scoredDays.length}`}
-                      color="primary"
-                      variant="outlined"
-                      sx={{ fontWeight: 900 }}
-                    />
+                    <Chip icon={<WarningAmberRoundedIcon />} label={`Flagged: ${flaggedDays.length}`} color="error" variant="outlined" sx={{ fontWeight: 900 }} />
+                    <Chip icon={<TableChartRoundedIcon />} label={`Scored: ${scoredDays.length}`} color="primary" variant="outlined" sx={{ fontWeight: 900 }} />
                   </Stack>
 
                   <Divider sx={{ my: 2, opacity: 0.6 }} />
 
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center" flexWrap="wrap">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Button
                       variant="outlined"
                       startIcon={<DownloadRoundedIcon />}
@@ -871,18 +813,16 @@ export default function Anomaly() {
                       Export events (CSV)
                     </Button>
 
-                    {/* ✅ NEW: Notify button */}
+                    {/* ✅ NEW: open form */}
                     <Button
                       variant="contained"
                       color="error"
-                      startIcon={
-                        notifying ? <CircularProgress size={18} color="inherit" /> : <WarningAmberRoundedIcon />
-                      }
-                      disabled={notifying || !scoredDays.length || flaggedDays.length === 0}
-                      onClick={handleNotifyResponsible}
+                      startIcon={<WarningAmberRoundedIcon />}
+                      disabled={!scoredDays.length}
+                      onClick={openNotifyForm}
                       sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
                     >
-                      {notifying ? "Notifying..." : "Notify Responsible Staff"}
+                      Notify Responsible Staff
                     </Button>
                   </Stack>
 
@@ -965,9 +905,6 @@ export default function Anomaly() {
                 }}
               />
             </Stack>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Consecutive flagged days grouped into events.
-            </Typography>
 
             <Divider sx={{ mb: 2, opacity: 0.6 }} />
 
@@ -979,7 +916,7 @@ export default function Anomaly() {
                 elevation={0}
                 sx={{
                   borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
                   bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
                 }}
               >
@@ -1006,7 +943,7 @@ export default function Anomaly() {
                             label={String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
                             sx={{
                               fontWeight: 900,
-                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.1),
+                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
                               border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
                             }}
                           />
@@ -1035,29 +972,10 @@ export default function Anomaly() {
                 sx={{
                   ml: 1,
                   fontWeight: 900,
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.1),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
                   border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
                 }}
               />
-              {showOnlyFlagged ? (
-                <Chip label="Flagged only" size="small" color="error" variant="outlined" sx={{ fontWeight: 900 }} />
-              ) : null}
-
-              <Box sx={{ flex: 1 }} />
-
-              <Tooltip title="Export currently shown rows">
-                <span>
-                  <Button
-                    variant="outlined"
-                    startIcon={<DownloadRoundedIcon />}
-                    disabled={!filteredScoredDays.length}
-                    onClick={() => downloadCSV("scored_days_view.csv", filteredScoredDays.map(mapRow))}
-                    sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
-                  >
-                    Export view
-                  </Button>
-                </span>
-              </Tooltip>
             </Stack>
 
             <Divider sx={{ mb: 2, opacity: 0.6 }} />
@@ -1071,7 +989,7 @@ export default function Anomaly() {
                 sx={{
                   maxHeight: 560,
                   borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
                   bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
                 }}
               >
@@ -1106,18 +1024,12 @@ export default function Anomaly() {
                               size="small"
                               sx={{
                                 fontWeight: 900,
-                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.16 : 0.1),
+                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.16 : 0.10),
                                 border: `1px solid ${alpha(theme.palette.secondary.main, 0.18)}`,
                               }}
                             />
                           </TableCell>
-                          <TableCell
-                            align="right"
-                            sx={{
-                              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                              fontWeight: 900,
-                            }}
-                          >
+                          <TableCell align="right" sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontWeight: 900 }}>
                             {safeFixed(row.score)}
                           </TableCell>
                           <TableCell>
@@ -1135,23 +1047,108 @@ export default function Anomaly() {
                 </Table>
               </TableContainer>
             )}
-
-            {filteredScoredDays.length > 500 ? (
-              <Typography variant="caption" sx={{ display: "block", mt: 1.2, color: "text.secondary" }}>
-                Showing first 500 rows only. Use Export to download full filtered data.
-              </Typography>
-            ) : null}
           </Box>
         ) : null}
       </GlassCard>
 
+      {/* ✅ Notification Form Dialog */}
+      <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 950 }}>
+          Send Notification to Responsible Staff
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Station ID"
+              value={notifyStation}
+              onChange={(e) => setNotifyStation(e.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              select
+              label="Severity"
+              value={notifySeverity}
+              onChange={(e) => setNotifySeverity(e.target.value)}
+              fullWidth
+              helperText="Severity controls escalation + cooldown."
+            >
+              <MenuItem value="Advisory">Advisory</MenuItem>
+              <MenuItem value="Warning">Warning</MenuItem>
+              <MenuItem value="Critical">Critical</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Channel"
+              value={notifyChannel}
+              onChange={(e) => setNotifyChannel(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="email">Email</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Recipient Roles"
+              fullWidth
+              SelectProps={{
+                multiple: true,
+                renderValue: (selected) => selected.join(", "),
+              }}
+              value={notifyRoles}
+              onChange={(e) => setNotifyRoles(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+              helperText="Choose which roles should receive the alert."
+            >
+              {["SUPERVISOR", "MANAGER", "SENIOR_MANAGER"].map((role) => (
+                <MenuItem key={role} value={role}>
+                  <Checkbox checked={notifyRoles.indexOf(role) > -1} />
+                  <ListItemText primary={role} />
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Message"
+              value={notifyMessage}
+              onChange={(e) => setNotifyMessage(e.target.value)}
+              fullWidth
+              multiline
+              minRows={4}
+              placeholder="Explain what was detected and what action is required."
+            />
+
+            <GlassCard sx={{ p: 1.5 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Recipients available in DB for this station:
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                {recipientOptions.length
+                  ? recipientOptions.map((u) => `${u.role}: ${u.email}`).join(" • ")
+                  : "No recipients loaded (seed users first)."}
+              </Typography>
+            </GlassCard>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setNotifyOpen(false)} sx={{ borderRadius: 2, fontWeight: 900 }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleSendManual}
+            disabled={notifySending}
+            startIcon={notifySending ? <CircularProgress size={18} color="inherit" /> : <WarningAmberRoundedIcon />}
+            sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+          >
+            {notifySending ? "Sending…" : "Send Alert"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={closeSnack}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
+      <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={closeSnack} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
         <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%", borderRadius: 2 }}>
           {snackbar.message}
         </Alert>

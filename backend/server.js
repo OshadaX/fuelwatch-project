@@ -17,6 +17,7 @@ const uploadRoutes = require("./src/routes/member1-kumara/upload.routes");
 const employeeRoutes = require("./src/routes/member3-oshada/employee.routes");
 const attendanceRoutes = require("./src/routes/member3-oshada/attendance.routes");
 const notificationRoutes = require("./src/routes/member1-kumara/notificationRoutes");
+const seedRoutes = require("./src/routes/member1-kumara/seedRoutes");
 
 
 // (Optional) Models: only needed if you rely on auto-index creation or model side-effects.
@@ -61,6 +62,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/seed", seedRoutes);
 
 
 /* ===========================

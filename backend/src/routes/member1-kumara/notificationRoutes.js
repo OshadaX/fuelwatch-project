@@ -1,13 +1,19 @@
 const express = require("express");
 const router = express.Router();
 
-// ✅ correct path from routes/member1-kumara -> controllers/member1-kumara
 const {
   notifyFromScan,
   listNotifications,
+  getRecipients,
+  sendManualNotification,
 } = require("../../controllers/member1-kumara/notificationController");
 
+// existing
 router.post("/from-scan", notifyFromScan);
 router.get("/", listNotifications);
+
+// ✅ new
+router.get("/recipients", getRecipients);
+router.post("/send-manual", sendManualNotification);
 
 module.exports = router;
