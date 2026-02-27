@@ -95,39 +95,45 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
 
             {/* NAVIGATION */}
             <nav className="flex-1 flex flex-col gap-2 px-2 overflow-y-auto custom-scrollbar">
-                {!user ? (
-                    <div className="px-4 py-8 text-center text-slate-400 text-sm italic">
-                        Access Restricted
-                    </div>
-                ) : (
-                    filteredMenuItems.map((item, idx) => (
-                        <div key={idx} className="mb-4">
-                            {!isCollapsed && (
-                                <div className="text-[0.75rem] uppercase text-[#64748b] mt-6 mb-2 ml-4 font-semibold whitespace-nowrap">
-                                    {item.title} ({item.member})
-                                </div>
-                            )}
+                {(user ? filteredMenuItems : [
+                    {
+                        title: "Guest Services",
+                        member: "Customer",
+                        features: [
+                            { name: "Home", path: "/" },
+                            { name: "Customer", path: "/customer" },
+                            { name: "EV Station", path: "/ev-station" },
+                            { name: "Fuel Station", path: "/fuel-station" }
+                        ]
+                    }
+                ]).map((item, idx) => (
+                    <div key={idx} className="mb-4">
+                        {!isCollapsed && (
+                            <div className="text-[0.75rem] uppercase text-[#64748b] mt-6 mb-2 ml-4 font-semibold whitespace-nowrap">
+                                {item.title} ({item.member})
+                            </div>
+                        )}
 
-                            {item.features.map((feature, fIdx) => (
-                                <div
-                                    key={fIdx}
-                                    className={`flex items-center py-3 px-4 rounded-lg transition-all duration-200 cursor-pointer whitespace-nowrap hover:bg-white/10 active:scale-95 ${isCollapsed ? 'justify-center' : ''
-                                        }`}
-                                    onClick={() => handleClick(feature)}
-                                    title={isCollapsed ? feature.name : ''}
-                                >
-                                    {isCollapsed ? (
-                                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                                    ) : (
-                                        <span className="text-slate-300 hover:text-white transition-colors">
-                                            {feature.name}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ))
-                )}
+                        {item.features.map((feature, fIdx) => (
+                            <div
+                                key={fIdx}
+                                className={`flex items-center py-3 px-4 rounded-lg transition-all duration-200 cursor-pointer whitespace-nowrap hover:bg-white/10 active:scale-95 ${isCollapsed ? 'justify-center' : ''
+                                    }`}
+                                onClick={() => handleClick(feature)}
+                                title={isCollapsed ? feature.name : ''}
+                            >
+                                {isCollapsed ? (
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                ) : (
+                                    <span className="text-slate-300 hover:text-white transition-colors">
+                                        {feature.name}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+
             </nav>
 
             {/* AUTH ACTIONS */}

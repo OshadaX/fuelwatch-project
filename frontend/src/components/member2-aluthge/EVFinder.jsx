@@ -1,0 +1,267 @@
+import React, { useState, useEffect } from 'react';
+import { MapPin, Navigation, ArrowRight, Zap, ChevronLeft, BatteryCharging, CheckCircle, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const EVFinder = () => {
+    const [step, setStep] = useState(1); // 1: Form, 2: Loading, 3: Result
+    const [location, setLocation] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+    const [error, setError] = useState(null);
+
+    // Mock data for EV stations
+    const mockStations = [
+        { id: 1, name: "City Center EV Hub", lat: 6.9271, lng: 79.8612, address: "123 Main St, Colombo", status: "Open" },
+        { id: 2, name: "Green Park Charging", lat: 6.9320, lng: 79.8550, address: "45 Park Ave, Colombo", status: "Closed" },
+        { id: 3, name: "TechZone Charger", lat: 6.9100, lng: 79.8700, address: "88 Tech Rd, Colombo", status: "Open" },
+    ];
+
+    const getTimeOfDay = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good Morning";
+        if (hour < 18) return "Good Afternoon";
+        return "Good Evening";
+    };
+
+    const handleGetLocation = () => {
+        setLoading(true);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setLocation({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                    setLoading(false);
+                },
+                (err) => {
+                    setError("Unable to retrieve your location. Please enable GPS.");
+                    setLoading(false);
+                    // Fallback for demo if GPS fails/denied
+                    setLocation({ lat: 6.9270, lng: 79.8610 }); 
+                }
+            );
+        } else {
+            setError("Geolocation is not supported by your browser.");
+            setLoading(false);
+        }
+    };
+
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371; // Radius of the earth in km
+        const dLat = deg2rad(lat2 - lat1);
+        const dLon = deg2rad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const d = R * c; // Distance in km
+        return d;
+    };
+
+    const deg2rad = (deg) => {
+        return deg * (Math.PI / 180);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setStep(2);
+        
+        // Simulate API call and calculation
+        setTimeout(() => {
+            if (!location) {
+                // If location wasn't set (e.g. manual entry not implemented yet), use default
+                const defaultLoc = { lat: 6.9270, lng: 79.8610 };
+                findNearestStation(defaultLoc);
+            } else {
+                findNearestStation(location);
+            }
+        }, 1500);
+    };
+
+    const findNearestStation = (userLoc) => {
+        const stationsWithDist = mockStations.map(station => ({
+            ...station,
+            distance: calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng)
+        }));
+
+        // Sort by distance
+        stationsWithDist.sort((a, b) => a.distance - b.distance);
+
+        // Recommend nearest (ignoring availability as per requirements)
+        if (stationsWithDist.length > 0) {
+            setResult(stationsWithDist[0]);
+            setStep(3);
+        } else {
+            setError("No stations found nearby.");
+            setStep(1);
+        }
+    };
+
+    const resetForm = () => {
+        setStep(1);
+        setResult(null);
+        setError(null);
+    };
+
+    useEffect(() => {
+        handleGetLocation();
+    }, []);
+
+    return (
+        <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center justify-center relative overflow-hidden">
+             {/* Background Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-blue-200/30 rounded-full blur-3xl" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-green-200/30 rounded-full blur-3xl" />
+            </div>
+
+            <div className="w-full max-w-md z-10">
+                <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-8 text-center"
+                >
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg text-white mb-4">
+                        <Zap size={32} />
+                    </div>
+                    <h1 className="text-3xl font-bold text-slate-800">EV Station Finder</h1>
+                    <p className="text-slate-500 mt-2">Find the nearest charging point in seconds</p>
+                </motion.div>
+
+                <AnimatePresence mode="wait">
+                    {step === 1 && (
+                        <motion.div
+                            key="form"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="bg-white rounded-3xl shadow-xl p-8 border border-white/50 backdrop-blur-sm"
+                        >
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        Current Location
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <MapPin className={`h-5 w-5 ${location ? 'text-green-500' : 'text-slate-400'}`} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Detecting location..."}
+                                            className="block w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl text-slate-800 font-medium focus:ring-2 focus:ring-blue-500/20 transition-all cursor-not-allowed"
+                                        />
+                                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                                            {loading && <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>}
+                                        </div>
+                                    </div>
+                                    {error && <p className="text-red-500 text-xs mt-2 ml-1">{error}</p>}
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading || !location}
+                                    className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-semibold shadow-lg shadow-slate-900/20 transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span>Find Nearest Station</span>
+                                    <ArrowRight size={20} />
+                                </button>
+                            </form>
+                        </motion.div>
+                    )}
+
+                    {step === 2 && (
+                        <motion.div
+                            key="loading"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="bg-white/80 rounded-3xl shadow-xl p-12 text-center backdrop-blur-sm"
+                        >
+                            <div className="relative w-24 h-24 mx-auto mb-6">
+                                <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                                <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <BatteryCharging className="text-blue-500 animate-pulse" size={32} />
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Analyzing Routes</h3>
+                            <p className="text-slate-500 text-sm">Finding the best charging spot for you...</p>
+                        </motion.div>
+                    )}
+
+                    {step === 3 && result && (
+                        <motion.div
+                            key="result"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100"
+                        >
+                            <div className="bg-slate-900 p-6 text-white relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-6 opacity-10">
+                                    <Zap size={120} />
+                                </div>
+                                <div className="relative z-10">
+                                    <span className="inline-block px-3 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-full mb-3 border border-green-500/20">
+                                        NEAREST STATION
+                                    </span>
+                                    <h2 className="text-2xl font-bold mb-1">{result.name}</h2>
+                                    <p className="text-slate-400 text-sm flex items-center gap-1">
+                                        <MapPin size={14} />
+                                        {result.address}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="p-6">
+                                <div className="grid grid-cols-2 gap-4 mb-8">
+                                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                        <p className="text-slate-500 text-xs font-semibold uppercase mb-1">Distance</p>
+                                        <p className="text-2xl font-bold text-blue-600">{result.distance.toFixed(1)} <span className="text-sm text-slate-500 font-medium">km</span></p>
+                                    </div>
+                                    <div className={`p-4 rounded-2xl border ${result.status === 'Open' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                                        <p className="text-slate-500 text-xs font-semibold uppercase mb-1">Status</p>
+                                        <p className={`text-2xl font-bold ${result.status === 'Open' ? 'text-green-600' : 'text-red-500'}`}>
+                                            {result.status}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => window.alert("Station Confirmed! Navigation started.")} // Mock action
+                                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    >
+                                        <Navigation size={20} />
+                                        Confirm Station
+                                    </button>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={resetForm}
+                                            className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <ChevronLeft size={18} />
+                                            Back
+                                        </button>
+                                         <button
+                                            onClick={() => window.location.href = '/'} 
+                                            className="py-3 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-colors"
+                                        >
+                                            Home
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
+    );
+};
+
+export default EVFinder;
