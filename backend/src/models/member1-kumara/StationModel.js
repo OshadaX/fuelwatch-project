@@ -41,7 +41,10 @@ const StationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Extra safety index (recommended)
+// Unique Station ID
 StationSchema.index({ Id: 1 }, { unique: true });
+
+// Unique Person NIC (VERY IMPORTANT)
+StationSchema.index({ "person.Id": 1 }, { unique: true });
 
 module.exports = mongoose.model("Station", StationSchema);
