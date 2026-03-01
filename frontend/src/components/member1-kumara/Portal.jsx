@@ -4,7 +4,6 @@ import axios from "axios";
 import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import toast, { Toaster } from "react-hot-toast";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 import {
@@ -14,12 +13,9 @@ import {
   Plus,
   Trash2,
   Save,
-  Search,
   Pencil,
   X,
   RefreshCw,
-  CheckCircle2,
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -34,12 +30,9 @@ const http = axios.create({ baseURL: API_BASE, headers: { "Content-Type": "appli
    SweetAlert (single place)
 ---------------------------- */
 const MySwal = withReactContent(Swal);
-const alertOk = (title, text = "") =>
-  MySwal.fire({ icon: "success", title, text, confirmButtonText: "OK" });
-const alertErr = (title, text = "") =>
-  MySwal.fire({ icon: "error", title, text, confirmButtonText: "OK" });
-const alertInfo = (title, text = "") =>
-  MySwal.fire({ icon: "info", title, text, confirmButtonText: "OK" });
+const alertOk = (title, text = "") => MySwal.fire({ icon: "success", title, text, confirmButtonText: "OK" });
+const alertErr = (title, text = "") => MySwal.fire({ icon: "error", title, text, confirmButtonText: "OK" });
+const alertInfo = (title, text = "") => MySwal.fire({ icon: "info", title, text, confirmButtonText: "OK" });
 const confirmBox = async (title, text = "Are you sure?") => {
   const r = await MySwal.fire({
     icon: "warning",
@@ -52,45 +45,26 @@ const confirmBox = async (title, text = "Are you sure?") => {
   return r.isConfirmed;
 };
 
+/* ----------------------------
+   Allowed Districts (Sri Lanka)
+---------------------------- */
 const allowedDistricts = [
-  "Ampara",
-  "Anuradhapura",
-  "Badulla",
-  "Batticaloa",
-  "Colombo",
-  "Galle",
-  "Gampaha",
-  "Hambantota",
-  "Jaffna",
-  "Kalutara",
-  "Kandy",
-  "Kegalle",
-  "Kilinochchi",
-  "Kurunegala",
-  "Mannar",
-  "Matale",
-  "Matara",
-  "Monaragala",
-  "Mullaitivu",
-  "Nuwara Eliya",
-  "Polonnaruwa",
-  "Puttalam",
-  "Ratnapura",
-  "Trincomalee",
-  "Vavuniya",
+  "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara",
+  "Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya",
+  "Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya",
 ];
 
 /* ----------------------------
-   Validation (LOGIC SAME)
+   Validation Regex
 ---------------------------- */
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/;
-const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
-const personIdRegex = /^(?:\d{9}[Vv]|\d{12})$/;
-const personNameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/;
-const designationRegex = /^MANAGER$/;
-const gmailRegex = /^[a-z0-9._%+-]+@gmail\.com$/;
-const phoneRegex = /^0[1-9]\d-\d{4}-\d{3}$/;
+const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/; // PUCSL/PRL/1234/2026
+const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/; // letters + spaces only
+const personIdRegex = /^(?:\d{9}[Vv]|\d{12})$/; // old NIC 9+V/v OR new NIC 12 digits
+const personNameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/; // Two names, first letters capital
+const designationRegex = /^MANAGER$/; // only MANAGER
+const gmailRegex = /^[a-z0-9._%+-]+@gmail\.com$/; // only gmail, no capitals
+const phoneRegex = /^0[1-9]\d-\d{4}-\d{3}$/; // 071-1234-567 (2nd digit not 0)
 
 const allowedFuelTypes = [
   "Lanka Auto Diesel",
@@ -100,43 +74,27 @@ const allowedFuelTypes = [
   "Kerosene",
 ];
 
+/* ----------------------------
+   ZOD Schema
+---------------------------- */
 const schema = z
   .object({
-    Id: z
-      .string()
-      .trim()
-      .min(3, "Station Id is required")
-      .max(20, "Max 20 characters")
-      .regex(stationIdRegex),
-    
-
-    Name: z
-      .string()
-      .trim()
-      .regex(
-    stationNameRegex,
-    "Station name must contain letters and spaces only"
-    ),
-
+    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/1234/202X only"),
+    Name: z.string().trim().regex(stationNameRegex, "Only letters + spaces (no numbers/special chars)"),
     Location: z
       .string()
       .trim()
       .min(1, "District is required")
-      .refine((v) => allowedDistricts.includes(v), "Enter district (First letter must be capital)"),
+      .refine((v) => allowedDistricts.includes(v), "Select a valid Sri Lanka district (First letter capital)"),
 
     person: z.object({
-      Id: z.string().trim().regex(personIdRegex, "NIC must be in the correct format"),
-
-    PersonName: z
-        .string()
-        .trim()
-        .regex(personNameRegex, "Ex - Alen Smith"),
-
-    PersonDesignation: z.string().trim().regex(designationRegex, 'Give the correct designation'),
-    PersonEmail: z.string().trim().regex(gmailRegex,'Email must be in the correct format'),
-    ContactNumber: z.string().trim().regex(phoneRegex,'Contact number must be in correct format'),
-    StartTime: z.string().trim().regex(timeRegex, "Time must be HH:mm (24-hour)"),
-    EndTime: z.string().trim().regex(timeRegex, "Time must be HH:mm (24-hour)"),
+      Id: z.string().trim().regex(personIdRegex, "NIC must be 9 digits + V/v OR 12 digits"),
+      PersonName: z.string().trim().regex(personNameRegex, "Use 2 names with capitals (Ex: Alen Smith)"),
+      PersonDesignation: z.string().trim().regex(designationRegex, "Only MANAGER is allowed"),
+      PersonEmail: z.string().trim().regex(gmailRegex, "Only xxxxx@gmail.com allowed (no capitals)"),
+      ContactNumber: z.string().trim().regex(phoneRegex, "Use 071-1234-567 format (2nd digit cannot be 0)"),
+      StartTime: z.string().trim().regex(timeRegex, "Select a time"),
+      EndTime: z.string().trim().regex(timeRegex, "Select a time"),
     }),
 
     tanks: z
@@ -149,18 +107,18 @@ const schema = z
             .refine((v) => allowedFuelTypes.includes(v), "Select a valid fuel type from the list"),
           number_of_tanks: z.coerce.number().int().min(1, "Min 1").max(50, "Max 50"),
           tank_index: z.coerce.number().int().min(1, "Min 1").max(200, "Too large"),
-          tank_capacity: z.coerce.number().min(500, "Capacity too low (min 500L)").max(100000, "Capacity too high (max 100000L)"),
+          tank_capacity: z.coerce.number().min(500, "Min 500L").max(100000, "Max 100000L"),
         })
       )
       .min(1, "At least one tank is required")
       .max(50, "Too many tanks (max 50)"),
   })
   .superRefine((data, ctx) => {
+    // Start/End time order
     const toMins = (t) => {
       const [h, m] = t.split(":").map(Number);
       return h * 60 + m;
     };
-
     if (data?.person?.StartTime && data?.person?.EndTime) {
       if (toMins(data.person.EndTime) <= toMins(data.person.StartTime)) {
         ctx.addIssue({
@@ -171,8 +129,9 @@ const schema = z
       }
     }
 
+    // Unique tank index per fuel type
     const seen = new Set();
-    data.tanks.forEach((t, i) => {
+    (data.tanks || []).forEach((t, i) => {
       const key = `${t.fuel_type}::${t.tank_index}`;
       if (seen.has(key)) {
         ctx.addIssue({
@@ -180,14 +139,22 @@ const schema = z
           path: ["tanks", i, "tank_index"],
           message: "Tank index must be unique per fuel type",
         });
-      } else {
-        seen.add(key);
-      }
+      } else seen.add(key);
     });
   });
 
 /* ----------------------------
-   Simple, readable UI helpers
+   Time dropdown (every 30 min)
+---------------------------- */
+const timeOptions = Array.from({ length: 48 }, (_, i) => {
+  const mins = i * 30;
+  const h = String(Math.floor(mins / 60)).padStart(2, "0");
+  const m = String(mins % 60).padStart(2, "0");
+  return `${h}:${m}`;
+});
+
+/* ----------------------------
+   UI helpers
 ---------------------------- */
 const S = {
   app: { minHeight: "100vh", background: "#F3F6FB", color: "#0F172A" },
@@ -219,28 +186,6 @@ const S = {
     if (tone === "danger") return { ...base, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.22)", color: "#DC2626" };
     if (tone === "soft") return { ...base, background: "rgba(15,23,42,0.04)" };
     return base;
-  },
-  pill: (tone) => {
-    const map = {
-      ok: { bg: "rgba(22,163,74,0.10)", bd: "rgba(22,163,74,0.25)", fg: "#166534" },
-      bad: { bg: "rgba(220,38,38,0.10)", bd: "rgba(220,38,38,0.25)", fg: "#7F1D1D" },
-      warn: { bg: "rgba(245,158,11,0.12)", bd: "rgba(245,158,11,0.25)", fg: "#92400E" },
-      info: { bg: "rgba(37,99,235,0.10)", bd: "rgba(37,99,235,0.25)", fg: "#1D4ED8" },
-      neutral: { bg: "rgba(15,23,42,0.04)", bd: "rgba(15,23,42,0.12)", fg: "#0F172A" },
-    }[tone || "neutral"];
-    return {
-      display: "inline-flex",
-      gap: 8,
-      alignItems: "center",
-      padding: "6px 10px",
-      borderRadius: 999,
-      background: map.bg,
-      border: `1px solid ${map.bd}`,
-      color: map.fg,
-      fontSize: 12,
-      fontWeight: 900,
-      whiteSpace: "nowrap",
-    };
   },
   label: { fontSize: 12.5, fontWeight: 900, marginBottom: 6 },
   inputWrap: (invalid) => ({
@@ -323,27 +268,24 @@ const steps = [
   { key: "tanks", title: "Tank Details", icon: Droplets },
 ];
 
-/* ----------------------------
-   MAIN (LOGIC UNCHANGED)
----------------------------- */
 export default function Portal() {
   const [activeStep, setActiveStep] = useState(0);
-
   const [loadingList, setLoadingList] = useState(false);
   const [stations, setStations] = useState([]);
   const [total, setTotal] = useState(0);
-  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
 
   const [editingId, setEditingId] = useState(null);
   const isEditing = !!editingId;
 
-  const [view, setView] = useState("table");
   const [quickFuel, setQuickFuel] = useState("all");
-
   const [activeTab, setActiveTab] = useState("portal");
+
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState(null);
+
+  // 🔒 Registry lock
+  const [pucslId, setPucslId] = useState("");
 
   const defaultValues = useMemo(
     () => ({
@@ -370,7 +312,7 @@ export default function Portal() {
 
   const { fields, append, remove } = useFieldArray({ control, name: "tanks" });
 
-  // autosave draft (only in create mode)
+  // autosave draft (only create mode)
   useEffect(() => {
     const sub = watch((val) => {
       if (!isEditing) localStorage.setItem("fuelwatch_portal_draft", JSON.stringify(val));
@@ -382,24 +324,21 @@ export default function Portal() {
     if (!isEditing) {
       const draft = localStorage.getItem("fuelwatch_portal_draft");
       if (draft) {
-        try {
-          reset(JSON.parse(draft));
-        } catch {}
+        try { reset(JSON.parse(draft)); } catch {}
       }
     }
   }, [reset, isEditing]);
 
-  async function fetchStations(nextPage = 1, nextQ = "") {
+  async function fetchStations(nextPage = 1, q = "") {
     setLoadingList(true);
     try {
-      const { data } = await http.get("/station", { params: { page: nextPage, limit: 10, q: nextQ } });
-      if (Array.isArray(data)) {
-        setStations(data);
-        setTotal(data.length);
-      } else {
-        setStations(data.items || []);
-        setTotal(data.total ?? (data.items ? data.items.length : 0));
-      }
+      const { data } = await http.get("/station", { params: { page: nextPage, limit: 10, q } });
+
+      const items = Array.isArray(data) ? data : data.items || [];
+      const onlyMine = q ? items.filter((s) => (s.Id || "").toUpperCase() === q.toUpperCase()) : items;
+
+      setStations(onlyMine);
+      setTotal(q ? onlyMine.length : (Array.isArray(data) ? data.length : (data.total ?? items.length)));
     } catch (e) {
       await alertErr("Failed", e?.response?.data?.message || "Failed to load stations");
     } finally {
@@ -411,29 +350,55 @@ export default function Portal() {
     fetchStations(1, "");
   }, []);
 
-  const pages = Math.max(1, Math.ceil(total / 10));
+  /* ----------------------------
+     Registry PUCSL prompt
+  ---------------------------- */
+  async function askPUCSL() {
+    const r = await MySwal.fire({
+      icon: "info",
+      title: "Enter your PUCSL Station ID",
+      input: "text",
+      inputPlaceholder: "PUCSL/PRL/0005/2026",
+      showCancelButton: true,
+      confirmButtonText: "Continue",
+      cancelButtonText: "Cancel",
+      inputValidator: (val) => {
+        const v = (val || "").trim().toUpperCase();
+        if (!v) return "PUCSL ID is required";
+        if (!stationIdRegex.test(v)) return "Invalid format. Use PUCSL/PRL/1234/202X";
+        const formId = (getValues("Id") || "").trim().toUpperCase();
+        if (formId && formId !== v) return "PUCSL must match the Station ID in Station Details";
+        return null;
+      },
+      didOpen: () => {
+        const input = Swal.getInput();
+        if (input) input.style.textTransform = "uppercase";
+      },
+    });
 
-  async function nextStep() {
-  const fieldsToCheck =
-    activeStep === 0
-      ? ["Id", "Name", "Location"]
-      : activeStep === 1
-      ? ["person.Id", "person.PersonName", "person.PersonDesignation", "person.PersonEmail", "person.ContactNumber", "person.StartTime", "person.EndTime"]
-      : ["tanks"];
+    if (!r.isConfirmed) return false;
 
-  const ok = await trigger(fieldsToCheck, { shouldFocus: true });
+    const entered = (r.value || "").trim().toUpperCase();
+    const formId = (getValues("Id") || "").trim().toUpperCase();
 
-  if (!ok) {
-    const e = errors; // current errors object
-    await alertErr(
-      "Validation failed",
-      "A required field is invalid. The cursor will jump to the wrong field."
-    );
-    return;
+    // If Station Details empty, auto-fill it so your manager flow works
+    if (!formId) setValue("Id", entered, { shouldValidate: true, shouldDirty: true });
+
+    setPucslId(entered);
+    return true;
   }
 
-  setActiveStep((s) => Math.min(s + 1, steps.length - 1));
-}
+  async function nextStep() {
+    const ok =
+      activeStep === 0
+        ? await trigger(["Id", "Name", "Location"])
+        : activeStep === 1
+        ? await trigger(["person.Id", "person.PersonName", "person.PersonDesignation", "person.PersonEmail", "person.ContactNumber", "person.StartTime", "person.EndTime"])
+        : await trigger(["tanks"]);
+
+    if (!ok) return alertErr("Validation", "Please fix the highlighted fields.");
+    setActiveStep((s) => Math.min(s + 1, steps.length - 1));
+  }
 
   function prevStep() {
     setActiveStep((s) => Math.max(s - 1, 0));
@@ -442,6 +407,7 @@ export default function Portal() {
   async function clearForm() {
     setEditingId(null);
     setActiveStep(0);
+    setPucslId("");
     localStorage.removeItem("fuelwatch_portal_draft");
     reset(defaultValues);
     await alertOk("Done", "Form cleared");
@@ -454,7 +420,7 @@ export default function Portal() {
         Id: payload.Id.trim().toUpperCase(),
         person: {
           ...payload.person,
-          Id: payload.person.Id.trim().toUpperCase(),
+          Id: payload.person.Id.trim(), // NIC can include v
           PersonEmail: payload.person.PersonEmail.trim(),
           ContactNumber: payload.person.ContactNumber.trim(),
         },
@@ -471,7 +437,6 @@ export default function Portal() {
 
       await clearForm();
       setPage(1);
-      fetchStations(1, q);
       setActiveTab("registry");
     } catch (e) {
       await alertErr("Save failed", e?.response?.data?.message || "Save failed");
@@ -482,6 +447,7 @@ export default function Portal() {
     const id = row._id || row.id;
     setEditingId(id);
     setActiveStep(0);
+    setActiveTab("portal");
 
     reset({
       Id: row.Id || "",
@@ -498,7 +464,6 @@ export default function Portal() {
 
     await alertInfo("Edit mode", "Editing mode enabled");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    setActiveTab("portal");
   }
 
   async function removeStation(id) {
@@ -507,14 +472,13 @@ export default function Portal() {
     try {
       await http.delete(`/station/${id}`);
       await alertOk("Deleted", "Deleted successfully");
-      setPage(1);
-      fetchStations(1, q);
+      fetchStations(1, pucslId || "");
     } catch (e) {
       await alertErr("Delete failed", e?.response?.data?.message || "Delete failed");
     }
   }
 
-  // Step completion flags
+  // step flags
   const doneStation = !!getValues("Id") && !!getValues("Name") && !!getValues("Location");
   const donePerson =
     !!getValues("person.Id") &&
@@ -524,7 +488,6 @@ export default function Portal() {
     !!getValues("person.ContactNumber") &&
     !!getValues("person.StartTime") &&
     !!getValues("person.EndTime");
-  const doneTanks = (getValues("tanks") || []).length > 0;
 
   const stationStepOk = !errors.Id && !errors.Name && !errors.Location && doneStation;
   const personStepOk =
@@ -536,12 +499,9 @@ export default function Portal() {
     !errors?.person?.StartTime &&
     !errors?.person?.EndTime &&
     donePerson;
-  const tanksStepOk = !errors?.tanks && doneTanks;
 
   const canGoPerson = stationStepOk;
   const canGoTanks = stationStepOk && personStepOk;
-
-  const completion = useMemo(() => (stationStepOk ? 34 : 0) + (personStepOk ? 33 : 0) + (tanksStepOk ? 33 : 0), [stationStepOk, personStepOk, tanksStepOk]);
 
   const shownStations = useMemo(() => {
     const base = stations || [];
@@ -560,14 +520,8 @@ export default function Portal() {
     URL.revokeObjectURL(url);
   }
 
-  const statusPill = isValid ? ["ok", CheckCircle2, "Ready"] : ["bad", AlertTriangle, "Fix validation"];
-  const modePill = isEditing ? ["warn", Pencil, "Editing"] : ["info", CheckCircle2, "Create"];
-
   return (
     <div style={S.app}>
-      {/* kept for compatibility; no longer used for notifications */}
-      <Toaster position="top-right" />
-
       <div style={S.wrap}>
         {/* Header */}
         <div style={{ ...S.card, marginBottom: 12 }}>
@@ -576,41 +530,22 @@ export default function Portal() {
               <div style={{ fontWeight: 980, fontSize: 18 }}>FuelWatch Portal</div>
               <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>Fuelwatch - Filling Station Registering Dashboard</div>
             </div>
-            <div style={S.row}>
-              <span style={S.pill(statusPill[0])}>
-                {React.createElement(statusPill[1], { size: 16 })} {statusPill[2]}
-              </span>
-              <span style={S.pill(modePill[0])}>
-                {React.createElement(modePill[1], { size: 16 })} {modePill[2]}
-              </span>
-            </div>
           </div>
 
           <div style={S.divider} />
 
-          {/* Tabs */}
           <div style={S.tabs}>
-            <button type="button" style={S.tabBtn(activeTab === "portal")} onClick={() => setActiveTab("portal")}>
-              Form
-            </button>
-            <button type="button" style={S.tabBtn(activeTab === "registry")} onClick={() => setActiveTab("registry")}>
-              Registry
-            </button>
-            <button type="button" style={S.tabBtn(activeTab === "settings")} onClick={() => setActiveTab("settings")}>
-              Settings
-            </button>
+            <button type="button" style={S.tabBtn(activeTab === "portal")} onClick={() => setActiveTab("portal")}>Form</button>
+            <button type="button" style={S.tabBtn(activeTab === "registry")} onClick={() => setActiveTab("registry")}>Registry</button>
           </div>
         </div>
 
-        {/* Progress + actions */}
+        {/* Top buttons */}
         <div style={{ ...S.card, marginBottom: 12 }}>
           <div style={{ ...S.row, justifyContent: "space-between" }}>
-            
-
+            <div />
             <div style={S.row}>
-              <button type="button" style={S.btn("soft")} onClick={clearForm}>
-                <X size={16} /> Reset
-              </button>
+              <button type="button" style={S.btn("soft")} onClick={clearForm}><X size={16} /> Reset</button>
               <button
                 type="button"
                 style={S.btn("primary")}
@@ -622,8 +557,6 @@ export default function Portal() {
               </button>
             </div>
           </div>
-
-          
         </div>
 
         {/* FORM TAB */}
@@ -641,29 +574,25 @@ export default function Portal() {
 
                 {activeStep < steps.length - 1 ? (
                   <button
-                        type="button"
-                        style={S.btn("primary")}
-                        onClick={nextStep}
-                        disabled={
-                          (activeStep === 0 && !stationStepOk) ||
-                          (activeStep === 1 && !personStepOk)
-                        }
-                        title={
-                          activeStep === 0 && !stationStepOk
-                            ? "Complete Station Details first"
-                            : activeStep === 1 && !personStepOk
-                            ? "Complete Contact Person details first"
-                            : ""
-                        }
-                      >
-                        Next <ChevronRight size={16} />
-                      </button>
+                    type="button"
+                    style={S.btn("primary")}
+                    onClick={nextStep}
+                    disabled={(activeStep === 0 && !stationStepOk) || (activeStep === 1 && !personStepOk)}
+                    title={
+                      activeStep === 0 && !stationStepOk
+                        ? "Complete Station Details first"
+                        : activeStep === 1 && !personStepOk
+                        ? "Complete Contact Person details first"
+                        : ""
+                    }
+                  >
+                    Next <ChevronRight size={16} />
+                  </button>
                 ) : (
                   <button type="button" style={S.btn("primary")} onClick={handleSubmit(onSubmit)} disabled={isSubmitting || !isValid}>
                     <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update Station" : "Register Station"}
                   </button>
                 )}
-
               </div>
             </div>
 
@@ -672,41 +601,31 @@ export default function Portal() {
             {/* Step buttons */}
             <div style={S.row}>
               {steps.map((s, idx) => {
-                  const Icon = s.icon;
-                  const ok = idx === 0 ? stationStepOk : idx === 1 ? personStepOk : tanksStepOk;
-                  const active = idx === activeStep;
+                const Icon = s.icon;
+                const locked = (idx === 1 && !canGoPerson) || (idx === 2 && !canGoTanks);
+                const active = idx === activeStep;
 
-                  const locked = (idx === 1 && !canGoPerson) || (idx === 2 && !canGoTanks);
-
-              return (
+                return (
                   <button
-                     key={s.key}
-                      type="button"
-                      disabled={locked}
-                      onClick={() => {
-              if (locked) {
-              toast.error(
-              idx === 1
-                ? "Complete Station Details first."
-                : "Complete Station + Contact Person details first."
-              );
-            return;
-                  }
-                setActiveStep(idx);
-                  }}
-                    style={{
-                        ...S.tabBtn(active),
-                        opacity: locked ? 0.5 : 1,
-                        cursor: locked ? "not-allowed" : "pointer",
-                  }}
-                  title={locked ? "Complete previous step first" : ""}
-                    >
-                <span style={S.row}>
-                <Icon size={16} /> {s.title}
-                <span style={S.pill(ok ? "ok" : "neutral")}>{ok ? "Valid" : "View"}</span>
-                </span>
-              </button>
-              );
+                    key={s.key}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => {
+                      if (locked) {
+                        alertErr(
+                          "Complete previous step",
+                          idx === 1 ? "Complete Station Details first." : "Complete Station + Contact Person details first."
+                        );
+                        return;
+                      }
+                      setActiveStep(idx);
+                    }}
+                    style={{ ...S.tabBtn(active), opacity: locked ? 0.5 : 1, cursor: locked ? "not-allowed" : "pointer" }}
+                    title={locked ? "Complete previous step first" : ""}
+                  >
+                    <span style={S.row}><Icon size={16} /> {s.title}</span>
+                  </button>
+                );
               })}
             </div>
 
@@ -715,10 +634,10 @@ export default function Portal() {
             {/* STEP 0 */}
             {activeStep === 0 && (
               <div style={S.grid3}>
-                <Field label="Station Id" hint="PUCSL" >
+                <Field label="Station Id" hint="PUCSL/PRL/1234/202X" error={errors?.Id?.message}>
                   <Input
                     icon={Building2}
-                    placeholder="Enter PUCSL Id"
+                    placeholder="PUCSL/PRL/0005/2026"
                     invalid={!!errors?.Id}
                     {...register("Id", { onChange: (e) => setValue("Id", e.target.value.toUpperCase()) })}
                   />
@@ -728,8 +647,11 @@ export default function Portal() {
                   <Input icon={Building2} placeholder="Sample Filling Station" invalid={!!errors?.Name} {...register("Name")} />
                 </Field>
 
-                <Field label="Location" error={errors?.Location?.message}>
-                  <Input icon={Filter} placeholder="Enter District (First letter must be capital)" invalid={!!errors?.Location} {...register("Location")} />
+                <Field label="Location (District)" error={errors?.Location?.message}>
+                  <Select icon={Filter} invalid={!!errors?.Location} {...register("Location")}>
+                    <option value="">Select district...</option>
+                    {allowedDistricts.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </Select>
                 </Field>
               </div>
             )}
@@ -738,8 +660,11 @@ export default function Portal() {
             {activeStep === 1 && (
               <div style={S.grid2}>
                 <Field label="NIC Number" error={errors?.person?.Id?.message}>
-                  <Input icon={UserRound} placeholder="Enter NIC number" invalid={!!errors?.person?.Id}
-                    {...register("person.Id", { onChange: (e) => setValue("person.Id", e.target.value.toLowerCase()) })}
+                  <Input
+                    icon={UserRound}
+                    placeholder="200456834V or 200456834v or 200456834567"
+                    invalid={!!errors?.person?.Id}
+                    {...register("person.Id", { onChange: (e) => setValue("person.Id", e.target.value) })}
                   />
                 </Field>
 
@@ -748,23 +673,39 @@ export default function Portal() {
                 </Field>
 
                 <Field label="Designation" error={errors?.person?.PersonDesignation?.message}>
-                  <Input icon={Building2} placeholder="ADMINISTRATOR (Only uppercase letters)" invalid={!!errors?.person?.PersonDesignation} {...register("person.PersonDesignation")} />
+                  <Input
+                    icon={Building2}
+                    placeholder="MANAGER"
+                    invalid={!!errors?.person?.PersonDesignation}
+                    {...register("person.PersonDesignation", { onChange: (e) => setValue("person.PersonDesignation", e.target.value.toUpperCase()) })}
+                  />
                 </Field>
 
                 <Field label="Email" error={errors?.person?.PersonEmail?.message}>
-                  <Input icon={Search} placeholder="e.g. alen@gmail.com" invalid={!!errors?.person?.PersonEmail} {...register("person.PersonEmail")} />
+                  <Input
+                    icon={Filter}
+                    placeholder="alen@gmail.com"
+                    invalid={!!errors?.person?.PersonEmail}
+                    {...register("person.PersonEmail", { onChange: (e) => setValue("person.PersonEmail", e.target.value.toLowerCase()) })}
+                  />
                 </Field>
 
                 <Field label="Contact Number" error={errors?.person?.ContactNumber?.message}>
-                  <Input icon={Search} placeholder="071-0000-000" invalid={!!errors?.person?.ContactNumber} {...register("person.ContactNumber")} />
+                  <Input icon={Filter} placeholder="071-1234-567" invalid={!!errors?.person?.ContactNumber} {...register("person.ContactNumber")} />
                 </Field>
 
                 <div style={S.grid2}>
                   <Field label="Start Time" error={errors?.person?.StartTime?.message}>
-                    <Input type="time" invalid={!!errors?.person?.StartTime} {...register("person.StartTime")} />
+                    <Select invalid={!!errors?.person?.StartTime} {...register("person.StartTime")}>
+                      <option value="">Select...</option>
+                      {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </Select>
                   </Field>
                   <Field label="End Time" error={errors?.person?.EndTime?.message}>
-                    <Input type="time" invalid={!!errors?.person?.EndTime} {...register("person.EndTime")} />
+                    <Select invalid={!!errors?.person?.EndTime} {...register("person.EndTime")}>
+                      <option value="">Select...</option>
+                      {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </Select>
                   </Field>
                 </div>
               </div>
@@ -774,12 +715,8 @@ export default function Portal() {
             {activeStep === 2 && (
               <div>
                 <div style={{ ...S.row, justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>Fuel type is locked list • capacity bounds • unique tank index per fuel type</div>
-                  <button
-                    type="button"
-                    style={S.btn("primary")}
-                    onClick={() => append({ fuel_type: "", number_of_tanks: 1, tank_index: fields.length + 1, tank_capacity: 500 })}
-                  >
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>Fuel type locked • unique tank index per fuel type</div>
+                  <button type="button" style={S.btn("primary")} onClick={() => append({ fuel_type: "", number_of_tanks: 1, tank_index: fields.length + 1, tank_capacity: 500 })}>
                     <Plus size={16} /> Add Tank
                   </button>
                 </div>
@@ -804,11 +741,7 @@ export default function Portal() {
                         <Field label="Fuel Type" error={errors?.tanks?.[idx]?.fuel_type?.message}>
                           <Select icon={Droplets} invalid={!!errors?.tanks?.[idx]?.fuel_type} {...register(`tanks.${idx}.fuel_type`)}>
                             <option value="">Select fuel type...</option>
-                            {allowedFuelTypes.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
+                            {allowedFuelTypes.map((t) => <option key={t} value={t}>{t}</option>)}
                           </Select>
                         </Field>
 
@@ -834,133 +767,135 @@ export default function Portal() {
 
         {/* REGISTRY TAB */}
         {activeTab === "registry" && (
-          <div style={S.card}>
-            <div style={{ ...S.row, justifyContent: "space-between" }}>
-              <div style={{ fontWeight: 980 }}>Registered Stations ({total})</div>
-              <div style={S.row}>
-                
-                <button type="button" style={S.btn("soft")} onClick={exportStationsJSON} disabled={loadingList || !stations.length}>
-                  <Download size={16} /> Export JSON
-                </button>
-                
-              </div>
-            </div>
+          <>
+            {!pucslId ? (
+              <div style={S.card}>
+                <div style={{ fontWeight: 950 }}>Registry is locked</div>
+                <div style={S.divider} />
+                <div style={{ fontSize: 13, opacity: 0.75 }}>
+                  Enter your PUCSL Station ID to view your station details only.
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    type="button"
+                    style={S.btn("primary")}
+                    onClick={async () => {
+                      const ok = await askPUCSL();
+                      if (ok) fetchStations(1, (getValues("Id") || "").trim().toUpperCase());
+                    }}
+                  >
+                    Enter PUCSL ID
+                  </button>
 
-            <div style={S.divider} />
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 80px auto", gap: 10 }}>
-              <div style={S.inputWrap(false)}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <Filter size={18} style={{ opacity: 0.55, color: "#1D4ED8" }} />
-                  <select style={{ ...S.input, cursor: "pointer" }} value={quickFuel} onChange={(e) => setQuickFuel(e.target.value)}>
-                    <option value="all">All fuel types</option>
-                    {allowedFuelTypes.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
+                  <button type="button" style={{ ...S.btn("soft"), marginLeft: 8 }} onClick={() => setActiveTab("portal")}>
+                    Back to Form
+                  </button>
                 </div>
               </div>
-
-              <button
-                type="button"
-                style={S.btn("primary")}
-                onClick={() => {
-                  setPage(1);
-                  fetchStations(1, q);
-                }}
-                disabled={loadingList}
-              >
-                Search
-              </button>
-            </div>
-
-            {loadingList ? <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>Loading stations…</div> : null}
-            <div style={S.divider} />
-
-            {shownStations.length === 0 ? (
-              <div style={{ fontSize: 13, opacity: 0.75, display: "flex", gap: 8, alignItems: "center" }}>
-                <AlertTriangle size={18} /> No stations found.
-              </div>
             ) : (
-              <div style={{ overflowX: "auto", border: "1px solid rgba(15,23,42,0.10)", borderRadius: 10 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
-                  <thead>
-                    <tr style={{ background: "rgba(15,23,42,0.04)" }}>
-                      <Th>Station</Th><Th>Id</Th><Th>Location</Th><Th>Contact</Th><Th>Tanks</Th><Th right>Actions</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shownStations.map((s, idx) => (
-                      <tr key={s._id || idx} style={{ borderTop: "1px solid rgba(15,23,42,0.10)" }}>
-                        <Td><b>{s.Name}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.PersonDesignation || "—"}</div></Td>
-                        <Td>{s.Id}</Td>
-                        <Td>{s.Location}</Td>
-                        <Td><b>{s.person?.PersonName || "—"}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.ContactNumber || "—"}</div></Td>
-                        <Td>{(s.tanks || []).length}</Td>
-                        <Td right>
-                          <button style={S.btn("soft")} onClick={() => { setPreviewRow(s); setPreviewOpen(true); }}><Eye size={16} /></button>
-                          <button style={S.btn()} onClick={() => startEdit(s)}><Pencil size={16} /></button>
-                          <button style={S.btn("danger")} onClick={() => removeStation(s._id || s.id)}><Trash2 size={16} /></button>
-                        </Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={S.card}>
+                <div style={{ ...S.row, justifyContent: "space-between" }}>
+                  <div style={{ fontWeight: 980 }}>Registered Station</div>
+                  <div style={S.row}>
+                    <button
+                      type="button"
+                      style={S.btn("soft")}
+                      onClick={() => fetchStations(1, pucslId)}
+                      disabled={loadingList}
+                    >
+                      <RefreshCw size={16} /> Refresh
+                    </button>
+
+                    <button
+                      type="button"
+                      style={S.btn("soft")}
+                      onClick={exportStationsJSON}
+                      disabled={loadingList || !stations.length}
+                    >
+                      <Download size={16} /> Export JSON
+                    </button>
+
+                    <button
+                      type="button"
+                      style={S.btn("danger")}
+                      onClick={async () => {
+                        setPucslId("");
+                        await alertInfo("Locked", "Registry locked again. Enter PUCSL ID to view.");
+                      }}
+                    >
+                      <X size={16} /> Lock
+                    </button>
+                  </div>
+                </div>
+
+                <div style={S.divider} />
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 10 }}>
+                  <div style={S.inputWrap(false)}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <Filter size={18} style={{ opacity: 0.55, color: "#1D4ED8" }} />
+                      <select style={{ ...S.input, cursor: "pointer" }} value={quickFuel} onChange={(e) => setQuickFuel(e.target.value)}>
+                        <option value="all">All fuel types</option>
+                        {allowedFuelTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    style={S.btn("primary")}
+                    onClick={() => fetchStations(1, pucslId)}
+                    disabled={loadingList}
+                  >
+                    Search
+                  </button>
+                </div>
+
+                {loadingList ? <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>Loading…</div> : null}
+
+                <div style={S.divider} />
+
+                {shownStations.length === 0 ? (
+                  <div style={{ fontSize: 13, opacity: 0.75 }}>No station found for PUCSL ID: <b>{pucslId}</b></div>
+                ) : (
+                  <div style={{ overflowX: "auto", border: "1px solid rgba(15,23,42,0.10)", borderRadius: 10 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+                      <thead>
+                        <tr style={{ background: "rgba(15,23,42,0.04)" }}>
+                          <Th>Station</Th><Th>Id</Th><Th>Location</Th><Th>Contact</Th><Th>Tanks</Th><Th right>Actions</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shownStations.map((s, idx) => (
+                          <tr key={s._id || idx} style={{ borderTop: "1px solid rgba(15,23,42,0.10)" }}>
+                            <Td><b>{s.Name}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.PersonDesignation || "—"}</div></Td>
+                            <Td>{s.Id}</Td>
+                            <Td>{s.Location}</Td>
+                            <Td><b>{s.person?.PersonName || "—"}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.ContactNumber || "—"}</div></Td>
+                            <Td>{(s.tanks || []).length}</Td>
+                            <Td right>
+                              <button style={S.btn("soft")} onClick={() => { setPreviewRow(s); setPreviewOpen(true); }}><Eye size={16} /></button>
+                              <button style={S.btn()} onClick={() => startEdit(s)}><Pencil size={16} /></button>
+                              <button style={S.btn("danger")} onClick={() => removeStation(s._id || s.id)}><Trash2 size={16} /></button>
+                            </Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
-
-            <div style={{ ...S.row, justifyContent: "space-between", marginTop: 12 }}>
-              <button
-                type="button"
-                style={S.btn()}
-                disabled={page <= 1}
-                onClick={() => {
-                  const p = page - 1;
-                  setPage(p);
-                  fetchStations(p, q);
-                }}
-              >
-                <ChevronLeft size={16} /> Prev
-              </button>
-              <div style={{ fontSize: 13, opacity: 0.75 }}>
-                Page <b style={{ opacity: 1 }}>{page}</b> / {pages}
-              </div>
-              <button
-                type="button"
-                style={S.btn()}
-                disabled={page >= pages}
-                onClick={() => {
-                  const p = page + 1;
-                  setPage(p);
-                  fetchStations(p, q);
-                }}
-              >
-                Next <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          </>
         )}
 
-        {/* SETTINGS TAB */}
-        {activeTab === "settings" && (
-          <div style={S.card}>
-            <div style={{ fontWeight: 980 }}>Settings</div>
-            <div style={S.divider} />
-            <div style={{ fontSize: 13, opacity: 0.75 }}>Coming soon</div>
-          </div>
-        )}
       </div>
 
       {/* Preview Modal */}
       <Modal
         open={previewOpen}
         title={`Station Preview${previewRow?.Id ? ` • ${previewRow.Id}` : ""}`}
-        onClose={() => {
-          setPreviewOpen(false);
-          setPreviewRow(null);
-        }}
+        onClose={() => { setPreviewOpen(false); setPreviewRow(null); }}
       >
         {previewRow ? (
           <pre style={{ margin: 0, fontSize: 12, background: "rgba(15,23,42,0.04)", padding: 12, borderRadius: 10, overflow: "auto" }}>
@@ -968,26 +903,28 @@ export default function Portal() {
           </pre>
         ) : null}
       </Modal>
+
+      <style>{`
+        @media (max-width: 980px){
+          .grid2, .grid3, .grid4 { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }
 
-/* ----------------------------
-   Table helpers
----------------------------- */
+/* table helpers */
 function Th({ children, right }) {
   return (
-    <th
-      style={{
-        textAlign: right ? "right" : "left",
-        padding: "10px 10px",
-        fontSize: 12,
-        opacity: 0.75,
-        fontWeight: 950,
-        borderBottom: "1px solid rgba(15,23,42,0.10)",
-        whiteSpace: "nowrap",
-      }}
-    >
+    <th style={{
+      textAlign: right ? "right" : "left",
+      padding: "10px 10px",
+      fontSize: 12,
+      opacity: 0.75,
+      fontWeight: 950,
+      borderBottom: "1px solid rgba(15,23,42,0.10)",
+      whiteSpace: "nowrap",
+    }}>
       {children}
     </th>
   );

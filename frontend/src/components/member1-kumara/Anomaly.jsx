@@ -94,49 +94,38 @@ function downloadCSV(filename, rows) {
 }
 
 // ==============================
-// Styled “premium” card
+// Enterprise surfaces + stats
+// (UI-only; NO logic changes)
+// Uses normal fonts (Arial / system)
 // ==============================
-function GlassCard({ children, sx }) {
+function EnterpriseCard({ children, sx }) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Paper
       elevation={0}
       sx={{
-        position: "relative",
-        overflow: "hidden",
-        borderRadius: 3,
-        border: `1px solid ${alpha(theme.palette.common.white, 0.08)}`,
-        background:
-          theme.palette.mode === "dark"
-            ? `linear-gradient(180deg, ${alpha("#0b1220", 0.9)}, ${alpha("#0b1220", 0.6)})`
-            : `linear-gradient(180deg, ${alpha("#ffffff", 0.9)}, ${alpha("#ffffff", 0.65)})`,
-        backdropFilter: "blur(14px)",
-        boxShadow:
-          theme.palette.mode === "dark"
-            ? "0 18px 55px -35px rgba(0,0,0,0.9)"
-            : "0 18px 55px -35px rgba(0,0,0,0.35)",
+        borderRadius: 10 / 4,
+        border: `1px solid ${alpha(
+          isDark ? theme.palette.common.white : theme.palette.common.black,
+          isDark ? 0.10 : 0.08
+        )}`,
+        backgroundColor: isDark ? alpha("#0b1220", 0.75) : "#ffffff",
+        boxShadow: isDark ? "0 8px 28px rgba(0,0,0,0.35)" : "0 10px 30px rgba(16, 24, 40, 0.06)",
+        fontFamily: "Arial, Helvetica, sans-serif",
         ...sx,
       }}
     >
-      <Box
-        sx={{
-          pointerEvents: "none",
-          position: "absolute",
-          inset: 0,
-          opacity: theme.palette.mode === "dark" ? 0.5 : 0.7,
-          background:
-            "radial-gradient(900px 220px at 10% 0%, rgba(37,99,235,0.20), transparent 60%)," +
-            "radial-gradient(700px 220px at 80% 10%, rgba(16,185,129,0.16), transparent 60%)," +
-            "radial-gradient(800px 300px at 55% 110%, rgba(139,92,246,0.14), transparent 55%)",
-        }}
-      />
-      <Box sx={{ position: "relative" }}>{children}</Box>
+      {children}
     </Paper>
   );
 }
 
-function MetricCard({ label, value, sub, tone = "primary", icon, sx }) {
+function StatCard({ label, value, sub, tone = "primary", icon, sx }) {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   const palette =
     tone === "danger"
       ? theme.palette.error
@@ -147,7 +136,7 @@ function MetricCard({ label, value, sub, tone = "primary", icon, sx }) {
       : theme.palette.primary;
 
   return (
-    <GlassCard sx={{ p: 2, ...sx }}>
+    <EnterpriseCard sx={{ p: 2, ...sx }}>
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Box
           sx={{
@@ -156,56 +145,82 @@ function MetricCard({ label, value, sub, tone = "primary", icon, sx }) {
             borderRadius: 2,
             display: "grid",
             placeItems: "center",
-            color: palette.contrastText,
-            background: `linear-gradient(135deg, ${palette.main}, ${alpha(palette.main, 0.65)})`,
-            boxShadow: `0 10px 30px -18px ${alpha(palette.main, 0.7)}`,
+            bgcolor: alpha(palette.main, isDark ? 0.20 : 0.12),
+            border: `1px solid ${alpha(palette.main, isDark ? 0.35 : 0.18)}`,
+            color: palette.main,
           }}
         >
           {icon}
         </Box>
 
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800, letterSpacing: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              color: "text.secondary",
+              fontWeight: 800,
+              letterSpacing: 0.2,
+              textTransform: "uppercase",
+              fontFamily: "Arial, Helvetica, sans-serif",
+            }}
+          >
             {label}
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 900,
+              lineHeight: 1.1,
+              mt: 0.25,
+              fontFamily: "Arial, Helvetica, sans-serif",
+            }}
+          >
             {value}
           </Typography>
+
           {sub ? (
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                mt: 0.25,
+                fontFamily: "Arial, Helvetica, sans-serif",
+              }}
+            >
               {sub}
             </Typography>
           ) : null}
         </Box>
       </Stack>
-    </GlassCard>
+    </EnterpriseCard>
   );
 }
 
 function SeverityChip({ pred }) {
   const flagged = pred === 1 || pred === true;
-  return flagged ? (
+
+  return (
     <Chip
-      label="FLAG"
+      label={flagged ? "FLAGGED" : "OK"}
       size="small"
-      icon={<WarningAmberRoundedIcon />}
+      icon={flagged ? <WarningAmberRoundedIcon /> : <CheckCircleRoundedIcon />}
+      variant="outlined"
       sx={{
         fontWeight: 900,
-        bgcolor: (t) => alpha(t.palette.error.main, t.palette.mode === "dark" ? 0.22 : 0.12),
-        color: "error.main",
-        border: (t) => `1px solid ${alpha(t.palette.error.main, 0.3)}`,
-      }}
-    />
-  ) : (
-    <Chip
-      label="OK"
-      size="small"
-      icon={<CheckCircleRoundedIcon />}
-      sx={{
-        fontWeight: 900,
-        bgcolor: (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.22 : 0.12),
-        color: "success.main",
-        border: (t) => `1px solid ${alpha(t.palette.success.main, 0.25)}`,
+        borderRadius: 999,
+        fontFamily: "Arial, Helvetica, sans-serif",
+        ...(flagged
+          ? {
+              color: "error.main",
+              borderColor: (t) => alpha(t.palette.error.main, 0.35),
+              bgcolor: (t) => alpha(t.palette.error.main, t.palette.mode === "dark" ? 0.12 : 0.06),
+            }
+          : {
+              color: "success.main",
+              borderColor: (t) => alpha(t.palette.success.main, 0.30),
+              bgcolor: (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.12 : 0.06),
+            }),
       }}
     />
   );
@@ -287,7 +302,17 @@ export default function Anomaly() {
     const q = search.trim().toLowerCase();
     return scoredDays.filter((r) => {
       const day = String(r.day || r.date || r.timestamp || "").toLowerCase();
-      const station = String(r.station_name || r.stationName || r.site_name || r.site || r.tank_name || r.tankName || r.station_id || r.stationId || "").toLowerCase();
+      const station = String(
+        r.station_name ||
+          r.stationName ||
+          r.site_name ||
+          r.site ||
+          r.tank_name ||
+          r.tankName ||
+          r.station_id ||
+          r.stationId ||
+          ""
+      ).toLowerCase();
       const fuel = String(r.fuel_type || r.fuelType || r.item || "").toLowerCase();
       const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
 
@@ -384,7 +409,16 @@ export default function Anomaly() {
   // -----------------------------
   const mapRow = (r) => {
     const day = r.day || r.date || r.timestamp || "-";
-    const station = r.station_name || r.stationName || r.site_name || r.site || r.tank_name || r.tankName || r.station_id || r.stationId || "-";
+    const station =
+      r.station_name ||
+      r.stationName ||
+      r.site_name ||
+      r.site ||
+      r.tank_name ||
+      r.tankName ||
+      r.station_id ||
+      r.stationId ||
+      "-";
     const fuel = r.fuel_type || r.fuelType || r.item || "-";
     const score = r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0;
     const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
@@ -439,8 +473,8 @@ export default function Anomaly() {
       const payload = {
         station_id: notifyStation,
         severity: notifySeverity, // Advisory/Warning/Critical
-        channel: notifyChannel,   // email
-        roles: notifyRoles,       // ["SUPERVISOR","MANAGER"]
+        channel: notifyChannel, // email
+        roles: notifyRoles, // ["SUPERVISOR","MANAGER"]
         message: notifyMessage,
 
         // attach scan context (for audit + email preview)
@@ -475,38 +509,63 @@ export default function Anomaly() {
   // Render
   // -----------------------------
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1500, mx: "auto" }}>
-      <GlassCard sx={{ mb: 2 }}>
+    <Box
+      sx={{
+        p: { xs: 2, md: 3 },
+        maxWidth: 1500,
+        mx: "auto",
+        bgcolor: (t) => (t.palette.mode === "dark" ? "transparent" : "#f5f7fb"),
+        minHeight: "100vh",
+        borderRadius: 2,
+        fontFamily: "Arial, Helvetica, sans-serif",
+      }}
+    >
+      {/* Header */}
+      <EnterpriseCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between">
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={2}
+            alignItems={{ md: "center" }}
+            justifyContent="space-between"
+          >
             <Box sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box
                   sx={{
                     width: 44,
                     height: 44,
-                    borderRadius: 2.5,
+                    borderRadius: 2,
                     display: "grid",
                     placeItems: "center",
-                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.08),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.10),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
+                    color: "primary.main",
                   }}
                 >
-                  <InsightsRoundedIcon sx={{ color: "primary.main" }} />
+                  <InsightsRoundedIcon />
                 </Box>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="overline" sx={{ letterSpacing: 0.8, fontWeight: 900, color: "text.secondary" }}>
-                    FuelWatch • Anomaly Detection
+                  <Typography
+                    variant="overline"
+                    sx={{
+                      letterSpacing: 0.8,
+                      fontWeight: 900,
+                      color: "text.secondary",
+                      display: "block",
+                      lineHeight: 1.2,
+                      fontFamily: "Arial, Helvetica, sans-serif",
+                    }}
+                  >
+                    FuelWatch
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 950, lineHeight: 1.15 }}>
-                    Fuel Dispensing Irregularities
+                  <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1.15, fontFamily: "Arial, Helvetica, sans-serif" }}>
+                    Fuel Dispensing Irregularities Monitoring
                   </Typography>
                 </Box>
               </Stack>
 
-              <Typography variant="body2" sx={{ mt: 1, color: "text.secondary", maxWidth: 860 }}>
-                Upload monthly report → run ML scan → review scored days + grouped events. Adjust threshold to see results update automatically for the same file.
-              </Typography>
+              
             </Box>
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
@@ -517,8 +576,8 @@ export default function Anomaly() {
                     disabled={!scoredDays.length && !events.length}
                     sx={{
                       borderRadius: 2,
-                      border: `1px solid ${alpha(theme.palette.common.white, 0.12)}`,
-                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                      border: `1px solid ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.18 : 0.08)}`,
+                      bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                     }}
                   >
                     <DownloadRoundedIcon />
@@ -531,8 +590,8 @@ export default function Anomaly() {
                   onClick={onReset}
                   sx={{
                     borderRadius: 2,
-                    border: `1px solid ${alpha(theme.palette.common.white, 0.12)}`,
-                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                    border: `1px solid ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.18 : 0.08)}`,
+                    bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                   }}
                 >
                   <RestartAltRoundedIcon />
@@ -548,12 +607,13 @@ export default function Anomaly() {
                   borderRadius: 2,
                   px: 2.2,
                   py: 1.05,
-                  fontWeight: 950,
+                  fontWeight: 900,
                   textTransform: "none",
-                  boxShadow: `0 18px 45px -30px ${alpha(theme.palette.primary.main, 0.85)}`,
+                  boxShadow: "none",
+                  fontFamily: "Arial, Helvetica, sans-serif",
                 }}
               >
-                {loading ? "Scanning…" : "Run ML Scan"}
+                {loading ? "Scanning…" : "Proceed"}
               </Button>
             </Stack>
           </Stack>
@@ -564,25 +624,26 @@ export default function Anomaly() {
                 sx={{
                   height: 10,
                   borderRadius: 999,
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.08),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.10),
                   "& .MuiLinearProgress-bar": { borderRadius: 999 },
                 }}
               />
-              <Typography variant="caption" sx={{ display: "block", mt: 0.8, color: "text.secondary" }}>
-                Upload parsing + model scoring in progress…
+              <Typography variant="caption" sx={{ display: "block", mt: 0.8, color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Process in progress…
               </Typography>
             </Box>
           ) : null}
         </Box>
-      </GlassCard>
+      </EnterpriseCard>
 
       {error ? (
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2, fontFamily: "Arial, Helvetica, sans-serif" }}>
           {error}
         </Alert>
       ) : null}
 
-      <GlassCard sx={{ mb: 2 }}>
+      {/* Controls */}
+      <EnterpriseCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>
@@ -596,12 +657,13 @@ export default function Anomaly() {
                   py: 1.25,
                   fontWeight: 900,
                   textTransform: "none",
-                  borderColor: alpha(theme.palette.primary.main, 0.35),
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.08 : 0.03),
+                  borderColor: alpha(theme.palette.primary.main, 0.25),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.10 : 0.05),
                   "&:hover": {
-                    borderColor: alpha(theme.palette.primary.main, 0.55),
-                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.05),
+                    borderColor: alpha(theme.palette.primary.main, 0.40),
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.14 : 0.07),
                   },
+                  fontFamily: "Arial, Helvetica, sans-serif",
                 }}
               >
                 {file ? `Selected: ${file.name}` : "Upload CSV / XLSX"}
@@ -610,8 +672,8 @@ export default function Anomaly() {
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
                 <InfoOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Tip: Use clean monthly exports; threshold changes auto-rerun after first scan.
+                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
+                  Important: Upload only CSV reports
                 </Typography>
               </Stack>
             </Grid>
@@ -635,12 +697,15 @@ export default function Anomaly() {
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     borderRadius: 2,
-                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                    bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                    fontFamily: "Arial, Helvetica, sans-serif",
                   },
+                  "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                  "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
                 }}
               >
                 {[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85].map((v) => (
-                  <MenuItem key={v} value={v}>
+                  <MenuItem key={v} value={v} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                     {v}
                   </MenuItem>
                 ))}
@@ -672,50 +737,67 @@ export default function Anomaly() {
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 2,
-                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.55),
+                      bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                      fontFamily: "Arial, Helvetica, sans-serif",
                     },
+                    "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
                   }}
                 />
+
                 <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                   <FormControlLabel
                     control={<Switch checked={showOnlyFlagged} onChange={(e) => setShowOnlyFlagged(e.target.checked)} />}
                     label="Only flagged"
-                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13 } }}
+                    sx={{
+                      ".MuiFormControlLabel-label": {
+                        fontWeight: 800,
+                        fontSize: 13,
+                        fontFamily: "Arial, Helvetica, sans-serif",
+                      },
+                    }}
                   />
                   <FormControlLabel
                     control={<Switch checked={dense} onChange={(e) => setDense(e.target.checked)} />}
                     label="Dense"
-                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13 } }}
+                    sx={{
+                      ".MuiFormControlLabel-label": {
+                        fontWeight: 800,
+                        fontSize: 13,
+                        fontFamily: "Arial, Helvetica, sans-serif",
+                      },
+                    }}
                   />
                 </Stack>
               </Stack>
             </Grid>
           </Grid>
         </Box>
-      </GlassCard>
+      </EnterpriseCard>
 
+      {/* KPI Cards */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard label="Scored Days" value={scoredDays.length} sub="Rows processed by model" tone="primary" icon={<TableChartRoundedIcon />} />
+          <StatCard label="Scored Days" value={scoredDays.length} sub="Processed count" tone="primary" icon={<TableChartRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard label="Flagged Days" value={flaggedDays.length} sub="Predicted irregularities" tone="danger" icon={<WarningAmberRoundedIcon />} />
+          <StatCard label="Flagged Days" value={flaggedDays.length} sub="Predicted irregularities" tone="danger" icon={<WarningAmberRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard label="Threshold" value={decisionThreshold} sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set then scan"} tone="success" icon={<TuneRoundedIcon />} />
+          <StatCard label="Threshold" value={decisionThreshold} sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set threshold"} tone="success" icon={<TuneRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <MetricCard
+          <StatCard
             label="Avg Score"
             value={safeFixed(avgScore)}
-            sub={maxScoreRow ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})` : "No data yet"}
+            sub={maxScoreRow ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})` : "Predicted average"}
             tone="warning"
             icon={<WhatshotRoundedIcon />}
           />
         </Grid>
       </Grid>
 
-      <GlassCard sx={{ mb: 2 }}>
+      {/* Tabs + Content */}
+      <EnterpriseCard sx={{ mb: 2 }}>
         <Box sx={{ px: 2, pt: 1.5 }}>
           <Tabs
             value={tab}
@@ -723,8 +805,17 @@ export default function Anomaly() {
             variant="scrollable"
             scrollButtons="auto"
             sx={{
-              "& .MuiTab-root": { fontWeight: 950, textTransform: "none" },
-              "& .MuiTabs-indicator": { height: 4, borderRadius: 999 },
+              px: 1,
+              fontFamily: "Arial, Helvetica, sans-serif",
+              "& .MuiTab-root": {
+                fontWeight: 900,
+                textTransform: "none",
+                minHeight: 48,
+                borderRadius: 1.5,
+                mx: 0.5,
+                fontFamily: "Arial, Helvetica, sans-serif",
+              },
+              "& .MuiTabs-indicator": { height: 3, borderRadius: 999 },
             }}
           >
             <Tab
@@ -758,39 +849,49 @@ export default function Anomaly() {
           </Tabs>
         </Box>
 
-        <Divider sx={{ opacity: 0.6 }} />
+        <Divider sx={{ opacity: 0.8 }} />
 
         {tab === 0 ? (
           <Box sx={{ p: { xs: 2.25, md: 3 } }}>
             <Grid container spacing={2}>
               <Grid item xs={12} md={7}>
-                <GlassCard sx={{ p: 2.25 }}>
+                <EnterpriseCard sx={{ p: 2.25 }}>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <InsightsRoundedIcon color="primary" />
-                    <Typography variant="h6" fontWeight={950}>
-                      What you’re seeing
+                    <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                      General Outputs
                     </Typography>
                   </Stack>
-
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    This scanner flags days that look abnormal based on the uploaded station report. Increase the threshold to reduce false positives; decrease it to catch more anomalies.
-                  </Typography>
 
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
                     <Chip
                       icon={<TuneRoundedIcon />}
                       label={`Threshold: ${decisionThreshold}`}
+                      variant="outlined"
                       sx={{
                         fontWeight: 900,
-                        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.08),
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                        borderColor: alpha(theme.palette.primary.main, 0.25),
+                        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                        fontFamily: "Arial, Helvetica, sans-serif",
                       }}
                     />
-                    <Chip icon={<WarningAmberRoundedIcon />} label={`Flagged: ${flaggedDays.length}`} color="error" variant="outlined" sx={{ fontWeight: 900 }} />
-                    <Chip icon={<TableChartRoundedIcon />} label={`Scored: ${scoredDays.length}`} color="primary" variant="outlined" sx={{ fontWeight: 900 }} />
+                    <Chip
+                      icon={<WarningAmberRoundedIcon />}
+                      label={`Flagged: ${flaggedDays.length}`}
+                      color="error"
+                      variant="outlined"
+                      sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}
+                    />
+                    <Chip
+                      icon={<TableChartRoundedIcon />}
+                      label={`Scored: ${scoredDays.length}`}
+                      color="primary"
+                      variant="outlined"
+                      sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}
+                    />
                   </Stack>
 
-                  <Divider sx={{ my: 2, opacity: 0.6 }} />
+                  <Divider sx={{ my: 2, opacity: 0.8 }} />
 
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Button
@@ -798,9 +899,9 @@ export default function Anomaly() {
                       startIcon={<DownloadRoundedIcon />}
                       disabled={!filteredScoredDays.length}
                       onClick={() => downloadCSV("scored_days_filtered.csv", filteredScoredDays.map(mapRow))}
-                      sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                      sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
                     >
-                      Export filtered scored days (CSV)
+                      Export filtered scored days 
                     </Button>
 
                     <Button
@@ -808,41 +909,44 @@ export default function Anomaly() {
                       startIcon={<DownloadRoundedIcon />}
                       disabled={!events.length}
                       onClick={() => downloadCSV("events.csv", events)}
-                      sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                      sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
                     >
-                      Export events (CSV)
+                      Export events 
                     </Button>
 
-                    {/* ✅ NEW: open form */}
                     <Button
                       variant="contained"
                       color="error"
                       startIcon={<WarningAmberRoundedIcon />}
                       disabled={!scoredDays.length}
                       onClick={openNotifyForm}
-                      sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 900,
+                        textTransform: "none",
+                        boxShadow: "none",
+                        fontFamily: "Arial, Helvetica, sans-serif",
+                      }}
                     >
                       Notify Responsible Staff
                     </Button>
                   </Stack>
-
-                  <Typography variant="caption" sx={{ display: "block", mt: 1.2, color: "text.secondary" }}>
-                    Safety: Notifications are deduplicated + cooldown-controlled by the backend policy.
-                  </Typography>
-                </GlassCard>
+                </EnterpriseCard>
               </Grid>
 
               <Grid item xs={12} md={5}>
-                <GlassCard sx={{ p: 2.25 }}>
+                <EnterpriseCard sx={{ p: 2.25 }}>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <WarningAmberRoundedIcon color="error" />
-                    <Typography variant="h6" fontWeight={950}>
+                    <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                       Highest score snapshot
                     </Typography>
                   </Stack>
 
                   {!maxScoreRow ? (
-                    <Typography color="text.secondary">No data yet. Upload a report and run scan.</Typography>
+                    <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                      No data yet. Upload a report and run scan.
+                    </Typography>
                   ) : (
                     (() => {
                       const row = mapRow(maxScoreRow);
@@ -851,36 +955,38 @@ export default function Anomaly() {
                           <Chip
                             icon={<WhatshotRoundedIcon />}
                             label={`Max score: ${safeFixed(row.score)} `}
+                            variant="outlined"
                             sx={{
                               width: "fit-content",
                               fontWeight: 900,
-                              bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.2 : 0.12),
-                              border: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`,
+                              borderColor: alpha(theme.palette.warning.main, 0.25),
+                              bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                              fontFamily: "Arial, Helvetica, sans-serif",
                             }}
                           />
-                          <Typography variant="body2">
+                          <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                             <b>Day:</b> {String(row.day)}
                           </Typography>
-                          <Typography variant="body2">
+                          <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                             <b>Station:</b> {String(row.station)}
                           </Typography>
-                          <Typography variant="body2">
+                          <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                             <b>Fuel:</b> {String(row.fuel)}
                           </Typography>
                           <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="body2" sx={{ fontWeight: 900 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}>
                               Prediction:
                             </Typography>
                             <SeverityChip pred={row.pred} />
                           </Stack>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                             {row.reason ? String(row.reason).slice(0, 180) : "—"}
                           </Typography>
                         </Stack>
                       );
                     })()
                   )}
-                </GlassCard>
+                </EnterpriseCard>
               </Grid>
             </Grid>
           </Box>
@@ -891,60 +997,66 @@ export default function Anomaly() {
           <Box sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <WarningAmberRoundedIcon color="error" />
-              <Typography variant="h6" fontWeight={950}>
+              <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                 Top Events (Grouped)
               </Typography>
               <Chip
                 label={`${events.length} total`}
                 size="small"
+                variant="outlined"
                 sx={{
                   ml: 1,
                   fontWeight: 900,
-                  bgcolor: alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.2 : 0.12),
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.25)}`,
+                  borderColor: alpha(theme.palette.error.main, 0.25),
+                  bgcolor: alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                  fontFamily: "Arial, Helvetica, sans-serif",
                 }}
               />
             </Stack>
 
-            <Divider sx={{ mb: 2, opacity: 0.6 }} />
+            <Divider sx={{ mb: 2, opacity: 0.8 }} />
 
             {events.length === 0 ? (
-              <Typography color="text.secondary">No events yet. Upload a report and run scan.</Typography>
+              <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                No events yet. Upload a report and run scan.
+              </Typography>
             ) : (
               <TableContainer
                 component={Paper}
                 elevation={0}
                 sx={{
-                  borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
-                  bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
+                  borderRadius: 2.25,
+                  border: (t) => `1px solid ${alpha(t.palette.common.black, t.palette.mode === "dark" ? 0.15 : 0.08)}`,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                 }}
               >
                 <Table size={dense ? "small" : "medium"}>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 950 }}>Event</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Start Day</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>End Day</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Days</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Max Score</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Event</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Start Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>End Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Days</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Max Score</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {events.slice(0, 20).map((ev, idx) => (
                       <TableRow key={idx} hover>
-                        <TableCell sx={{ fontWeight: 900 }}>#{idx + 1}</TableCell>
-                        <TableCell>{ev.start_day || ev.start || ev.startDay || "-"}</TableCell>
-                        <TableCell>{ev.end_day || ev.end || ev.endDay || "-"}</TableCell>
-                        <TableCell>{ev.days || ev.length || "-"}</TableCell>
+                        <TableCell sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}>#{idx + 1}</TableCell>
+                        <TableCell sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{ev.start_day || ev.start || ev.startDay || "-"}</TableCell>
+                        <TableCell sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{ev.end_day || ev.end || ev.endDay || "-"}</TableCell>
+                        <TableCell sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{ev.days || ev.length || "-"}</TableCell>
                         <TableCell>
                           <Chip
                             size="small"
+                            variant="outlined"
                             label={String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
                             sx={{
                               fontWeight: 900,
-                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
-                              border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                              borderColor: alpha(theme.palette.primary.main, 0.25),
+                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                              fontFamily: "Arial, Helvetica, sans-serif",
                             }}
                           />
                         </TableCell>
@@ -962,48 +1074,52 @@ export default function Anomaly() {
           <Box sx={{ p: { xs: 2.25, md: 3 } }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <TableChartRoundedIcon color="primary" />
-              <Typography variant="h6" fontWeight={950}>
+              <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                 Scored Days
               </Typography>
 
               <Chip
                 label={`${filteredScoredDays.length} shown`}
                 size="small"
+                variant="outlined"
                 sx={{
                   ml: 1,
                   fontWeight: 900,
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                  borderColor: alpha(theme.palette.primary.main, 0.25),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                  fontFamily: "Arial, Helvetica, sans-serif",
                 }}
               />
             </Stack>
 
-            <Divider sx={{ mb: 2, opacity: 0.6 }} />
+            <Divider sx={{ mb: 2, opacity: 0.8 }} />
 
             {filteredScoredDays.length === 0 ? (
-              <Typography color="text.secondary">No scored days yet. Upload a report and run scan.</Typography>
+              <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                No scored days yet. Upload a report and run scan.
+              </Typography>
             ) : (
               <TableContainer
                 component={Paper}
                 elevation={0}
                 sx={{
                   maxHeight: 560,
-                  borderRadius: 3,
-                  border: `1px solid ${alpha(theme.palette.common.white, 0.10)}`,
-                  bgcolor: alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.03 : 0.65),
+                  borderRadius: 2.25,
+                  border: (t) => `1px solid ${alpha(t.palette.common.black, t.palette.mode === "dark" ? 0.15 : 0.08)}`,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                 }}
               >
                 <Table stickyHeader size={dense ? "small" : "medium"}>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 950 }}>Day</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Station</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Fuel</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 950 }}>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Station</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Fuel</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
                         Score
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Pred</TableCell>
-                      <TableCell sx={{ fontWeight: 950 }}>Reason</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Pred</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Reason</TableCell>
                     </TableRow>
                   </TableHead>
 
@@ -1012,9 +1128,9 @@ export default function Anomaly() {
                       const row = mapRow(r);
                       return (
                         <TableRow key={idx} hover>
-                          <TableCell sx={{ whiteSpace: "nowrap" }}>{String(row.day)}</TableCell>
+                          <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "Arial, Helvetica, sans-serif" }}>{String(row.day)}</TableCell>
                           <TableCell sx={{ maxWidth: 280 }}>
-                            <Typography noWrap fontWeight={800}>
+                            <Typography noWrap fontWeight={800} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                               {String(row.station)}
                             </Typography>
                           </TableCell>
@@ -1022,21 +1138,29 @@ export default function Anomaly() {
                             <Chip
                               label={String(row.fuel)}
                               size="small"
+                              variant="outlined"
                               sx={{
                                 fontWeight: 900,
-                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.16 : 0.10),
-                                border: `1px solid ${alpha(theme.palette.secondary.main, 0.18)}`,
+                                borderColor: alpha(theme.palette.secondary.main, 0.22),
+                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.10 : 0.06),
+                                fontFamily: "Arial, Helvetica, sans-serif",
                               }}
                             />
                           </TableCell>
-                          <TableCell align="right" sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontWeight: 900 }}>
+                          <TableCell
+                            align="right"
+                            sx={{
+                              fontFamily: "Arial, Helvetica, sans-serif",
+                              fontWeight: 900,
+                            }}
+                          >
                             {safeFixed(row.score)}
                           </TableCell>
                           <TableCell>
                             <SeverityChip pred={row.pred} />
                           </TableCell>
                           <TableCell sx={{ maxWidth: 520 }}>
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            <Typography variant="body2" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
                               {String(row.reason || "").slice(0, 220) || "—"}
                             </Typography>
                           </TableCell>
@@ -1049,13 +1173,11 @@ export default function Anomaly() {
             )}
           </Box>
         ) : null}
-      </GlassCard>
+      </EnterpriseCard>
 
       {/* ✅ Notification Form Dialog */}
       <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 950 }}>
-          Send Notification to Responsible Staff
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Send Notification to Responsible Staff</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
@@ -1063,6 +1185,14 @@ export default function Anomaly() {
               value={notifyStation}
               onChange={(e) => setNotifyStation(e.target.value)}
               fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
             />
 
             <TextField
@@ -1072,10 +1202,25 @@ export default function Anomaly() {
               onChange={(e) => setNotifySeverity(e.target.value)}
               fullWidth
               helperText="Severity controls escalation + cooldown."
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
             >
-              <MenuItem value="Advisory">Advisory</MenuItem>
-              <MenuItem value="Warning">Warning</MenuItem>
-              <MenuItem value="Critical">Critical</MenuItem>
+              <MenuItem value="Advisory" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Advisory
+              </MenuItem>
+              <MenuItem value="Warning" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Warning
+              </MenuItem>
+              <MenuItem value="Critical" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Critical
+              </MenuItem>
             </TextField>
 
             <TextField
@@ -1084,8 +1229,18 @@ export default function Anomaly() {
               value={notifyChannel}
               onChange={(e) => setNotifyChannel(e.target.value)}
               fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
             >
-              <MenuItem value="email">Email</MenuItem>
+              <MenuItem value="email" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Email
+              </MenuItem>
             </TextField>
 
             <TextField
@@ -1099,9 +1254,18 @@ export default function Anomaly() {
               value={notifyRoles}
               onChange={(e) => setNotifyRoles(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
               helperText="Choose which roles should receive the alert."
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
             >
               {["SUPERVISOR", "MANAGER", "SENIOR_MANAGER"].map((role) => (
-                <MenuItem key={role} value={role}>
+                <MenuItem key={role} value={role} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                   <Checkbox checked={notifyRoles.indexOf(role) > -1} />
                   <ListItemText primary={role} />
                 </MenuItem>
@@ -1116,22 +1280,30 @@ export default function Anomaly() {
               multiline
               minRows={4}
               placeholder="Explain what was detected and what action is required."
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
             />
 
-            <GlassCard sx={{ p: 1.5 }}>
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <EnterpriseCard sx={{ p: 1.5 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
                 Recipients available in DB for this station:
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              <Typography variant="body2" sx={{ fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif" }}>
                 {recipientOptions.length
                   ? recipientOptions.map((u) => `${u.role}: ${u.email}`).join(" • ")
                   : "No recipients loaded (seed users first)."}
               </Typography>
-            </GlassCard>
+            </EnterpriseCard>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setNotifyOpen(false)} sx={{ borderRadius: 2, fontWeight: 900 }}>
+          <Button onClick={() => setNotifyOpen(false)} sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}>
             Cancel
           </Button>
           <Button
@@ -1140,7 +1312,7 @@ export default function Anomaly() {
             onClick={handleSendManual}
             disabled={notifySending}
             startIcon={notifySending ? <CircularProgress size={18} color="inherit" /> : <WarningAmberRoundedIcon />}
-            sx={{ borderRadius: 2, fontWeight: 950, textTransform: "none" }}
+            sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", boxShadow: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
           >
             {notifySending ? "Sending…" : "Send Alert"}
           </Button>
@@ -1149,7 +1321,7 @@ export default function Anomaly() {
 
       {/* Snackbar */}
       <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={closeSnack} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%", borderRadius: 2 }}>
+        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%", borderRadius: 2, fontFamily: "Arial, Helvetica, sans-serif" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
