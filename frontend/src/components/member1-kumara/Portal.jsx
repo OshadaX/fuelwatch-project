@@ -414,16 +414,26 @@ export default function Portal() {
   const pages = Math.max(1, Math.ceil(total / 10));
 
   async function nextStep() {
-    const ok =
-      activeStep === 0
-        ? await trigger(["Id", "Name", "Location"])
-        : activeStep === 1
-        ? await trigger(["person.Id", "person.PersonName", "person.PersonDesignation", "person.PersonEmail", "person.ContactNumber", "person.StartTime", "person.EndTime"])
-        : await trigger(["tanks"]);
+  const fieldsToCheck =
+    activeStep === 0
+      ? ["Id", "Name", "Location"]
+      : activeStep === 1
+      ? ["person.Id", "person.PersonName", "person.PersonDesignation", "person.PersonEmail", "person.ContactNumber", "person.StartTime", "person.EndTime"]
+      : ["tanks"];
 
-    if (!ok) return alertErr("Validation", "Please fix the highlighted fields.");
-    setActiveStep((s) => Math.min(s + 1, steps.length - 1));
+  const ok = await trigger(fieldsToCheck, { shouldFocus: true });
+
+  if (!ok) {
+    const e = errors; // current errors object
+    await alertErr(
+      "Validation failed",
+      "A required field is invalid. The cursor will jump to the wrong field."
+    );
+    return;
   }
+
+  setActiveStep((s) => Math.min(s + 1, steps.length - 1));
+}
 
   function prevStep() {
     setActiveStep((s) => Math.max(s - 1, 0));
