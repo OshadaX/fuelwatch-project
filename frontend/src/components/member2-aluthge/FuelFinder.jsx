@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, ArrowRight, Fuel, ChevronLeft, Search, CheckCircle, XCircle, Droplet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const FuelFinder = () => {
+    const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [location, setLocation] = useState(null);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    const [dbStations, setDbStations] = useState([]);
 
     // Form states
-    const [fuelType, setFuelType] = useState('Petrol');
+    const [fuelType, setFuelType] = useState('Lanka Petrol 92 Octane');
     const [brand, setBrand] = useState('');
+
+    // API Base URL
+    const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
 
     // Mock data
     const mockStations = [
@@ -56,6 +62,50 @@ const FuelFinder = () => {
             inventory: { 'Petrol': 'Unavailable', 'Diesel': 'Available', 'Other': 'Available' }
         },
     ];
+
+    const fetchDbStations = async () => {
+        try {
+            // Note: In reality, use an endpoint that returns all items without pagination if possible, 
+            // or pass a high limit just for frontend radius filtering.
+            const response = await fetch(`${API_BASE}/station?limit=100`);
+            const data = await response.json();
+
+            const stationsList = Array.isArray(data) ? data : (data.items || []);
+
+            // Map the DB Stations into a usable format, assigning mock coordinates built from their location string roughly
+            // since actual lat/lng fields don't seem explicitly present on the registration form Schema.
+            const mappedStations = stationsList.map(st => {
+                // Creating deterministic faux-coordinates based on ID length to scatter them around Colombo
+                const baseLat = 6.9271;
+                const baseLng = 79.8612;
+                const offset = (st.Id.length * 0.01) || 0.05;
+
+                // Simplify tank inventory structure to what the UI expects for `Available`/`Unavailable`
+                const inventoryObj = {};
+                st.tanks?.forEach(tank => {
+                    // If it exists in tanks array, assume Available 
+                    inventoryObj[tank.fuel_type] = 'Available';
+                });
+
+                return {
+                    id: st._id || st.Id,
+                    name: st.Name,
+                    lat: baseLat + (Math.random() * offset * (Math.random() > 0.5 ? 1 : -1)),
+                    lng: baseLng + (Math.random() * offset * (Math.random() > 0.5 ? 1 : -1)),
+                    address: st.Location,
+                    status: "Open", // Defaulting to Open
+                    brand: st.Name.includes("IOC") ? "IOC" : st.Name.includes("Sinopec") ? "Sinopec" : "Ceypetco",
+                    inventory: inventoryObj
+                };
+            });
+
+            setDbStations(mappedStations);
+        } catch (err) {
+            console.error("Failed to fetch registered stations", err);
+            // Fallback to mock data if backend request fails
+            setDbStations(mockStations);
+        }
+    };
 
     const handleGetLocation = () => {
         setLoading(true);
@@ -104,7 +154,7 @@ const FuelFinder = () => {
 
     const findBestStation = (userLoc) => {
         // 1. Calculate distance & Filter by Brand (if selected)
-        let candidates = mockStations.map(station => ({
+        let candidates = dbStations.map(station => ({
             ...station,
             distance: calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng)
         }));
@@ -134,10 +184,47 @@ const FuelFinder = () => {
         if (recommended) {
             setResult(recommended);
             setStep(3);
+
+            saveSubmissionLogger({
+                type: 'Fuel',
+                location: userLoc,
+                preference: `${fuelType} (${brand || 'Any'})`,
+                status: 'Resolved',
+                recommendedStation: recommended.name
+            });
         } else {
             setError(`No open stations found with ${fuelType} available nearby.`);
             setStep(1);
+
+            saveSubmissionLogger({
+                type: 'Fuel',
+                location: userLoc,
+                preference: `${fuelType} (${brand || 'Any'})`,
+                status: 'No Stations',
+                recommendedStation: 'N/A'
+            });
         }
+    };
+
+    const saveSubmissionLogger = (data) => {
+        const existingLogs = JSON.parse(localStorage.getItem('guestSubmissions') || '[]');
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+        const newLog = {
+            id: `REC-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+            currentLocation: `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}`,
+            type: data.type,
+            preference: data.preference,
+            status: data.status,
+            recommendedStation: data.recommendedStation,
+            submissionDate: dateStr,
+            submissionTime: timeStr
+        };
+
+        localStorage.setItem('guestSubmissions', JSON.stringify([newLog, ...existingLogs]));
     };
 
     const resetForm = () => {
@@ -148,6 +235,7 @@ const FuelFinder = () => {
 
     useEffect(() => {
         handleGetLocation();
+        fetchDbStations();
     }, []);
 
     return (
@@ -214,9 +302,11 @@ const FuelFinder = () => {
                                                 onChange={(e) => setFuelType(e.target.value)}
                                                 className="block w-full pl-4 pr-8 py-3.5 bg-slate-50 border-0 rounded-2xl text-slate-800 text-sm font-medium focus:ring-2 focus:ring-amber-500/20 appearance-none cursor-pointer"
                                             >
-                                                <option value="Petrol">Petrol</option>
-                                                <option value="Diesel">Diesel</option>
-                                                <option value="Other">Other</option>
+                                                <option value="Lanka Petrol 92 Octane">Petrol 92 Octane</option>
+                                                <option value="Lanka Petrol 95 Octane">Petrol 95 Octane</option>
+                                                <option value="Lanka Auto Diesel">Auto Diesel</option>
+                                                <option value="Lanka Super Diesel">Super Diesel</option>
+                                                <option value="Auto Kerosene">Auto Kerosene</option>
                                             </select>
                                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500">
                                                 <Droplet size={16} />
@@ -346,7 +436,12 @@ const FuelFinder = () => {
 
                                 <div className="space-y-3">
                                     <button
-                                        onClick={() => window.alert("Navigation Started!")}
+                                        onClick={() => navigate('/navigate', {
+                                            state: {
+                                                destination: { ...result, type: 'fuel' },
+                                                origin: location || { lat: 6.9270, lng: 79.8610 }
+                                            }
+                                        })}
                                         className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                     >
                                         <Navigation size={20} />

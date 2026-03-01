@@ -25,6 +25,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             roles: ["admin"],
             features: [
                 { name: "Smart Recommendations", path: "/recommendation" },
+                { name: "EV Station Portal", path: "/ev-portal" },
                 { name: "Station Map", path: "/station-map" }
             ]
         },

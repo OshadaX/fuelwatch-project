@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, ArrowRight, Zap, ChevronLeft, BatteryCharging, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const EVFinder = () => {
+    const navigate = useNavigate();
     const [step, setStep] = useState(1); // 1: Form, 2: Loading, 3: Result
     const [location, setLocation] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -38,7 +40,7 @@ const EVFinder = () => {
                     setError("Unable to retrieve your location. Please enable GPS.");
                     setLoading(false);
                     // Fallback for demo if GPS fails/denied
-                    setLocation({ lat: 6.9270, lng: 79.8610 }); 
+                    setLocation({ lat: 6.9270, lng: 79.8610 });
                 }
             );
         } else {
@@ -67,7 +69,7 @@ const EVFinder = () => {
     const handleSubmit = (e) => {
         e.preventDefault();
         setStep(2);
-        
+
         // Simulate API call and calculation
         setTimeout(() => {
             if (!location) {
@@ -91,12 +93,52 @@ const EVFinder = () => {
 
         // Recommend nearest (ignoring availability as per requirements)
         if (stationsWithDist.length > 0) {
-            setResult(stationsWithDist[0]);
+            const recommendedStation = stationsWithDist[0];
+            setResult(recommendedStation);
             setStep(3);
+
+            // Save to localStorage for Admin Smart Recommendation Logging
+            saveSubmissionLogger({
+                type: 'EV Charging',
+                location: userLoc,
+                preference: 'Any',
+                status: 'Resolved',
+                recommendedStation: recommendedStation.name
+            });
         } else {
             setError("No stations found nearby.");
             setStep(1);
+
+            // Log failed search
+            saveSubmissionLogger({
+                type: 'EV Charging',
+                location: userLoc,
+                preference: 'Any',
+                status: 'No Stations',
+                recommendedStation: 'N/A'
+            });
         }
+    };
+
+    const saveSubmissionLogger = (data) => {
+        const existingLogs = JSON.parse(localStorage.getItem('guestSubmissions') || '[]');
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+        const newLog = {
+            id: `REC-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+            currentLocation: `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}`,
+            type: data.type,
+            preference: data.preference,
+            status: data.status,
+            recommendedStation: data.recommendedStation,
+            submissionDate: dateStr,
+            submissionTime: timeStr
+        };
+
+        localStorage.setItem('guestSubmissions', JSON.stringify([newLog, ...existingLogs]));
     };
 
     const resetForm = () => {
@@ -111,14 +153,14 @@ const EVFinder = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 p-6 flex flex-col items-center justify-center relative overflow-hidden">
-             {/* Background Elements */}
+            {/* Background Elements */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
                 <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-blue-200/30 rounded-full blur-3xl" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-green-200/30 rounded-full blur-3xl" />
             </div>
 
             <div className="w-full max-w-md z-10">
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-8 text-center"
@@ -215,7 +257,7 @@ const EVFinder = () => {
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div className="p-6">
                                 <div className="grid grid-cols-2 gap-4 mb-8">
                                     <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
@@ -232,13 +274,18 @@ const EVFinder = () => {
 
                                 <div className="space-y-3">
                                     <button
-                                        onClick={() => window.alert("Station Confirmed! Navigation started.")} // Mock action
+                                        onClick={() => navigate('/navigate', {
+                                            state: {
+                                                destination: { ...result, type: 'ev' },
+                                                origin: location || { lat: 6.9270, lng: 79.8610 }
+                                            }
+                                        })}
                                         className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                     >
                                         <Navigation size={20} />
                                         Confirm Station
                                     </button>
-                                    
+
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={resetForm}
@@ -247,8 +294,8 @@ const EVFinder = () => {
                                             <ChevronLeft size={18} />
                                             Back
                                         </button>
-                                         <button
-                                            onClick={() => window.location.href = '/'} 
+                                        <button
+                                            onClick={() => window.location.href = '/'}
                                             className="py-3 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition-colors"
                                         >
                                             Home
