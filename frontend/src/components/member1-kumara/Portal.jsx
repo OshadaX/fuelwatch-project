@@ -685,11 +685,12 @@ export default function Portal() {
                       disabled={locked}
                       onClick={() => {
               if (locked) {
-              toast.error(
-              idx === 1
-                ? "Complete Station Details first."
-                : "Complete Station + Contact Person details first."
-              );
+              await alertErr(
+                  "Complete previous step",
+                  idx === 1
+                    ? "Complete Station Details first."
+                    : "Complete Station + Contact Person details first."
+                );
             return;
                   }
                 setActiveStep(idx);
