@@ -680,29 +680,32 @@ export default function Portal() {
 
               return (
                   <button
-                      key={s.key}
+                     key={s.key}
                       type="button"
                       disabled={locked}
-                      onClick={async () => {
-                        if (locked) {
-                          await alertErr(
-                            "Complete previous step",
-                            idx === 1
-                              ? "Complete Station Details first."
-                              : "Complete Station + Contact Person details first."
-                          );
-                          return;
-                        }
-                        setActiveStep(idx);
-                      }}
-                      style={{
+                      onClick={() => {
+              if (locked) {
+              toast.error(
+              idx === 1
+                ? "Complete Station Details first."
+                : "Complete Station + Contact Person details first."
+              );
+            return;
+                  }
+                setActiveStep(idx);
+                  }}
+                    style={{
                         ...S.tabBtn(active),
                         opacity: locked ? 0.5 : 1,
                         cursor: locked ? "not-allowed" : "pointer",
-                      }}
+                  }}
+                  title={locked ? "Complete previous step first" : ""}
                     >
-                        ...
-                    </button>
+                <span style={S.row}>
+                <Icon size={16} /> {s.title}
+                <span style={S.pill(ok ? "ok" : "neutral")}>{ok ? "Valid" : "View"}</span>
+                </span>
+              </button>
               );
               })}
             </div>
