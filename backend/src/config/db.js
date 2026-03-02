@@ -19,22 +19,22 @@ const connectDB = async () => {
       tls: true, // Required for Atlas
     });
 
-    console.log("🟢 Mongoose connected");
-    console.log(`✅ MongoDB connected: ${conn.connection.host}`);
-    console.log("📦 Connected DB name:", mongoose.connection.name);
+    console.log("Mongoose connected");
+    console.log(`MongoDB connected: ${conn.connection.host}`);
+    console.log("Connected DB name:", mongoose.connection.name);
 
     // Connection event listeners
     mongoose.connection.on("disconnected", () => {
-      console.log("🟡 Mongoose disconnected");
+      console.log("Mongoose disconnected");
     });
 
     mongoose.connection.on("error", (err) => {
-      console.error("🔴 Mongoose connection error:", err.message);
+      console.error("Mongoose connection error:", err.message);
     });
 
     return conn;
   } catch (err) {
-    console.error("❌ MongoDB connection failed:", err.message);
+    console.error("MongoDB connection failed:", err.message);
 
     if (process.env.NODE_ENV === "production") {
       process.exit(1);

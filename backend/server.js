@@ -19,9 +19,9 @@ const anomalyRoutes = require("./src/routes/member1-kumara/anomaly.routes");
 const uploadRoutes = require("./src/routes/member1-kumara/upload.routes");
 const employeeRoutes = require("./src/routes/member3-oshada/employee.routes");
 const attendanceRoutes = require("./src/routes/member3-oshada/attendance.routes");
-const notificationRoutes = require("./src/routes/member1-kumara/notificationRoutes");
 const seedRoutes = require("./src/routes/member1-kumara/seedRoutes");
-
+const reportRoutes = require("./src/routes/member1-kumara/reportRoutes");   // add near other requires
+const notificationsRoutes = require("./src/routes/member1-kumara/notifications.routes");
 
 // (Optional) Models: only needed if you rely on auto-index creation or model side-effects.
 // Safe to keep.
@@ -41,13 +41,7 @@ dns.setServers(["1.1.1.1", "8.8.8.8"]); // Cloudflare + Google
 /* ===========================
    Middleware
 =========================== */
-app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN || "*",
-    credentials: true,
-  })
-);
-
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -67,8 +61,9 @@ app.use("/api/anomaly", anomalyRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
-app.use("/api/notifications", notificationRoutes);
+app.use("/api/notifications", notificationsRoutes);
 app.use("/api/seed", seedRoutes);
+app.use("/api/reports", reportRoutes);
 
 
 /* ===========================
@@ -83,7 +78,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.json({ status: "FuelWatch API running 🚀" });
+  res.json({ status: "FuelWatch API running" });
 });
 
 /* ===========================
@@ -97,7 +92,7 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err);
+  console.error("Server Error:", err);
   res.status(err.status || 500).json({
     message: err.message || "Internal Server Error",
   });
@@ -109,7 +104,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8081;
 
 app.listen(PORT, () => {
-  console.log(`🚀 FuelWatch server running on port ${PORT}`);
-  console.log(`✅ Health: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Station base: http://localhost:${PORT}/api/station`);
+  console.log(`FuelWatch server running on port ${PORT}`);
+  console.log(`Health: http://localhost:${PORT}/api/health`);
+  console.log(`Station base: http://localhost:${PORT}/api/station`);
 });

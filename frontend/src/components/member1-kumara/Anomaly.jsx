@@ -476,12 +476,15 @@ export default function Anomaly() {
         channel: notifyChannel, // email
         roles: notifyRoles, // ["SUPERVISOR","MANAGER"]
         message: notifyMessage,
-
+        
+        manager_email: JSON.parse(localStorage.getItem("user"))?.email || "unknown",
         // attach scan context (for audit + email preview)
         threshold: decisionThreshold,
         file_name: file?.name || "",
         rows: scoredDays,
         events: events,
+
+        
       };
 
       const res = await fetch(`${BACKEND}/api/notifications/send-manual`, {

@@ -14,6 +14,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             roles: ["admin"],
             features: [
                 { name: "Fuelwatch Portal", path: "/portal" },
+                { name: "Report Generator", path: "/regen" },
                 { name: "Dispensed Error Detection", path: "/anomaly" },
                 { name: "Fuel quantity-Predictions", path: "/fuel-forecast" },
                 { name: "Sensor Testing", path: "/sensor-test" }

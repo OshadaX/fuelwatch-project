@@ -15,6 +15,8 @@
     "concurrently": "^8.2.2"
   },
   "dependencies": {
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
     "lucide-react": "^0.562.0",
     "nodemailer": "^8.0.1",
     "recharts": "^3.7.0",
