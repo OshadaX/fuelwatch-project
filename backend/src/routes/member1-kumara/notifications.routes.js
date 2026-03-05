@@ -1,8 +1,10 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
 
+const Station = require("../../models/member1-kumara/StationModel");
 const NotificationRecipient = require("../../models/member1-kumara/NotificationRecipientModel");
 const Notification = require("../../models/member1-kumara/NotificationModel");
+const { sendEmail } = require("../../utils/mailer");
 
 const router = express.Router();
 
@@ -84,98 +86,55 @@ router.get("/recipients", async (req, res) => {
 ========================================================= */
 router.post("/send-manual", async (req, res) => {
   try {
-    const {
+    const { station_id, severity, message } = req.body;
+
+    if (!station_id || station_id === "UNKNOWN") {
+      return res.status(400).json({ error: "Station ID is required (not UNKNOWN)" });
+    }
+
+    // 1) get station
+    const station = await Station.findOne({ Id: station_id.trim().toUpperCase() });
+    if (!station) {
+      return res.status(404).json({ error: "Station not found for this station_id" });
+    }
+
+    // 2) get manager email from station
+    const toEmail = (station.manager_email || "").trim().toLowerCase();
+    if (!toEmail) {
+      return res.status(400).json({ error: "manager_email not found for this station" });
+    }
+
+    // 3) send email
+    await sendEmail({
+      to: toEmail,
+      subject: `FuelWatch Alert — ${severity || "Warning"} — ${station_id}`,
+      html: `
+        <h3>FuelWatch Alert</h3>
+        <p><b>Station:</b> ${station_id}</p>
+        <p><b>Severity:</b> ${severity || "Warning"}</p>
+        <p><b>Message:</b> ${message || "-"}</p>
+      `,
+    });
+
+    // 4) save notification
+    await Notification.create({
       station_id,
-      severity,
-      channel,
-      roles,
-      message,
-      threshold,
-      file_name,
-      rows,
-      events,
-      manager_email, // frontend should send logged in manager email
-    } = req.body;
-
-    const station = normalizeStationId(station_id);
-    if (!station) return res.status(400).json({ error: "Station ID is required (not UNKNOWN)" });
-    if (!severity) return res.status(400).json({ error: "Severity is required" });
-    if (!Array.isArray(roles) || roles.length === 0) return res.status(400).json({ error: "Select at least one role" });
-    if (!message || !String(message).trim()) return res.status(400).json({ error: "Message is required" });
-
-    // 1) Resolve recipients from YOUR mapping collection
-    const recDocs = await NotificationRecipient.find({
-      station_id: station,
-      role: { $in: roles },
-      is_active: true,
+      severity: severity || "Warning",
+      channel: "email",
+      recipient_email: toEmail,
+      message: message || "",
+      triggered_by: "manager",
+      created_at: new Date(),
     });
-
-    if (!recDocs.length) {
-      return res.status(404).json({ error: "No recipients configured for this station & selected roles" });
-    }
-
-    // Deduplicate by email
-    const seen = new Set();
-    const recipients = [];
-    for (const r of recDocs) {
-      const email = String(r.email || "").trim().toLowerCase();
-      if (!email || seen.has(email)) continue;
-      seen.add(email);
-      recipients.push({ role: r.role, email });
-    }
-
-    const subject = `FuelWatch Alert — ${severity} — ${station}`;
-
-    // 2) Build and store summary context (don’t store huge rows unless you need it)
-    const summary = computeSummary(rows, events);
-    const context = {
-      threshold: Number(threshold),
-      file_name: String(file_name || ""),
-      ...summary,
-    };
-
-    // 3) Save record FIRST (queued)
-    const notification = await Notification.create({
-      station_id: station,
-      severity,
-      channel: channel || "email",
-      roles,
-      recipients,
-      subject,
-      message,
-      context,
-      created_by: {
-        role: "MANAGER",
-        email: manager_email ? String(manager_email).toLowerCase() : "unknown",
-      },
-      status: "queued",
-    });
-
-    // 4) Send email
-    const toList = recipients.map((r) => r.email).join(",");
-
-    const mailResp = await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: toList,
-      subject,
-      text: message,
-    });
-
-    // 5) Update record after send
-    notification.status = "sent";
-    notification.sentAt = new Date();
-    notification.provider = { name: "gmail", messageId: mailResp.messageId };
-    notification.error = null;
-    await notification.save();
 
     return res.json({
-      message: `Alert sent to ${recipients.length} recipient(s)`,
       status: "sent",
-      notification_id: notification._id,
+      message: `Email sent to manager: ${toEmail}`,
     });
-  } catch (err) {
-    // Optional: if send fails and you created a record, update it to failed (advanced)
-    return res.status(500).json({ error: err.message || "Failed to send alert" });
+
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Failed to send alert" });
   }
 });
 

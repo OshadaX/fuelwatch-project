@@ -1,4 +1,9 @@
 import React, { useMemo, useState } from "react";
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+
+// npm i sweetalert2 sweetalert2-react-content
+const MySwal = withReactContent(Swal);
 
 export default function ReportsGenerator() {
   const [file, setFile] = useState(null);
@@ -7,9 +12,6 @@ export default function ReportsGenerator() {
   const [useAI, setUseAI] = useState(true);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [rowErrors, setRowErrors] = useState([]);
-  const [validationErrors, setValidationErrors] = useState([]);
   const [audit, setAudit] = useState(null);
 
   const canSubmit = useMemo(() => {
@@ -20,18 +22,175 @@ export default function ReportsGenerator() {
     );
   }, [file, from, to]);
 
+  // ---------- SweetAlert helpers ----------
+  const toast = Swal.mixin({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 2400,
+    timerProgressBar: true,
+    didOpen: (t) => {
+      t.onmouseenter = Swal.stopTimer;
+      t.onmouseleave = Swal.resumeTimer;
+    },
+  });
+
+  const showError = async (title, html) => {
+    await MySwal.fire({
+      icon: "error",
+      title,
+      html,
+      confirmButtonText: "OK",
+    });
+  };
+
+  const showInfo = async (title, html) => {
+    await MySwal.fire({
+      icon: "info",
+      title,
+      html,
+      confirmButtonText: "OK",
+    });
+  };
+
+  const showWarn = async (title, html) => {
+    await MySwal.fire({
+      icon: "warning",
+      title,
+      html,
+      confirmButtonText: "OK",
+    });
+  };
+
+  const showSuccess = async (title, html) => {
+    await MySwal.fire({
+      icon: "success",
+      title,
+      html,
+      confirmButtonText: "OK",
+    });
+  };
+
+  const showAuditModal = async (auditObj) => {
+    await MySwal.fire({
+      icon: "info",
+      title: "Audit (traceability)",
+      html: `<pre style="
+        margin:0;
+        text-align:left;
+        white-space:pre-wrap;
+        word-break:break-word;
+        background:rgba(2,6,23,0.04);
+        border:1px solid rgba(15,23,42,0.08);
+        padding:12px;
+        border-radius:14px;
+        max-height:360px;
+        overflow:auto;
+        font-size:12px;
+        line-height:1.45;
+      ">${escapeHtml(JSON.stringify(auditObj, null, 2))}</pre>`,
+      width: 720,
+      confirmButtonText: "Close",
+    });
+  };
+
+  const showValidationErrors = async (validationErrors) => {
+    const items = validationErrors.slice(0, 50).map((e) => {
+      const prefix = e?.rowIndex ? `<b>Row ${e.rowIndex}:</b> ` : "";
+      return `<li style="margin:6px 0;">${prefix}${escapeHtml(String(e?.error ?? e))}</li>`;
+    });
+
+    const more =
+      validationErrors.length > 50
+        ? `<div style="margin-top:10px;color:#64748b;font-size:12px;">Showing first 50…</div>`
+        : "";
+
+    await MySwal.fire({
+      icon: "warning",
+      title: "Validation Errors",
+      html: `
+        <div style="text-align:left">
+          <ul style="padding-left:18px;margin:0;">
+            ${items.join("")}
+          </ul>
+          ${more}
+        </div>
+      `,
+      width: 760,
+      confirmButtonText: "OK",
+    });
+  };
+
+  const showRowErrors = async (rowErrors) => {
+    const items = rowErrors.slice(0, 20).map((re) => {
+      const errs = (re?.errors || [])
+        .slice(0, 50)
+        .map((x) => `<li style="margin:6px 0;">${escapeHtml(String(x))}</li>`)
+        .join("");
+
+      return `
+        <li style="margin:12px 0;">
+          <div style="font-weight:900;margin-bottom:6px;">Row ${escapeHtml(
+            String(re?.rowIndex ?? "")
+          )}</div>
+          <ul style="padding-left:18px;margin:0;">
+            ${errs}
+          </ul>
+        </li>
+      `;
+    });
+
+    const more =
+      rowErrors.length > 20
+        ? `<div style="margin-top:10px;color:#64748b;font-size:12px;">Showing first 20 rows…</div>`
+        : "";
+
+    await MySwal.fire({
+      icon: "error",
+      title: "Row Normalization Errors (Strict Mode)",
+      html: `
+        <div style="text-align:left">
+          <ul style="padding-left:18px;margin:0;">
+            ${items.join("")}
+          </ul>
+          ${more}
+        </div>
+      `,
+      width: 820,
+      confirmButtonText: "OK",
+    });
+  };
+
+  const showGeneratingModal = () => {
+    MySwal.fire({
+      title: "Generating report…",
+      html: "Please wait while we prepare your PDF.",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+  };
+
+  const closeModal = () => {
+    Swal.close();
+  };
+
   async function handleGenerate() {
-    setError("");
-    setRowErrors([]);
-    setValidationErrors([]);
     setAudit(null);
 
     if (!canSubmit) {
-      setError("Please select a CSV file and valid From/To dates.");
+      await showWarn(
+        "Missing inputs",
+        "Please select a CSV file and enter valid <b>From</b>/<b>To</b> dates (YYYY-MM-DD)."
+      );
       return;
     }
 
     setLoading(true);
+    showGeneratingModal();
+
     try {
       const form = new FormData();
       form.append("file", file);
@@ -47,30 +206,51 @@ export default function ReportsGenerator() {
       const contentType = resp.headers.get("content-type") || "";
 
       if (!resp.ok) {
+        // Prefer JSON error payloads
         if (contentType.includes("application/json")) {
-          const data = await resp.json();
-          setError(data.error || "Report generation failed.");
-          if (data.rowErrors) setRowErrors(data.rowErrors);
-          if (data.validationErrors) setValidationErrors(data.validationErrors);
+          const data = await resp.json().catch(() => ({}));
+
+          closeModal();
+          const msg = data?.error || `Report generation failed (HTTP ${resp.status}).`;
+          await showError("Generation failed", escapeHtml(String(msg)));
+
+          if (Array.isArray(data?.validationErrors) && data.validationErrors.length) {
+            await showValidationErrors(data.validationErrors);
+          }
+          if (Array.isArray(data?.rowErrors) && data.rowErrors.length) {
+            await showRowErrors(data.rowErrors);
+          }
           return;
         } else {
-          setError(`Report generation failed (HTTP ${resp.status}).`);
+          closeModal();
+          await showError(
+            "Generation failed",
+            `Report generation failed (HTTP ${resp.status}).`
+          );
           return;
         }
       }
 
       const blob = await resp.blob();
 
+      // Audit (base64 JSON in header)
       const auditHeader = resp.headers.get("X-Report-Audit");
       if (auditHeader) {
         try {
           const json = JSON.parse(atob(auditHeader));
           setAudit(json);
+
+          // optional: show audit toast + button in modal
+          toast.fire({
+            icon: "info",
+            title: "Audit captured",
+          });
         } catch {
           // ignore
         }
       }
 
+      // Download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -79,10 +259,35 @@ export default function ReportsGenerator() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+
+      closeModal();
+      await showSuccess(
+        "Done!",
+        `Your report has been generated and downloaded as <b>${escapeHtml(
+          `sale-by-site-${from}-to-${to}.pdf`
+        )}</b>.`
+      );
+
+      // If audit exists, offer to view it
+      if (auditHeader) {
+        const res = await MySwal.fire({
+          icon: "question",
+          title: "View audit details?",
+          html: "An audit trace was returned by the server. Do you want to open it now?",
+          showCancelButton: true,
+          confirmButtonText: "Open audit",
+          cancelButtonText: "Not now",
+        });
+        if (res.isConfirmed && audit) {
+          await showAuditModal(audit);
+        }
+      }
     } catch (e) {
-      setError(String(e?.message || e));
+      closeModal();
+      await showError("Unexpected error", escapeHtml(String(e?.message || e)));
     } finally {
       setLoading(false);
+      closeModal();
     }
   }
 
@@ -245,53 +450,6 @@ export default function ReportsGenerator() {
       gap: 10,
     },
     secondaryText: { fontSize: 12, color: "#64748b" },
-    panel: {
-      borderRadius: 16,
-      border: "1px solid rgba(15, 23, 42, 0.08)",
-      background: "rgba(255,255,255,0.78)",
-      backdropFilter: "blur(10px)",
-      boxShadow:
-        "0 16px 40px rgba(2, 6, 23, 0.08), 0 1px 0 rgba(255,255,255,0.7) inset",
-      overflow: "hidden",
-    },
-    panelHeader: {
-      padding: "14px 16px",
-      borderBottom: "1px solid rgba(15, 23, 42, 0.06)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-    },
-    panelTitle: { margin: 0, fontSize: 14, fontWeight: 900 },
-    panelBody: { padding: 16 },
-    alert: (tone) => ({
-      borderRadius: 14,
-      border: "1px solid rgba(15, 23, 42, 0.08)",
-      padding: 12,
-      background:
-        tone === "error"
-          ? "linear-gradient(180deg, rgba(255, 240, 245, 0.9) 0%, rgba(255,255,255,0.7) 100%)"
-          : tone === "warn"
-          ? "linear-gradient(180deg, rgba(255, 247, 237, 0.9) 0%, rgba(255,255,255,0.7) 100%)"
-          : "linear-gradient(180deg, rgba(239, 246, 255, 0.9) 0%, rgba(255,255,255,0.7) 100%)",
-      boxShadow: "0 10px 24px rgba(2, 6, 23, 0.06)",
-    }),
-    alertTitle: { fontWeight: 900, marginBottom: 6, fontSize: 13 },
-    list: { margin: 0, paddingLeft: 18, color: "#0f172a" },
-    smallNote: { marginTop: 8, fontSize: 12, color: "#64748b" },
-    pre: {
-      margin: 0,
-      borderRadius: 14,
-      padding: 12,
-      background: "rgba(2,6,23,0.04)",
-      border: "1px solid rgba(15,23,42,0.08)",
-      whiteSpace: "pre-wrap",
-      color: "#0f172a",
-      fontSize: 12,
-      lineHeight: 1.45,
-      overflow: "auto",
-      maxHeight: 340,
-    },
     footer: {
       marginTop: 14,
       fontSize: 12,
@@ -300,26 +458,10 @@ export default function ReportsGenerator() {
     },
   };
 
-  const Spinner = () => (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 16,
-        height: 16,
-        borderRadius: "50%",
-        border: "2px solid rgba(255,255,255,0.55)",
-        borderTopColor: "rgba(255,255,255,1)",
-        display: "inline-block",
-        animation: "spin 0.9s linear infinite",
-      }}
-    />
-  );
-
   return (
     <div style={styles.page}>
       {/* Keyframes (UI-only) */}
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 980px) {
           .rg-grid { grid-template-columns: 1fr !important; }
         }
@@ -332,7 +474,7 @@ export default function ReportsGenerator() {
             <div style={styles.titleWrap}>
               <h1 style={styles.h1}>AI-based Report Generator</h1>
               <p style={styles.sub}>
-                Fuelwatch - Report Generator for Fuel Quantity Forecasting 
+                Fuelwatch - Report Generator for Fuel Quantity Forecasting
               </p>
             </div>
           </div>
@@ -344,7 +486,9 @@ export default function ReportsGenerator() {
                 height: 8,
                 borderRadius: 999,
                 background: loading ? "#f59e0b" : "#22c55e",
-                boxShadow: loading ? "0 0 0 4px rgba(245,158,11,0.15)" : "0 0 0 4px rgba(34,197,94,0.15)",
+                boxShadow: loading
+                  ? "0 0 0 4px rgba(245,158,11,0.15)"
+                  : "0 0 0 4px rgba(34,197,94,0.15)",
               }}
             />
             {loading ? "Generating…" : "Ready"}
@@ -366,7 +510,9 @@ export default function ReportsGenerator() {
 
                 <div style={styles.fileWrap}>
                   <div style={styles.fileMeta}>
-                    <div style={styles.fileName}>{file ? file.name : "No file selected"}</div>
+                    <div style={styles.fileName}>
+                      {file ? file.name : "No file selected"}
+                    </div>
                     <div style={styles.fileHint}>Accepted: .csv (text/csv)</div>
                   </div>
 
@@ -392,7 +538,17 @@ export default function ReportsGenerator() {
                       type="file"
                       accept=".csv,text/csv"
                       style={{ display: "none" }}
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0] || null;
+                        setFile(f);
+                        if (f) {
+                          toast.fire({
+                            icon: "success",
+                            title: "File selected",
+                            text: f.name,
+                          });
+                        }
+                      }}
                     />
                   </label>
                 </div>
@@ -428,117 +584,107 @@ export default function ReportsGenerator() {
                   type="checkbox"
                   style={styles.checkbox}
                   checked={useAI}
-                  onChange={(e) => setUseAI(e.target.checked)}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setUseAI(v);
+                    toast.fire({
+                      icon: "info",
+                      title: v ? "AI mapping enabled" : "AI mapping disabled",
+                    });
+                  }}
                 />
                 <div style={styles.checkboxText}>
-                  <div style={styles.checkboxTitle}>Use AI for column mapping</div>
+                  <div style={styles.checkboxTitle}>
+                    Use AI for column mapping
+                  </div>
                   <div style={styles.checkboxDesc}>
-                    Recommended if your CSV headers differ. Only mapping uses AI; computation and PDF rendering remain deterministic.
+                    Recommended if your CSV headers differ. Only mapping uses AI;
+                    computation and PDF rendering remain deterministic.
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
               <div style={styles.actions}>
-                <button onClick={handleGenerate} disabled={!canSubmit || loading} style={styles.primaryBtn}>
-                  {loading ? (
-                    <>
-                      <Spinner />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      Generate & Download PDF
-                      <span style={{ opacity: 0.9 }}>→</span>
-                    </>
-                  )}
+                <button
+                  onClick={handleGenerate}
+                  disabled={!canSubmit || loading}
+                  style={styles.primaryBtn}
+                >
+                  {loading ? "Generating…" : "Generate & Download PDF →"}
                 </button>
 
                 <div style={styles.secondaryText}>
-                  {canSubmit ? "All inputs look good." : "Select a CSV and enter valid dates to enable generation."}
+                  {canSubmit
+                    ? "All inputs look good."
+                    : "Select a CSV and enter valid dates to enable generation."}
                 </div>
               </div>
 
               <div style={styles.help}>
-                Tip: If your server returns structured errors (422/400), they will appear in the right panel for faster triage.
+                Tip: If your server returns structured errors (422/400), they
+                will be shown as SweetAlerts for faster triage.
               </div>
+
+              {audit && (
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => showAuditModal(audit)}
+                    style={{
+                      height: 40,
+                      padding: "0 12px",
+                      borderRadius: 12,
+                      border: "1px solid rgba(15, 23, 42, 0.14)",
+                      background: "rgba(255,255,255,0.9)",
+                      cursor: "pointer",
+                      fontWeight: 900,
+                    }}
+                  >
+                    View last audit
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* RIGHT: Status / Errors / Audit */}
-          <div style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <h3 style={styles.panelTitle}>Run status</h3>
+          {/* RIGHT: Status panel replaced with a friendly info card */}
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <h3 style={styles.cardTitle}>Notifications</h3>
               <div style={{ fontSize: 12, color: "#64748b" }}>
-                {audit ? "Audit available" : "No audit yet"}
+                SweetAlerts enabled
               </div>
             </div>
-
-            <div style={styles.panelBody}>
-              {!error && validationErrors.length === 0 && rowErrors.length === 0 && !audit && (
-                <div style={styles.alert("info")}>
-                  <div style={styles.alertTitle}>No issues reported</div>
-                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.45 }}>
-                    Errors, validations, row-normalization problems, and audit output will show up here after you generate a report.
-                  </div>
+            <div style={styles.cardBody}>
+              <div
+                style={{
+                  borderRadius: 14,
+                  border: "1px solid rgba(15, 23, 42, 0.08)",
+                  padding: 12,
+                  background:
+                    "linear-gradient(180deg, rgba(239, 246, 255, 0.9) 0%, rgba(255,255,255,0.7) 100%)",
+                  boxShadow: "0 10px 24px rgba(2, 6, 23, 0.06)",
+                }}
+              >
+                <div style={{ fontWeight: 900, marginBottom: 6, fontSize: 13 }}>
+                  How it works now
                 </div>
-              )}
-
-              {error && (
-                <div style={{ ...styles.alert("error"), marginBottom: 12 }}>
-                  <div style={styles.alertTitle}>Error</div>
-                  <div style={{ fontSize: 13, color: "#0f172a" }}>{error}</div>
+                <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.45 }}>
+                  All errors, validations, row-normalization issues, progress,
+                  and audit output are shown via SweetAlert modals/toasts. Use
+                  the “View last audit” button after a run if you want to re-open
+                  it.
                 </div>
-              )}
+              </div>
 
-              {validationErrors.length > 0 && (
-                <div style={{ ...styles.alert("warn"), marginBottom: 12 }}>
-                  <div style={styles.alertTitle}>Validation Errors</div>
-                  <ul style={styles.list}>
-                    {validationErrors.slice(0, 50).map((e, i) => (
-                      <li key={i} style={{ marginBottom: 4, fontSize: 13 }}>
-                        {e.rowIndex ? `Row ${e.rowIndex}: ` : ""}
-                        {e.error}
-                      </li>
-                    ))}
-                  </ul>
-                  {validationErrors.length > 50 && (
-                    <div style={styles.smallNote}>Showing first 50…</div>
-                  )}
-                </div>
-              )}
-
-              {rowErrors.length > 0 && (
-                <div style={{ ...styles.alert("error"), marginBottom: 12 }}>
-                  <div style={styles.alertTitle}>Row Normalization Errors (Strict Mode)</div>
-                  <ul style={styles.list}>
-                    {rowErrors.slice(0, 20).map((re, i) => (
-                      <li key={i} style={{ marginBottom: 10 }}>
-                        <div style={{ fontWeight: 900, fontSize: 13 }}>
-                          Row {re.rowIndex}
-                        </div>
-                        <ul style={{ margin: "6px 0 0 0", paddingLeft: 18 }}>
-                          {re.errors.map((x, j) => (
-                            <li key={j} style={{ marginBottom: 4, fontSize: 13 }}>
-                              {x}
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
-                    ))}
-                  </ul>
-                  {rowErrors.length > 20 && (
-                    <div style={styles.smallNote}>Showing first 20 rows…</div>
-                  )}
-                </div>
-              )}
-
-              {audit && (
-                <div style={styles.alert("info")}>
-                  <div style={styles.alertTitle}>Audit (traceability)</div>
-                  <pre style={styles.pre}>{JSON.stringify(audit, null, 2)}</pre>
-                </div>
-              )}
+              <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
+                • File select → toast<br />
+                • Generate progress → loading modal<br />
+                • Success/Failure → modal<br />
+                • Validation + Row errors → modal lists<br />
+                • Audit → modal (optional)
+              </div>
             </div>
           </div>
         </div>
@@ -549,4 +695,13 @@ export default function ReportsGenerator() {
       </div>
     </div>
   );
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }

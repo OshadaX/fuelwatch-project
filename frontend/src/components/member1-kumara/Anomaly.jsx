@@ -7,8 +7,6 @@ import {
   Button,
   TextField,
   MenuItem,
-  Snackbar,
-  Alert,
   CircularProgress,
   Table,
   TableHead,
@@ -36,6 +34,7 @@ import {
   ListItemText,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
@@ -49,8 +48,28 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import WhatshotRoundedIcon from "@mui/icons-material/WhatshotRounded";
 
+// ✅ SweetAlert2
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+
+const currentUser = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+const managerEmail = currentUser?.email || "";
+const MySwal = withReactContent(Swal);
+
+const Toast = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 4200,
+  timerProgressBar: true,
+  didOpen: (toast) => {
+    toast.addEventListener("mouseenter", Swal.stopTimer);
+    toast.addEventListener("mouseleave", Swal.resumeTimer);
+  },
+});
+
 const ML_API = "http://127.0.0.1:8090/ml/score-report";
-const BACKEND = "http://localhost:8081"; // ✅ your node backend
+const BACKEND = "http://localhost:8081";
 
 // ==============================
 // Small utilities
@@ -94,9 +113,7 @@ function downloadCSV(filename, rows) {
 }
 
 // ==============================
-// Enterprise surfaces + stats
-// (UI-only; NO logic changes)
-// Uses normal fonts (Arial / system)
+// Enterprise UI components
 // ==============================
 function EnterpriseCard({ children, sx }) {
   const theme = useTheme();
@@ -109,7 +126,7 @@ function EnterpriseCard({ children, sx }) {
         borderRadius: 10 / 4,
         border: `1px solid ${alpha(
           isDark ? theme.palette.common.white : theme.palette.common.black,
-          isDark ? 0.10 : 0.08
+          isDark ? 0.1 : 0.08
         )}`,
         backgroundColor: isDark ? alpha("#0b1220", 0.75) : "#ffffff",
         boxShadow: isDark ? "0 8px 28px rgba(0,0,0,0.35)" : "0 10px 30px rgba(16, 24, 40, 0.06)",
@@ -145,7 +162,7 @@ function StatCard({ label, value, sub, tone = "primary", icon, sx }) {
             borderRadius: 2,
             display: "grid",
             placeItems: "center",
-            bgcolor: alpha(palette.main, isDark ? 0.20 : 0.12),
+            bgcolor: alpha(palette.main, isDark ? 0.2 : 0.12),
             border: `1px solid ${alpha(palette.main, isDark ? 0.35 : 0.18)}`,
             color: palette.main,
           }}
@@ -218,7 +235,7 @@ function SeverityChip({ pred }) {
             }
           : {
               color: "success.main",
-              borderColor: (t) => alpha(t.palette.success.main, 0.30),
+              borderColor: (t) => alpha(t.palette.success.main, 0.3),
               bgcolor: (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.12 : 0.06),
             }),
       }}
@@ -238,12 +255,6 @@ export default function Anomaly() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
-
   // -----------------------------
   // Result State
   // -----------------------------
@@ -259,19 +270,59 @@ export default function Anomaly() {
 
   // -----------------------------
   // ✅ Notification Form State
+  // (NO station selection here)
   // -----------------------------
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [notifyStation, setNotifyStation] = useState("UNKNOWN");
   const [notifySeverity, setNotifySeverity] = useState("Warning"); // Advisory/Warning/Critical
   const [notifyChannel, setNotifyChannel] = useState("email");
-  const [notifyRoles, setNotifyRoles] = useState(["SUPERVISOR", "MANAGER"]); // default
+  const [notifyRoles, setNotifyRoles] = useState(["SUPERVISOR", "MANAGER"]);
   const [notifyMessage, setNotifyMessage] = useState("");
-  const [recipientOptions, setRecipientOptions] = useState([]);
   const [notifySending, setNotifySending] = useState(false);
 
-  const openSnack = (message, severity = "success") => setSnackbar({ open: true, message, severity });
-  const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
+  // Station preview (derived from manager_email)
+  const [stationPreviewLoading, setStationPreviewLoading] = useState(false);
+  const [stationPreview, setStationPreview] = useState(null); // { Id, Name, Location, ... }
+  const [stationPreviewError, setStationPreviewError] = useState("");
 
+  // -----------------------------
+  // ✅ SweetAlert helpers
+  // -----------------------------
+  const loaderOpenRef = useRef(false);
+
+  const toast = (message, severity = "success") => {
+    const icon =
+      severity === "success"
+        ? "success"
+        : severity === "error"
+        ? "error"
+        : severity === "warning"
+        ? "warning"
+        : "info";
+    Toast.fire({ icon, title: message });
+  };
+
+  const showBlockingLoading = (title = "Processing…", text = "Please wait") => {
+    loaderOpenRef.current = true;
+    MySwal.fire({
+      title,
+      text,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+  };
+
+  const closeBlockingLoading = () => {
+    if (!loaderOpenRef.current) return;
+    loaderOpenRef.current = false;
+    Swal.close();
+  };
+
+  // -----------------------------
+  // Derived stats
+  // -----------------------------
   const flaggedDays = useMemo(() => {
     return scoredDays.filter((r) => {
       const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
@@ -323,88 +374,6 @@ export default function Anomaly() {
   }, [scoredDays, search, showOnlyFlagged]);
 
   // -----------------------------
-  // ✅ RUN ML SCAN
-  // -----------------------------
-  const handleRunScan = useCallback(async () => {
-    if (!file) {
-      openSnack("Please choose a CSV/XLSX file first.", "warning");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const form = new FormData();
-      form.append("file", file);
-
-      const url = `${ML_API}?threshold=${decisionThreshold}`;
-      const res = await fetch(url, { method: "POST", body: form });
-      const data = await res.json();
-
-      if (!res.ok) {
-        const msg = data?.detail?.message || data?.detail || "Scan failed";
-        throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
-      }
-
-      const scored =
-        data?.scored_days ||
-        data?.scoredDays ||
-        data?.rows ||
-        data?.results ||
-        data?.data?.scored_days ||
-        data?.data?.rows ||
-        [];
-
-      const grouped =
-        data?.events ||
-        data?.grouped_events ||
-        data?.groupedEvents ||
-        data?.data?.events ||
-        data?.data?.grouped_events ||
-        [];
-
-      setScoredDays(Array.isArray(scored) ? scored : []);
-      setEvents(Array.isArray(grouped) ? grouped : []);
-
-      lastFileNameRef.current = file?.name || null;
-      openSnack("✅ ML Scan Completed Successfully", "success");
-      setTab(0);
-    } catch (e) {
-      const msg = e?.message || "Unknown error";
-      setError(msg);
-      setScoredDays([]);
-      setEvents([]);
-      openSnack(`❌ ${msg}`, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [file, decisionThreshold]);
-
-  useEffect(() => {
-    if (!file) return;
-    if (lastFileNameRef.current === file.name) {
-      const t = setTimeout(() => handleRunScan(), 350);
-      return () => clearTimeout(t);
-    }
-  }, [decisionThreshold, file, handleRunScan]);
-
-  const onPickFile = (f) => {
-    setFile(f);
-    setError("");
-    setScoredDays([]);
-    setEvents([]);
-    setSearch("");
-    setShowOnlyFlagged(false);
-    lastFileNameRef.current = null;
-  };
-
-  const onReset = () => {
-    onPickFile(null);
-    openSnack("Reset completed", "info");
-  };
-
-  // -----------------------------
   // Row mapper
   // -----------------------------
   const mapRow = (r) => {
@@ -427,64 +396,247 @@ export default function Anomaly() {
   };
 
   // -----------------------------
-  // ✅ Open notify form
+  // Helper: current manager email
+  // -----------------------------
+  const getManagerEmail = () => {
+  try {
+    const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+    const email = u?.email || "";
+    return String(email).trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+  // -----------------------------
+  // ✅ RUN ML SCAN
+  // -----------------------------
+  const handleRunScan = useCallback(async () => {
+    if (!file) {
+      toast("Please choose a CSV/XLSX file first.", "warning");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    showBlockingLoading("Running ML Scan…", "Uploading file and scoring days");
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const url = `${ML_API}?threshold=${decisionThreshold}`;
+      const res = await fetch(url, { method: "POST", body: form });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        const msg = data?.detail?.message || data?.detail || data?.error || "Scan failed";
+        throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+      }
+
+      const scored =
+        data?.scored_days ||
+        data?.scoredDays ||
+        data?.rows ||
+        data?.results ||
+        data?.data?.scored_days ||
+        data?.data?.rows ||
+        [];
+
+      const grouped =
+        data?.events ||
+        data?.grouped_events ||
+        data?.groupedEvents ||
+        data?.data?.events ||
+        data?.data?.grouped_events ||
+        [];
+
+      setScoredDays(Array.isArray(scored) ? scored : []);
+      setEvents(Array.isArray(grouped) ? grouped : []);
+      lastFileNameRef.current = file?.name || null;
+
+      closeBlockingLoading();
+      toast("✅ ML Scan Completed Successfully", "success");
+      setTab(0);
+
+      await MySwal.fire({
+        icon: "success",
+        title: "Scan completed",
+        html: `
+          <div style="text-align:left">
+            <div><b>Scored days:</b> ${Array.isArray(scored) ? scored.length : 0}</div>
+            <div><b>Events:</b> ${Array.isArray(grouped) ? grouped.length : 0}</div>
+            <div><b>Threshold:</b> ${decisionThreshold}</div>
+          </div>
+        `,
+        confirmButtonText: "OK",
+      });
+    } catch (e) {
+      const msg = e?.message || "Unknown error";
+      setError(msg);
+      setScoredDays([]);
+      setEvents([]);
+
+      closeBlockingLoading();
+      toast(`❌ ${msg}`, "error");
+
+      await MySwal.fire({
+        icon: "error",
+        title: "Scan failed",
+        text: msg,
+        confirmButtonText: "Close",
+      });
+    } finally {
+      closeBlockingLoading();
+      setLoading(false);
+    }
+  }, [file, decisionThreshold]);
+
+  // Auto-rerun when threshold changes AND the same file was already scanned
+  useEffect(() => {
+    if (!file) return;
+    if (lastFileNameRef.current === file.name) {
+      const t = setTimeout(() => handleRunScan(), 350);
+      return () => clearTimeout(t);
+    }
+  }, [decisionThreshold, file, handleRunScan]);
+
+  const onPickFile = (f) => {
+    setFile(f);
+    setError("");
+    setScoredDays([]);
+    setEvents([]);
+    setSearch("");
+    setShowOnlyFlagged(false);
+    lastFileNameRef.current = null;
+
+    if (f) toast(`Selected: ${f.name}`, "info");
+  };
+
+  const onReset = async () => {
+    const result = await MySwal.fire({
+      icon: "warning",
+      title: "Reset page state?",
+      text: "This will clear the selected file and all results.",
+      showCancelButton: true,
+      confirmButtonText: "Yes, reset",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: theme.palette.error.main,
+    });
+
+    if (!result.isConfirmed) return;
+
+    onPickFile(null);
+    toast("Reset completed", "info");
+  };
+
+  // -----------------------------
+  // ✅ Open notify form (SAFE)
+  // - station is derived from manager email via backend
+  // - no manual station selection
   // -----------------------------
   const openNotifyForm = async () => {
-    // try best station
-    const stationGuess =
-      maxScoreRow?.stationId ||
-      maxScoreRow?.station_id ||
-      maxScoreRow?.station_name ||
-      maxScoreRow?.site ||
-      "UNKNOWN";
+    if (!scoredDays.length) {
+      toast("Run a scan first to notify staff.", "warning");
+      return;
+    }
 
-    setNotifyStation(String(stationGuess || "UNKNOWN"));
+    const managerEmail = getManagerEmail();
+    setStationPreview(null);
+    setStationPreviewError("");
+    setStationPreviewLoading(true);
+
+    // Default message based on max score row
     setNotifyMessage(
       maxScoreRow?.reason
         ? `Detected anomaly: ${String(maxScoreRow.reason).slice(0, 180)}`
         : "Please review the detected anomalies and take action."
     );
+
     setNotifyOpen(true);
 
-    // load recipient options
     try {
-      const url = `${BACKEND}/api/notifications/recipients?station_id=${encodeURIComponent(String(stationGuess || ""))}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (res.ok && data?.ok) {
-        setRecipientOptions(Array.isArray(data.recipients) ? data.recipients : []);
+      // ✅ expects backend route: GET /api/station/by-manager/:email
+      const res = await fetch(`${BACKEND}/api/station/by-manager/${encodeURIComponent(managerEmail)}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        const msg = data?.message || data?.error || "Cannot find station for this manager email";
+        setStationPreviewError(msg);
+        toast(msg, "error");
+        return;
       }
-    } catch {
-      // ignore - UI still works
+
+      setStationPreview(data.station || null);
+      toast("Station verified for this manager.", "success");
+    } catch (e) {
+      const msg = e?.message || "Station verification failed";
+      setStationPreviewError(msg);
+      toast(msg, "error");
+    } finally {
+      setStationPreviewLoading(false);
     }
   };
 
   // -----------------------------
   // ✅ Send manual notification
+  // - DOES NOT send station id from UI
+  // - backend derives station from manager_email
   // -----------------------------
   const handleSendManual = async () => {
     if (!notifyRoles.length) {
-      openSnack("Select at least one role.", "warning");
+      toast("Select at least one role.", "warning");
       return;
     }
 
+    if (!stationPreview?.Id) {
+      toast("Station is not verified. Please register a station first (or login as the correct manager).", "error");
+      return;
+    }
+
+    const confirm = await MySwal.fire({
+      icon: "question",
+      title: "Send alert now?",
+      html: `
+        <div style="text-align:left">
+          <div><b>Manager:</b> ${getManagerEmail()}</div>
+          <div><b>Station:</b> ${stationPreview?.Id || "—"} (${stationPreview?.Name || "—"})</div>
+          <div><b>Severity:</b> ${notifySeverity}</div>
+          <div><b>Channel:</b> ${notifyChannel}</div>
+          <div><b>Roles:</b> ${notifyRoles.join(", ")}</div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Send",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: theme.palette.error.main,
+    });
+
+    if (!confirm.isConfirmed) return;
+
     setNotifySending(true);
+    showBlockingLoading("Sending alert…", "Contacting notification service");
+
     try {
       const payload = {
-        station_id: notifyStation,
-        severity: notifySeverity, // Advisory/Warning/Critical
-        channel: notifyChannel, // email
-        roles: notifyRoles, // ["SUPERVISOR","MANAGER"]
+        station_id: stationPreview?.Id, // ✅ REQUIRED
+        manager_email: getManagerEmail(),
+
+        severity: notifySeverity,
+        channel: notifyChannel,
         message: notifyMessage,
-        
-        manager_email: JSON.parse(localStorage.getItem("user"))?.email || "unknown",
-        // attach scan context (for audit + email preview)
+
         threshold: decisionThreshold,
         file_name: file?.name || "",
         rows: scoredDays,
-        events: events,
-
-        
+        events: events
       };
 
       const res = await fetch(`${BACKEND}/api/notifications/send-manual`, {
@@ -493,17 +645,36 @@ export default function Anomaly() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to send alert");
+        throw new Error(data?.error || data?.message || "Failed to send alert");
       }
 
-      openSnack(data?.message || "Alert sent", data?.status === "sent" ? "success" : "warning");
+      const ok = data?.status === "sent" || data?.ok === true;
+
+      closeBlockingLoading();
+      toast(data?.message || (ok ? "Alert sent" : "Alert processed"), ok ? "success" : "warning");
+
+      await MySwal.fire({
+        icon: ok ? "success" : "warning",
+        title: ok ? "Alert sent" : "Alert processed",
+        text: data?.message || "Done",
+        confirmButtonText: "OK",
+      });
+
       setNotifyOpen(false);
     } catch (e) {
-      openSnack(`❌ ${e?.message || "Error"}`, "error");
+      closeBlockingLoading();
+      toast(`❌ ${e?.message || "Error"}`, "error");
+      await MySwal.fire({
+        icon: "error",
+        title: "Failed to send alert",
+        text: e?.message || "Unknown error",
+        confirmButtonText: "Close",
+      });
     } finally {
+      closeBlockingLoading();
       setNotifySending(false);
     }
   };
@@ -526,12 +697,7 @@ export default function Anomaly() {
       {/* Header */}
       <EnterpriseCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            alignItems={{ md: "center" }}
-            justifyContent="space-between"
-          >
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between">
             <Box sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box
@@ -541,7 +707,7 @@ export default function Anomaly() {
                     borderRadius: 2,
                     display: "grid",
                     placeItems: "center",
-                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.10),
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.1),
                     border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
                     color: "primary.main",
                   }}
@@ -567,15 +733,16 @@ export default function Anomaly() {
                   </Typography>
                 </Box>
               </Stack>
-
-              
             </Box>
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
               <Tooltip title="Export current results (JSON)">
                 <span>
                   <IconButton
-                    onClick={() => downloadJSON("anomaly_results.json", { scoredDays, events, threshold: decisionThreshold })}
+                    onClick={() => {
+                      downloadJSON("anomaly_results.json", { scoredDays, events, threshold: decisionThreshold });
+                      toast("Exported JSON.", "success");
+                    }}
                     disabled={!scoredDays.length && !events.length}
                     sx={{
                       borderRadius: 2,
@@ -627,7 +794,7 @@ export default function Anomaly() {
                 sx={{
                   height: 10,
                   borderRadius: 999,
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.10),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.1),
                   "& .MuiLinearProgress-bar": { borderRadius: 999 },
                 }}
               />
@@ -640,9 +807,11 @@ export default function Anomaly() {
       </EnterpriseCard>
 
       {error ? (
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2, fontFamily: "Arial, Helvetica, sans-serif" }}>
-          {error}
-        </Alert>
+        <EnterpriseCard sx={{ mb: 2, p: 2 }}>
+          <Typography sx={{ color: theme.palette.error.main, fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}>
+            {error}
+          </Typography>
+        </EnterpriseCard>
       ) : null}
 
       {/* Controls */}
@@ -661,9 +830,9 @@ export default function Anomaly() {
                   fontWeight: 900,
                   textTransform: "none",
                   borderColor: alpha(theme.palette.primary.main, 0.25),
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.10 : 0.05),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.1 : 0.05),
                   "&:hover": {
-                    borderColor: alpha(theme.palette.primary.main, 0.40),
+                    borderColor: alpha(theme.palette.primary.main, 0.4),
                     bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.14 : 0.07),
                   },
                   fontFamily: "Arial, Helvetica, sans-serif",
@@ -751,24 +920,12 @@ export default function Anomaly() {
                   <FormControlLabel
                     control={<Switch checked={showOnlyFlagged} onChange={(e) => setShowOnlyFlagged(e.target.checked)} />}
                     label="Only flagged"
-                    sx={{
-                      ".MuiFormControlLabel-label": {
-                        fontWeight: 800,
-                        fontSize: 13,
-                        fontFamily: "Arial, Helvetica, sans-serif",
-                      },
-                    }}
+                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13, fontFamily: "Arial, Helvetica, sans-serif" } }}
                   />
                   <FormControlLabel
                     control={<Switch checked={dense} onChange={(e) => setDense(e.target.checked)} />}
                     label="Dense"
-                    sx={{
-                      ".MuiFormControlLabel-label": {
-                        fontWeight: 800,
-                        fontSize: 13,
-                        fontFamily: "Arial, Helvetica, sans-serif",
-                      },
-                    }}
+                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13, fontFamily: "Arial, Helvetica, sans-serif" } }}
                   />
                 </Stack>
               </Stack>
@@ -786,7 +943,13 @@ export default function Anomaly() {
           <StatCard label="Flagged Days" value={flaggedDays.length} sub="Predicted irregularities" tone="danger" icon={<WarningAmberRoundedIcon />} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard label="Threshold" value={decisionThreshold} sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set threshold"} tone="success" icon={<TuneRoundedIcon />} />
+          <StatCard
+            label="Threshold"
+            value={decisionThreshold}
+            sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set threshold"}
+            tone="success"
+            icon={<TuneRoundedIcon />}
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
@@ -901,20 +1064,26 @@ export default function Anomaly() {
                       variant="outlined"
                       startIcon={<DownloadRoundedIcon />}
                       disabled={!filteredScoredDays.length}
-                      onClick={() => downloadCSV("scored_days_filtered.csv", filteredScoredDays.map(mapRow))}
+                      onClick={() => {
+                        downloadCSV("scored_days_filtered.csv", filteredScoredDays.map(mapRow));
+                        toast("Exported filtered scored days.", "success");
+                      }}
                       sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
                     >
-                      Export filtered scored days 
+                      Export filtered scored days
                     </Button>
 
                     <Button
                       variant="outlined"
                       startIcon={<DownloadRoundedIcon />}
                       disabled={!events.length}
-                      onClick={() => downloadCSV("events.csv", events)}
+                      onClick={() => {
+                        downloadCSV("events.csv", events);
+                        toast("Exported events.", "success");
+                      }}
                       sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
                     >
-                      Export events 
+                      Export events
                     </Button>
 
                     <Button
@@ -971,7 +1140,7 @@ export default function Anomaly() {
                             <b>Day:</b> {String(row.day)}
                           </Typography>
                           <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                            <b>Station:</b> {String(row.station)}
+                            <b>Station (from ML row):</b> {String(row.station)}
                           </Typography>
                           <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                             <b>Fuel:</b> {String(row.fuel)}
@@ -1145,18 +1314,12 @@ export default function Anomaly() {
                               sx={{
                                 fontWeight: 900,
                                 borderColor: alpha(theme.palette.secondary.main, 0.22),
-                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.10 : 0.06),
+                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.1 : 0.06),
                                 fontFamily: "Arial, Helvetica, sans-serif",
                               }}
                             />
                           </TableCell>
-                          <TableCell
-                            align="right"
-                            sx={{
-                              fontFamily: "Arial, Helvetica, sans-serif",
-                              fontWeight: 900,
-                            }}
-                          >
+                          <TableCell align="right" sx={{ fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 900 }}>
                             {safeFixed(row.score)}
                           </TableCell>
                           <TableCell>
@@ -1178,24 +1341,38 @@ export default function Anomaly() {
         ) : null}
       </EnterpriseCard>
 
-      {/* ✅ Notification Form Dialog */}
+      {/* ✅ Notification Dialog (SAFE: station derived from manager email) */}
       <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Send Notification to Responsible Staff</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
+          Send Notification to Responsible Staff
+        </DialogTitle>
+
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
-              label="Station ID"
-              value={notifyStation}
-              onChange={(e) => setNotifyStation(e.target.value)}
+              label="Manager Email (Logged in)"
+              value={getManagerEmail()}
               fullWidth
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
-                  fontFamily: "Arial, Helvetica, sans-serif",
-                },
-                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
-              }}
+              InputProps={{ readOnly: true }}
+            />
+
+            <TextField
+              label="Station (Auto from manager)"
+              value={
+                stationPreviewLoading
+                  ? "Loading station..."
+                  : stationPreview?.Id
+                  ? `${stationPreview.Id} - ${stationPreview.Name || ""}`
+                  : "Not verified"
+              }
+              fullWidth
+              InputProps={{ readOnly: true }}
+              helperText={
+                stationPreviewError
+                  ? stationPreviewError
+                  : "Station is derived from manager_email (no manual selection)."
+              }
+              error={!!stationPreviewError}
             />
 
             <TextField
@@ -1204,7 +1381,6 @@ export default function Anomaly() {
               value={notifySeverity}
               onChange={(e) => setNotifySeverity(e.target.value)}
               fullWidth
-              helperText="Severity controls escalation + cooldown."
               sx={{
                 "& .MuiOutlinedInput-root": {
                   borderRadius: 2,
@@ -1256,18 +1432,16 @@ export default function Anomaly() {
               }}
               value={notifyRoles}
               onChange={(e) => setNotifyRoles(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-              helperText="Choose which roles should receive the alert."
               sx={{
                 "& .MuiOutlinedInput-root": {
                   borderRadius: 2,
                   bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                   fontFamily: "Arial, Helvetica, sans-serif",
                 },
-                "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
                 "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
               }}
             >
-              {["SUPERVISOR", "MANAGER", "SENIOR_MANAGER"].map((role) => (
+              {["MANAGER"].map((role) => (
                 <MenuItem key={role} value={role} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                   <Checkbox checked={notifyRoles.indexOf(role) > -1} />
                   <ListItemText primary={role} />
@@ -1292,28 +1466,22 @@ export default function Anomaly() {
                 "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
               }}
             />
-
-            <EnterpriseCard sx={{ p: 1.5 }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
-                Recipients available in DB for this station:
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif" }}>
-                {recipientOptions.length
-                  ? recipientOptions.map((u) => `${u.role}: ${u.email}`).join(" • ")
-                  : "No recipients loaded (seed users first)."}
-              </Typography>
-            </EnterpriseCard>
           </Stack>
         </DialogContent>
+
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setNotifyOpen(false)} sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}>
+          <Button
+            onClick={() => setNotifyOpen(false)}
+            sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
+          >
             Cancel
           </Button>
+
           <Button
             variant="contained"
             color="error"
             onClick={handleSendManual}
-            disabled={notifySending}
+            disabled={notifySending || stationPreviewLoading || !stationPreview?.Id}
             startIcon={notifySending ? <CircularProgress size={18} color="inherit" /> : <WarningAmberRoundedIcon />}
             sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", boxShadow: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
           >
@@ -1321,13 +1489,6 @@ export default function Anomaly() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={closeSnack} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%", borderRadius: 2, fontFamily: "Arial, Helvetica, sans-serif" }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

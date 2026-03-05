@@ -2,7 +2,7 @@
 const SensorTest = require("../../models/member1-kumara/SensorTestModel");
 const { computeHealthFeatures } = require("../../utils/healthFeatures");
 
-// Simple distance -> fuel (keep for now)
+// Simple distance->fuel (replace with your calibration module if you already have it)
 function distanceToFuel(distanceCm, tankCapacityL) {
   const tankHeightCm = 30;
   const filledRatio = Math.max(
@@ -12,30 +12,29 @@ function distanceToFuel(distanceCm, tankCapacityL) {
   return Number((filledRatio * tankCapacityL).toFixed(1));
 }
 
-// POST /api/sensor/test
 exports.runSensorTest = async (req, res) => {
   try {
     const { stationId, tankCapacity, samples, reading } = req.body;
 
     if (!stationId || !tankCapacity) {
-      return res.status(400).json({
-        message: "stationId and tankCapacity required"
-      });
+      return res
+        .status(400)
+        .json({ message: "stationId and tankCapacity required" });
     }
 
-    // Accept burst samples (ESP32) OR single reading
+    // ✅ Accept burst samples from ESP32 OR single reading (compat)
     let burst = [];
     if (Array.isArray(samples) && samples.length > 0) {
-      burst = samples.map((v) => Number(v));
+      burst = samples.map(Number);
     } else if (Number.isFinite(reading)) {
       burst = [Number(reading)];
     } else {
-      return res.status(400).json({
-        message: "Provide samples[] or reading"
-      });
+      return res
+        .status(400)
+        .json({ message: "Provide samples[] or reading" });
     }
 
-    // Health features
+    // ✅ Health Features (Research grade)
     const health = computeHealthFeatures(burst);
 
     const status = health.validCount < 5 ? "FAILED" : "OK";
@@ -47,6 +46,7 @@ exports.runSensorTest = async (req, res) => {
     const distance = health.medianDistance ?? 0;
     const fuelLevel = status === "OK" ? distanceToFuel(distance, tankCapacity) : 0;
 
+    // ✅ Save to Mongo (USE SensorTest MODEL)
     const doc = await SensorTest.create({
       stationId,
       tankCapacity,
@@ -75,7 +75,6 @@ exports.runSensorTest = async (req, res) => {
   }
 };
 
-// GET /api/sensor/logs
 exports.getSensorLogs = async (req, res) => {
   try {
     const logs = await SensorTest.find().sort({ timestamp: -1 }).limit(500);
