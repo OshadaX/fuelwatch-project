@@ -1,48 +1,6 @@
-// FuelForecastPanel.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import Swal from "sweetalert2";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  Activity,
-  AlertCircle,
-  BadgeCheck,
-  BarChart3,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  CloudUpload,
-  Download,
-  FileText,
-  Filter,
-  Gauge,
-  Info,
-  LayoutDashboard,
-  LineChart as LineChartIcon,
-  Loader2,
-  Moon,
-  RefreshCw,
-  Search,
-  Settings2,
-  Sparkles,
-  Sun,
-  Trash2,
-  TrendingUp,
-  X,
-} from "lucide-react";
-
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
-
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
@@ -401,8 +359,7 @@ function FuelLegendChips({ fuelKeys, selected, onToggle, onAll, onNone }) {
 }
 
 export default function FuelForecastPanel() {
-  const reduceMotion = useReducedMotion();
-
+  const navigate = useNavigate();
   const [mode, setMode] = useState("weekly");
   const [file, setFile] = useState(null);
 
@@ -441,67 +398,14 @@ export default function FuelForecastPanel() {
   const monthly = useMemo(() => forecastObj?.monthly || [], [forecastObj]);
   const isAnnual = mode === "annual";
 
-  const headerFrom = forecastObj?.from || result?.from_date || result?.from || "-";
-  const headerTo = forecastObj?.to || result?.to_date || result?.to || "-";
-  const ingested = String(result?.ingest?.ingested ?? false);
-
-  const fileError = useMemo(() => {
-    if (!file) return "Please upload a PDF report to generate a forecast.";
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) return "Only PDF files are allowed.";
-    if (file.size > MAX_FILE_MB * 1024 * 1024) return `PDF is too large (max ${MAX_FILE_MB}MB).`;
-    return "";
-  }, [file]);
-
-  // data transforms
-  const totalsChartData = useMemo(() => {
-    if (!totals) return [];
-    return Object.entries(totals)
-      .map(([fuel, value]) => ({ fuel, value: Number(value) || 0 }))
-      .sort((a, b) => b.value - a.value);
-  }, [totals]);
-
-  const dailyChartData = useMemo(() => {
-    if (!daily?.length) return [];
-    return daily.map((row) => {
-      const d = row.Date || row.date || row.DATE;
-      return { ...row, DateLabel: d ? String(d).split("T")[0] : "" };
-    });
-  }, [daily]);
-
-  const monthlyChartData = useMemo(() => {
-    if (!monthly?.length) return [];
-    return monthly.map((row) => ({ ...row }));
-  }, [monthly]);
-
-  const fuelKeys = useMemo(() => {
-    if (!totals) return [];
-    return Object.keys(totals);
-  }, [totals]);
-
-  const filteredFuelKeys = useMemo(() => {
-    const q = fuelSearch.trim().toLowerCase();
-    if (!q) return fuelKeys;
-    return fuelKeys.filter((k) => k.toLowerCase().includes(q));
-  }, [fuelKeys, fuelSearch]);
-
-  useEffect(() => {
-    if (!fuelKeys.length) return;
-    setSelectedFuels((prev) => {
-      if (prev.size) return prev;
-      return new Set(fuelKeys);
-    });
-  }, [fuelKeys]);
-
-  const grandTotal = useMemo(() => {
-    if (!totals) return 0;
-    return Object.values(totals).reduce((acc, v) => acc + (Number(v) || 0), 0);
-  }, [totals]);
-
-  const topFuel = useMemo(() => {
-    if (!totalsChartData.length) return null;
-    return totalsChartData[0];
-  }, [totalsChartData]);
+  const fileError =
+    !file
+      ? "Please upload a PDF report to generate a forecast."
+      : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
+        ? "Only PDF files are allowed."
+        : file.size > 25 * 1024 * 1024
+          ? "PDF is too large (max 25MB)."
+          : "";
 
   async function onCheckHealth() {
     try {
@@ -1366,35 +1270,51 @@ export default function FuelForecastPanel() {
                         </span>
                       </div>
 
-                      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
-                        <table className={cx("w-full border-collapse text-sm", compactTables ? "text-xs" : "")}>
-                          <thead>
-                            <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
-                              <th className={cx("px-4 py-3", compactTables ? "py-2" : "")}>Fuel Type</th>
-                              <th className={cx("px-4 py-3", compactTables ? "py-2" : "")}>Predicted Total (L)</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {totalsChartData.map((row, idx) => (
-                              <tr
-                                key={row.fuel}
-                                className={cx(
-                                  "border-t border-slate-200 dark:border-white/10",
-                                  idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
-                                )}
-                              >
-                                <td className={cx("px-4 py-3 font-black", compactTables ? "py-2" : "")}>
-                                  <div className="flex items-center gap-2">
-                                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: FUEL_COLORS[idx % FUEL_COLORS.length] }} />
-                                    {row.fuel}
-                                  </div>
-                                </td>
-                                <td className={cx("px-4 py-3 tabular-nums", compactTables ? "py-2" : "")}>{formatNumber(row.value)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+            {/* ✅ Link to Member 3 Staff Prediction */}
+            {mode === "weekly" && daily && daily.length === 7 && (
+              <div
+                style={{
+                  marginTop: 24,
+                  padding: 20,
+                  borderRadius: 16,
+                  background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                  border: "1px solid #bfdbfe",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "between",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ margin: 0, color: "#1e40af", fontSize: 16 }}>🔮 Staffing Insight</h4>
+                  <p style={{ margin: "4px 0 0", color: "#3b82f6", fontSize: 13 }}>
+                    Predict how many employees you'll need based on this fuel forecast.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate("/staff-prediction", { state: { fuelForecast: daily } })}
+                  style={{
+                    backgroundColor: "#2563eb",
+                    color: "white",
+                    border: "none",
+                    padding: "10px 20px",
+                    borderRadius: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+                  }}
+                >
+                  Predict Staffing Impact
+                </button>
+              </div>
+            )}
+
+            {/* ✅ Annual: Month-wise breakdown (Jan..Dec) */}
+            {isAnnual && monthly && monthly.length > 0 && (
+              <>
+                <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Month-wise Breakdown (Annual)</h3>
+                <DataTable rows={monthly} emptyText="No month-wise data returned for annual forecast." />
+              </>
+            )}
 
                       <div className="mt-3 text-xs text-slate-600 dark:text-zinc-400">
                         Tip: Use <span className="font-black">Export → Totals CSV</span> for reporting.

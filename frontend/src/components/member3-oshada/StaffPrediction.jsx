@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import toast, { Toaster } from 'react-hot-toast';
 import {
     Users, Calendar, CloudSun, TrendingUp, RefreshCw,
     Sun, Cloud, CloudRain, CloudLightning, Loader2,
@@ -10,6 +12,7 @@ import {
     ResponsiveContainer, AreaChart, Area, Cell, Legend,
     ComposedChart, Line
 } from 'recharts';
+import { predictStaffBatch } from '../../services/mlService';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
 
@@ -21,10 +24,17 @@ const StaffPrediction = () => {
     const [baseDemand, setBaseDemand] = useState(6000);
     const [isDark, setIsDark] = useState(false);
 
+    const location = useLocation();
+    const [externalForecast, setExternalForecast] = useState(location.state?.fuelForecast || null);
+
     useEffect(() => {
-        fetchPredictions();
+        if (externalForecast) {
+            fetchExternalPredictions();
+        } else {
+            fetchPredictions();
+        }
         fetchModelInfo();
-    }, []);
+    }, [externalForecast]);
 
     const fetchPredictions = async () => {
         try {
@@ -44,6 +54,32 @@ const StaffPrediction = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchExternalPredictions = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Call the batch prediction service with Member 1's daily data
+            const data = await predictStaffBatch(externalForecast);
+
+            if (data.ok) {
+                setPredictions(data.predictions);
+                toast.success('Analyzing impact of Member 1 Fuel Forecast');
+            } else {
+                setError('Failed to process external forecast data');
+            }
+        } catch (err) {
+            console.error('Error processing external forecast:', err);
+            setError('Staffing service unavailable for batch processing');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReset = () => {
+        setExternalForecast(null);
     };
 
     const fetchModelInfo = async () => {
@@ -112,6 +148,7 @@ const StaffPrediction = () => {
 
     return (
         <div className={`min-h-screen transition-colors duration-500 ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-slate-50 to-slate-100'} p-6 md:p-12`}>
+            <Toaster position="top-right" />
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-12">
@@ -142,6 +179,29 @@ const StaffPrediction = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* External Forecast Source Indicator */}
+                {externalForecast && (
+                    <div className={`mb-8 p-6 rounded-[2rem] ${isDark ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'} border flex flex-col md:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-500`}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                                <TrendingUp size={24} />
+                            </div>
+                            <div>
+                                <h3 className={`font-semibold ${isDark ? 'text-blue-300' : 'text-blue-900'}`}>Live Data Source</h3>
+                                <p className={`text-sm ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>
+                                    Showing staffing requirements derived from <strong>Member 1: Fuel Demand Forecast</strong>
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleReset}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${isDark ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
+                        >
+                            Reset to Standard Forecast
+                        </button>
+                    </div>
+                )}
 
                 {/* Model Info Badge */}
                 {modelInfo && (
