@@ -10,6 +10,7 @@ import io
 import joblib
 import pandas as pd
 import numpy as np
+import hashlib
 
 from utils.config import PROCESSED_DAILY_CSV
 from utils.predictor import FuelDemandPredictor
@@ -20,7 +21,6 @@ app = FastAPI(title="FuelWatch ML Service")
 # BASE DIRECTORY (PROJECT ROOT)
 # ===============================
 BASE_DIR = Path(__file__).resolve().parent.parent  # member1-kumara/
-
 UPLOAD_DIR = BASE_DIR / "data" / "raw"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -57,6 +57,7 @@ scaler = None
 MODEL_FEATURES = []
 RF_LOAD_ERROR = None
 
+
 def load_rf_artifacts():
     global rf, scaler, MODEL_FEATURES, RF_LOAD_ERROR
     try:
@@ -81,10 +82,20 @@ def load_rf_artifacts():
         MODEL_FEATURES = []
         RF_LOAD_ERROR = str(e)
 
+
 load_rf_artifacts()
 
 # ===============================
-# BASIC HEALTH
+# RULE THRESHOLDS (STRICTER => fewer FLAGs)
+# You can tune these defaults to get ~2-3 FLAGs.
+# ===============================
+DEFAULT_GAP_TOL = 800.0              # mismatch litres threshold (was too low at 50)
+DEFAULT_RESET_TOL = 6000.0           # huge balance jump/reset litres (was too low at 3000)
+DEFAULT_NO_SALES_DROP_TOL = 1500.0   # balance drop with 0 sales
+
+
+# ===============================
+# HEALTH
 # ===============================
 @app.get("/health")
 def health():
@@ -93,6 +104,7 @@ def health():
         "forecast_model_loaded": predictor is not None,
         "base_dir": str(BASE_DIR),
     }
+
 
 @app.get("/ml/health")
 def ml_health():
@@ -109,13 +121,14 @@ def ml_health():
         "load_error": RF_LOAD_ERROR,
     }
 
+
 # ===============================
 # FORECAST ENDPOINT (UNCHANGED)
 # ===============================
 @app.post("/forecast")
 async def forecast(
     mode: str = Form(...),
-    file: UploadFile = File(None)
+    file: UploadFile = File(None),
 ):
     if predictor is None:
         raise HTTPException(status_code=500, detail="Forecast model not loaded. Train model first.")
@@ -146,7 +159,7 @@ async def forecast(
             [sys.executable, "-m", "scripts.parse_report_pdf", str(pdf_path)],
             cwd=str(BASE_DIR),
             capture_output=True,
-            text=True
+            text=True,
         )
 
         ingest_result["pdf_saved_as"] = str(pdf_path)
@@ -174,7 +187,7 @@ async def forecast(
             [sys.executable, "-m", "scripts.prepare_data"],
             cwd=str(BASE_DIR),
             capture_output=True,
-            text=True
+            text=True,
         )
         if prep.returncode != 0:
             return {
@@ -193,8 +206,9 @@ async def forecast(
 
     return {"ok": True, "message": "Forecast generated successfully", "mode": mode, "ingest": ingest_result, "forecast": forecast_result}
 
+
 # ============================================================
-#  MISBEHAVIOR SCORING: upload monthly report -> convert -> score
+#  MISBEHAVIOR SCORING: upload report -> convert -> score
 # ============================================================
 
 def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
@@ -202,10 +216,12 @@ def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
+
 def _looks_like_header_row(row: pd.Series) -> bool:
     text = " ".join([str(x).lower() for x in row.values if pd.notna(x)])
     keywords = ["date", "qty", "quantity", "balance", "amount", "item", "site", "fuel"]
     return any(k in text for k in keywords)
+
 
 def _fix_unnamed_header(df: pd.DataFrame) -> pd.DataFrame:
     cols = [c.lower() for c in df.columns.astype(str)]
@@ -224,9 +240,10 @@ def _fix_unnamed_header(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     new_header = [str(x).strip() for x in df.iloc[header_idx].values]
-    df2 = df.iloc[header_idx + 1:].copy()
+    df2 = df.iloc[header_idx + 1 :].copy()
     df2.columns = new_header
     return df2.reset_index(drop=True)
+
 
 def load_uploaded_report(file: UploadFile) -> pd.DataFrame:
     name = (file.filename or "").lower()
@@ -253,6 +270,7 @@ def load_uploaded_report(file: UploadFile) -> pd.DataFrame:
 
     return df
 
+
 def _pick_col(cols, candidates):
     cols_l = [c.strip().lower() for c in cols]
     for cand in candidates:
@@ -262,21 +280,22 @@ def _pick_col(cols, candidates):
                 return cols[i]
     return None
 
+
 def to_transactions(df: pd.DataFrame) -> pd.DataFrame:
     """
     Supports your report format columns:
     Site, Type, Date, Number, Class, Site, Item, Qty, Amount, Balance
-    (sometimes duplicated Site)
+    (sometimes duplicated 'Site')
     """
     d = df.copy()
     d.columns = [c.strip() for c in d.columns]
 
     col_date = _pick_col(d.columns, ["date", "datetime", "timestamp", "readingtime"])
-    col_qty  = _pick_col(d.columns, ["qty", "quantity", "volume"])
-    col_bal  = _pick_col(d.columns, ["balance", "tank_balance", "stock_balance"])
+    col_qty = _pick_col(d.columns, ["qty", "quantity", "volume"])
+    col_bal = _pick_col(d.columns, ["balance", "tank_balance", "stock_balance"])
     col_item = _pick_col(d.columns, ["item", "fuel", "fuel_type", "product"])
 
-    # Site can appear twice: choose the LAST non-empty site-ish column
+    # Site can appear twice: choose the LAST site-ish column
     site_candidates = []
     for c in d.columns:
         cl = c.strip().lower()
@@ -284,14 +303,7 @@ def to_transactions(df: pd.DataFrame) -> pd.DataFrame:
             site_candidates.append(c)
     col_site = site_candidates[-1] if site_candidates else None
 
-    missing = [k for k, v in {
-        "site": col_site,
-        "date": col_date,
-        "item": col_item,
-        "qty": col_qty,
-        "balance": col_bal
-    }.items() if v is None]
-
+    missing = [k for k, v in {"site": col_site, "date": col_date, "item": col_item, "qty": col_qty, "balance": col_bal}.items() if v is None]
     if missing:
         raise HTTPException(
             status_code=400,
@@ -299,110 +311,135 @@ def to_transactions(df: pd.DataFrame) -> pd.DataFrame:
                 "message": "Missing required columns in uploaded report.",
                 "missing": missing,
                 "found_columns": list(df.columns),
-                "expected_hint": ["Site", "Date", "Item", "Qty", "Balance"]
-            }
+                "expected_hint": ["Site", "Date", "Item", "Qty", "Balance"],
+            },
         )
 
-    tx = pd.DataFrame({
-        "station_id": d[col_site].astype(str).fillna("UNKNOWN"),
-        "fuel_type": d[col_item].astype(str).fillna("UNKNOWN"),
-        "timestamp": d[col_date],
-        "qty": pd.to_numeric(d[col_qty], errors="coerce"),
-        "balance": pd.to_numeric(d[col_bal], errors="coerce"),
-    })
+    # IMPORTANT FIX: fillna BEFORE astype(str) to avoid 'nan' strings
+    station_series = d[col_site].fillna("UNKNOWN").astype(str).str.strip()
+    fuel_series = d[col_item].fillna("UNKNOWN").astype(str).str.strip()
+
+    tx = pd.DataFrame(
+        {
+            "station_id": station_series,
+            "fuel_type": fuel_series,
+            "timestamp": d[col_date],
+            "qty": pd.to_numeric(d[col_qty], errors="coerce"),
+            "balance": pd.to_numeric(d[col_bal], errors="coerce"),
+        }
+    )
 
     tx["timestamp"] = pd.to_datetime(tx["timestamp"], errors="coerce")
     tx = tx.dropna(subset=["timestamp"]).copy()
 
     tx["qty"] = tx["qty"].fillna(0.0)
 
-    # IMPORTANT: balance must be real; don't create fake values
-    # Only forward-fill within each (station,fuel)
+    # balance must be real; only forward-fill within each (station,fuel)
     tx = tx.sort_values(["station_id", "fuel_type", "timestamp"]).reset_index(drop=True)
     tx["balance"] = tx.groupby(["station_id", "fuel_type"])["balance"].ffill()
 
-    # if balance still missing, those rows cannot be used
+    # if balance still missing, those rows cannot be used for real detection
     tx = tx.dropna(subset=["balance"]).copy()
 
     tx["tank_id"] = "TANK_1"
     tx["day"] = tx["timestamp"].dt.date.astype(str)
     return tx
 
+
 def build_daily_features(tx: pd.DataFrame) -> pd.DataFrame:
     gkeys = ["station_id", "tank_id", "fuel_type", "day"]
 
-    daily = tx.groupby(gkeys).agg(
-        total_qty=("qty", "sum"),
-        txn_count=("qty", "count"),
-        avg_txn=("qty", "mean"),
-        std_txn=("qty", "std"),
-        start_balance=("balance", "first"),
-        end_balance=("balance", "last")
-    ).reset_index()
+    daily = (
+        tx.groupby(gkeys)
+        .agg(
+            total_qty=("qty", "sum"),
+            txn_count=("qty", "count"),
+            avg_txn=("qty", "mean"),
+            std_txn=("qty", "std"),
+            start_balance=("balance", "first"),
+            end_balance=("balance", "last"),
+        )
+        .reset_index()
+    )
 
     daily["std_txn"] = daily["std_txn"].fillna(0.0)
-
     daily["balance_delta"] = daily["end_balance"] - daily["start_balance"]
 
-    # This is your key conservation check:
-    # Ideally: total_qty ≈ -balance_delta  (if balance decreases with dispensing)
-    # So gap should be near 0
+    # conservation check: total_qty ≈ -balance_delta  (if balance decreases with dispensing)
     daily["qty_vs_balance_gap"] = daily["total_qty"] + daily["balance_delta"]
 
-    daily["day_dt"] = pd.to_datetime(daily["day"])
+    daily["day_dt"] = pd.to_datetime(daily["day"], errors="coerce")
+    daily = daily.dropna(subset=["day_dt"]).copy()
     daily = daily.sort_values(["station_id", "tank_id", "fuel_type", "day_dt"]).reset_index(drop=True)
 
     daily["qty_change"] = daily.groupby(["station_id", "tank_id", "fuel_type"])["total_qty"].diff().fillna(0.0)
 
     daily["roll7_qty_mean"] = (
         daily.groupby(["station_id", "tank_id", "fuel_type"])["total_qty"]
-        .rolling(window=7, min_periods=1).mean().reset_index(level=[0,1,2], drop=True)
+        .rolling(window=7, min_periods=1)
+        .mean()
+        .reset_index(level=[0, 1, 2], drop=True)
     )
     daily["roll7_qty_std"] = (
         daily.groupby(["station_id", "tank_id", "fuel_type"])["total_qty"]
-        .rolling(window=7, min_periods=1).std().reset_index(level=[0,1,2], drop=True)
+        .rolling(window=7, min_periods=1)
+        .std()
+        .reset_index(level=[0, 1, 2], drop=True)
         .fillna(0.0)
     )
 
     return daily
 
-# ---------- RULE-BASED GENUINE DETECTOR (NO FAKE DATA) ----------
-def rule_anomaly_reason(row, gap_tol=50.0, reset_tol=3000.0):
+
+def make_anomaly_id(station_id, tank_id, fuel_type, day, anomaly_type):
+    raw = f"{station_id}|{tank_id}|{fuel_type}|{day}|{anomaly_type}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def rule_anomaly_reason(row, gap_tol: float, reset_tol: float, no_sales_drop_tol: float):
     """
-    Returns (rule_prob, reason_text)
-    These are REAL detection rules based on balance + qty conservation.
+    Returns: (rule_prob, reason_text, anomaly_type)
+
+    This is genuine detection using ONLY (Qty, Balance) behavior.
+    Tuning gap_tol/reset_tol reduces false flags.
     """
     total_qty = float(row["total_qty"])
     bal_delta = float(row["balance_delta"])
     gap = float(row["qty_vs_balance_gap"])
 
     reasons = []
+    anomaly_type = "NORMAL"
     score = 0.0
 
-    # 1) Balance drop without sales
-    if total_qty <= 0.0001 and bal_delta < -gap_tol:
-        reasons.append("Balance dropped but no sales recorded")
-        score = max(score, 0.90)
+    # 1) Balance drop without sales (strong)
+    if total_qty <= 0.0001 and bal_delta < -no_sales_drop_tol:
+        reasons.append(f"Balance dropped but no sales recorded (Δbalance={bal_delta:.1f})")
+        anomaly_type = "DROP_WITHOUT_SALES"
+        score = max(score, 0.92)
 
-    # 2) Sales but balance did not drop
+    # 2) Sales but balance did not drop (strong)
     if total_qty > gap_tol and abs(bal_delta) < gap_tol:
         reasons.append("Sales recorded but tank balance did not decrease")
-        score = max(score, 0.85)
+        anomaly_type = "SALES_NO_BALANCE_DROP"
+        score = max(score, 0.90)
 
-    # 3) Conservation mismatch
+    # 3) Conservation mismatch (medium -> make strict using gap_tol)
     if abs(gap) > gap_tol:
         reasons.append(f"Conservation mismatch (gap={gap:.1f})")
-        score = max(score, 0.80)
+        anomaly_type = "CONSERVATION_GAP"
+        score = max(score, 0.85)
 
-    # 4) Suspected reset/refill/maintenance event
+    # 4) Suspected reset/refill/maintenance (very strong)
     if abs(bal_delta) > reset_tol:
         reasons.append(f"Large balance jump/reset (Δbalance={bal_delta:.1f})")
-        score = max(score, 0.88)
+        anomaly_type = "BALANCE_JUMP"
+        score = max(score, 0.95)
 
     if not reasons:
-        return 0.0, ""
+        return 0.0, "", "NORMAL"
 
-    return score, "; ".join(reasons)
+    return score, "; ".join(reasons), anomaly_type
+
 
 def group_events(rows):
     """
@@ -430,9 +467,7 @@ def group_events(rows):
             cur = start_new(r)
             continue
 
-        # if same station+fuel and consecutive day => extend
-        if (r["stationId"] == cur["stationId"] and r["fuelType"] == cur["fuelType"]):
-            # consecutive check (string date -> datetime)
+        if r["stationId"] == cur["stationId"] and r["fuelType"] == cur["fuelType"]:
             prev = pd.to_datetime(cur["end_day"])
             now = pd.to_datetime(r["day"])
             if (now - prev).days == 1:
@@ -449,23 +484,38 @@ def group_events(rows):
 
     return events
 
+
 @app.post("/ml/score-report")
 async def score_report(
-    threshold: float = Query(0.65, ge=0.0, le=1.0),
-    file: UploadFile = File(...)
+    threshold: float = Query(0.85, ge=0.0, le=1.0),  # ✅ default higher => fewer FLAGS
+    gap_tol: float = Query(DEFAULT_GAP_TOL, ge=0.0),
+    reset_tol: float = Query(DEFAULT_RESET_TOL, ge=0.0),
+    no_sales_drop_tol: float = Query(DEFAULT_NO_SALES_DROP_TOL, ge=0.0),
+    file: UploadFile = File(...),
 ):
     df_raw = load_uploaded_report(file)
     tx = to_transactions(df_raw)
     daily = build_daily_features(tx)
 
+    if len(daily) == 0:
+        return {
+            "ok": True,
+            "threshold": threshold,
+            "count_days": 0,
+            "features_used": [],
+            "rf_used": False,
+            "rows": [],
+            "events": [],
+            "note": "No daily rows were produced. Check that Balance and Date exist and are parseable.",
+        }
+
     # ---- RF score (if available) ----
     rf_prob = np.zeros(len(daily), dtype=float)
-    rf_ok = (rf is not None and scaler is not None and MODEL_FEATURES)
+    rf_ok = bool(rf is not None and scaler is not None and MODEL_FEATURES)
 
     if rf_ok:
         missing = [c for c in MODEL_FEATURES if c not in daily.columns]
         if missing:
-            # RF can't run, but rules can still run
             rf_ok = False
         else:
             X = daily[MODEL_FEATURES].fillna(0.0).values
@@ -473,62 +523,91 @@ async def score_report(
             rf_prob = rf.predict_proba(Xs)[:, 1]
 
     # ---- Rule score (always available if balance exists) ----
-    rule_prob = []
-    reason = []
-    for _, r in daily.iterrows():
-        p, txt = rule_anomaly_reason(r)
-        rule_prob.append(p)
-        reason.append(txt)
+    rule_prob = np.zeros(len(daily), dtype=float)
+    reasons = [""] * len(daily)
+    anomaly_types = ["NORMAL"] * len(daily)
 
-    rule_prob = np.array(rule_prob, dtype=float)
+    for i, (_, r) in enumerate(daily.iterrows()):
+        p, txt, a_type = rule_anomaly_reason(
+            r,
+            gap_tol=float(gap_tol),
+            reset_tol=float(reset_tol),
+            no_sales_drop_tol=float(no_sales_drop_tol),
+        )
+        rule_prob[i] = p
+        reasons[i] = txt
+        anomaly_types[i] = a_type
 
-    # FINAL probability = max(RF, RULE)  (genuine fusion)
+    # FINAL probability = max(RF, RULE)
     prob = np.maximum(rf_prob, rule_prob)
     pred = (prob >= threshold).astype(int)
 
     scored = daily.copy()
+    scored["rf_prob"] = rf_prob
+    scored["rule_prob"] = rule_prob
     scored["prob_irregular"] = prob
     scored["pred"] = pred
-    scored["reason"] = reason
+    scored["reason"] = reasons
+    scored["anomaly_type"] = anomaly_types
 
     def sev(p):
-        if p >= 0.85: return "Critical"
-        if p >= threshold: return "Warning"
+        if p >= 0.95:
+            return "Critical"
+        if p >= threshold:
+            return "Warning"
         return "Normal"
 
     scored["severity"] = [sev(p) for p in prob]
-
-    scored = scored.sort_values("day_dt")
+    scored = scored.sort_values("day_dt").reset_index(drop=True)
 
     rows = []
     for _, r in scored.iterrows():
-        rows.append({
-            "id": f"{r['station_id']}-{r['fuel_type']}-{r['day']}",
-            "day": r["day"],
-            "stationId": r["station_id"],
-            "tankId": r["tank_id"],
-            "fuelType": r["fuel_type"],
-            "totalQty": float(r["total_qty"]),
-            "balanceDelta": float(r["balance_delta"]),
-            "gap": float(r["qty_vs_balance_gap"]),
-            "qtyChange": float(r["qty_change"]),
-            "prob": float(r["prob_irregular"]),         # frontend expects this
-            "prob_irregular": float(r["prob_irregular"]),# also supported
-            "pred": int(r["pred"]),
-            "severity": r["severity"],
-            "reason": r["reason"] or ("RF score used" if rf_ok else "No anomaly pattern detected"),
-            "rf_prob": float(rf_prob[rows.__len__()]) if len(rf_prob) == len(scored) else 0.0,
-            "rule_prob": float(rule_prob[rows.__len__()]) if len(rule_prob) == len(scored) else 0.0,
-        })
+        anomaly_id = make_anomaly_id(
+            r["station_id"],
+            r["tank_id"],
+            r["fuel_type"],
+            r["day"],
+            r["anomaly_type"],
+        )
+
+        reason_text = r["reason"]
+        if not reason_text:
+            reason_text = "RF score used" if rf_ok else "No anomaly pattern detected"
+
+        rows.append(
+            {
+                "id": anomaly_id,                       # ✅ unique stable anomaly id
+                "day": r["day"],
+                "stationId": r["station_id"],
+                "tankId": r["tank_id"],
+                "fuelType": r["fuel_type"],
+                "totalQty": float(r["total_qty"]),
+                "balanceDelta": float(r["balance_delta"]),
+                "gap": float(r["qty_vs_balance_gap"]),
+                "qtyChange": float(r["qty_change"]),
+                "prob": float(r["prob_irregular"]),     # frontend uses this
+                "pred": int(r["pred"]),
+                "severity": r["severity"],
+                "reason": reason_text,
+                "anomalyType": r["anomaly_type"],       # ✅ machine label
+                "rfProb": float(r["rf_prob"]),
+                "ruleProb": float(r["rule_prob"]),
+            }
+        )
 
     events = group_events(rows)
 
     return {
         "ok": True,
-        "threshold": threshold,
+        "threshold": float(threshold),
+        "params": {
+            "gap_tol": float(gap_tol),
+            "reset_tol": float(reset_tol),
+            "no_sales_drop_tol": float(no_sales_drop_tol),
+        },
         "count_days": len(rows),
         "features_used": MODEL_FEATURES if rf_ok else [],
         "rf_used": bool(rf_ok),
         "rows": rows,
-        "events": events
+        "events": events,
     }

@@ -1,3 +1,6 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -11,11 +14,14 @@ const connectDB = require("./src/config/db");
 const authRoutes = require("./src/routes/member1-kumara/auth.routes");
 const stationRoutes = require("./src/routes/member1-kumara/station.routes");
 const fuelRoutes = require("./src/routes/member1-kumara/fuel.routes");
-const sensorRoutes = require("./src/routes/member1-kumara/sensor.routes");
 const anomalyRoutes = require("./src/routes/member1-kumara/anomaly.routes");
 const uploadRoutes = require("./src/routes/member1-kumara/upload.routes");
 const employeeRoutes = require("./src/routes/member3-oshada/employee.routes");
 const attendanceRoutes = require("./src/routes/member3-oshada/attendance.routes");
+const seedRoutes = require("./src/routes/member1-kumara/seedRoutes");
+const reportRoutes = require("./src/routes/member1-kumara/reportRoutes");   // add near other requires
+const notificationsRoutes = require("./src/routes/member1-kumara/notifications.routes");
+const sensorRoutes = require("./src/routes/member1-kumara/sensor.routes");
 
 // (Optional) Models: only needed if you rely on auto-index creation or model side-effects.
 // Safe to keep.
@@ -29,16 +35,13 @@ require("./src/models/member1-kumara/AnomalyModel");
 
 const app = express();
 
+
+dns.setServers(["1.1.1.1", "8.8.8.8"]); // Cloudflare + Google
+
 /* ===========================
    Middleware
 =========================== */
-app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN || "*",
-    credentials: true,
-  })
-);
-
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -53,11 +56,14 @@ connectDB();
 app.use("/api/auth", authRoutes);
 app.use("/api/station", stationRoutes);
 app.use("/api/fuel", fuelRoutes);
-app.use("/api/sensor", sensorRoutes);
 app.use("/api/anomaly", anomalyRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/seed", seedRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/sensor", sensorRoutes);
 
 /* ===========================
    Health + Root
@@ -71,7 +77,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.json({ status: "FuelWatch API running 🚀" });
+  res.json({ status: "FuelWatch API running" });
 });
 
 /* ===========================
@@ -85,7 +91,7 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err);
+  console.error("Server Error:", err);
   res.status(err.status || 500).json({
     message: err.message || "Internal Server Error",
   });
@@ -97,7 +103,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8081;
 
 app.listen(PORT, () => {
-  console.log(`🚀 FuelWatch server running on port ${PORT}`);
-  console.log(`✅ Health: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Station base: http://localhost:${PORT}/api/station`);
+  console.log(`FuelWatch server running on port ${PORT}`);
+  console.log(`Health: http://localhost:${PORT}/api/health`);
+  console.log(`Station base: http://localhost:${PORT}/api/station`);
 });
