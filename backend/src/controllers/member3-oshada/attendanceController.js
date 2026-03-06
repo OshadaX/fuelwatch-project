@@ -95,9 +95,22 @@ const getClockStatus = async (req, res) => {
     }
 };
 
+// Get all currently checked-in employees (admin view)
+const getActiveCheckIns = async (req, res) => {
+    try {
+        const records = await Attendance.find({ status: 'Present' })
+            .populate('employeeId', 'name employeeId avatar color stationId role')
+            .sort({ checkInTime: -1 });
+        res.status(200).json(records);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     clockIn,
     clockOut,
     getEmployeeAttendance,
-    getClockStatus
+    getClockStatus,
+    getActiveCheckIns
 };

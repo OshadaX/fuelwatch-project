@@ -4,7 +4,7 @@ import { User, LogIn, LogOut, History, MapPin, Loader2, QrCode, X } from 'lucide
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 import 'leaflet.heat';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';

@@ -1,20 +1,20 @@
 import React from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import MainLayout from './components/shared/MainLayout';
-import LiveFuelStock from './components/member3-oshada/LiveFuelStock';
-import EmployeeDashboard from './components/member3-oshada/EmployeeDashboard';
+import LiveFuelStock from './components/member3-oshada/Station/LiveFuelStock';
+import EmployeeDashboard from './components/member3-oshada/Employee/EmployeeDashboard';
 import Portal from './components/member1-kumara/Portal';
 import ReportsGenerator from './components/member1-kumara/ReportsGenerator';
 import Anomaly from './components/member1-kumara/Anomaly';
 import FuelForecastPanel from './components/member1-kumara/FuelForecastPanel';
 import SensorTest from './components/member1-kumara/SensorTest';
 import Hero from './components/shared/Hero';
-import AdminQRView from './components/member3-oshada/AdminQRView';
-import EmployeePortal from './components/member3-oshada/EmployeePortal';
-import LoginPage from './components/member3-oshada/LoginPage';
-import StaffPrediction from './components/member3-oshada/StaffPrediction';
-import StationsView from './components/member3-oshada/StationsView';
-import SuperAdminDashboard from './components/member3-oshada/SuperAdminDashboard';
+import AdminQRView from './components/member3-oshada/Admin/AdminQRView';
+import EmployeePortal from './components/member3-oshada/Employee/EmployeePortal';
+import LoginPage from './components/member3-oshada/Auth/LoginPage';
+import StaffPrediction from './components/member3-oshada/Dashboard/StaffPrediction';
+import StationsView from './components/member3-oshada/Station/StationsView';
+import SuperAdminDashboard from './components/member3-oshada/Admin/SuperAdminDashboard';
 
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
