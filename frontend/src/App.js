@@ -12,6 +12,8 @@ import AdminQRView from './components/member3-oshada/AdminQRView';
 import EmployeePortal from './components/member3-oshada/EmployeePortal';
 import LoginPage from './components/member3-oshada/LoginPage';
 import StaffPrediction from './components/member3-oshada/StaffPrediction';
+import StationsView from './components/member3-oshada/StationsView';
+import SuperAdminDashboard from './components/member3-oshada/SuperAdminDashboard';
 
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
@@ -21,6 +23,9 @@ function App() {
   const { user } = useAuth();
 
   useEffect(() => {
+    if (user?.role === 'super_admin' && (window.location.pathname === '/' || window.location.pathname === '/live-fuel')) {
+      navigate('/super-admin-dashboard');
+    }
     if (user?.role === 'employee' && (window.location.pathname === '/' || window.location.pathname === '/live-fuel')) {
       navigate('/employee-portal');
     }
@@ -29,6 +34,8 @@ function App() {
   const handleExplore = () => {
     if (!user) {
       navigate('/login');
+    } else if (user.role === 'super_admin') {
+      navigate('/super-admin-dashboard');
     } else if (user.role === 'employee') {
       navigate('/employee-portal');
     } else {
@@ -40,6 +47,7 @@ function App() {
     <div className="App">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
         <Route path="*" element={
           <MainLayout onBrandClick={() => navigate('/')}>
             <Routes>
@@ -53,6 +61,7 @@ function App() {
               <Route path="/admin-qr" element={<AdminQRView />} />
               <Route path="/employee-portal" element={<EmployeePortal />} />
               <Route path="/staff-prediction" element={<StaffPrediction />} />
+              <Route path="/stations" element={<StationsView />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />
             </Routes>

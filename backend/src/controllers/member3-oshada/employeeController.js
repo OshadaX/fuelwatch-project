@@ -17,6 +17,29 @@ const loginEmployee = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // --- SUPER ADMIN CHECK ---
+        const SUPER_ADMIN_EMAIL = 'superadmin@fuelwatch.com';
+        const SUPER_ADMIN_PASSWORD = 'SuperAdmin@2026';
+
+        if (email === SUPER_ADMIN_EMAIL && password === SUPER_ADMIN_PASSWORD) {
+            const token = jwt.sign(
+                { id: 'SUPER_ADMIN_ID', role: 'super_admin' },
+                process.env.JWT_SECRET || 'your_jwt_secret',
+                { expiresIn: '1d' }
+            );
+            return res.status(200).json({
+                token,
+                user: {
+                    _id: 'SUPER_ADMIN_ID',
+                    email: SUPER_ADMIN_EMAIL,
+                    name: 'Network Super Admin',
+                    role: 'super_admin',
+                    avatar: 'SA'
+                }
+            });
+        }
+        // -------------------------
+
         // Find employee by email
         const employee = await Employee.findOne({ email });
         if (!employee) {

@@ -35,6 +35,8 @@ const StationSchema = new mongoose.Schema(
     },
     Name: { type: String, required: true },
     Location: { type: String, required: true },
+    latitude: { type: Number },
+    longitude: { type: Number },
     person: { type: PersonSchema, required: true },
     tanks: { type: [TankSchema], default: [] },
   },

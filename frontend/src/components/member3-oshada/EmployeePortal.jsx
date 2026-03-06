@@ -16,14 +16,32 @@ const EmployeePortal = () => {
     const [isScanning, setIsScanning] = useState(false);
     const [manualStationId, setManualStationId] = useState('');
     const [showManualInput, setShowManualInput] = useState(false);
+    const [assignedStationName, setAssignedStationName] = useState('');
 
     useEffect(() => {
         if (user) {
             fetchStatus();
             fetchHistory();
+            if (user.stationId) {
+                fetchAssignedStation(user.stationId);
+            }
             setLoading(false);
         }
     }, [user]);
+
+    const fetchAssignedStation = async (stationId) => {
+        try {
+            const response = await axios.get(`${API_URL}/station`);
+            // The stations are typically returned in response.data.items or response.data based on earlier API structures
+            const stations = response.data.items || response.data;
+            const station = stations.find(s => s._id === stationId || s.id === stationId);
+            if (station) {
+                setAssignedStationName(station.Name || station.name);
+            }
+        } catch (error) {
+            console.error('Failed to fetch station details:', error);
+        }
+    };
 
     const fetchStatus = async () => {
         try {
@@ -68,19 +86,64 @@ const EmployeePortal = () => {
         }, 100);
     };
 
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371e3; // metres
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // in metres
+    };
+
     const handleClockIn = async (stationId) => {
+        const toastId = toast.loading('Verifying location...');
         try {
+            // 1. Get current position
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+
+            const { latitude: userLat, longitude: userLon } = position.coords;
+
+            // 2. Fetch station details to get its coordinates
+            const response = await axios.get(`${API_URL}/station`);
+            const stations = response.data.items || response.data;
+            const station = stations.find(s => s._id === stationId || s.id === stationId);
+
+            if (!station || !station.latitude || !station.longitude) {
+                toast.error('Station location not configured. Proceeding with caution...', { id: toastId });
+                // If no station coords, we let it pass for now as requested in plan
+            } else {
+                const distance = calculateDistance(userLat, userLon, station.latitude, station.longitude);
+                if (distance > 500) {
+                    toast.error(`Check-in blocked. You are ${Math.round(distance)}m away from the station.`, { id: toastId });
+                    return;
+                }
+            }
+
+            // 3. Proceed with clock-in
             await axios.post(`${API_URL}/attendance/clock-in`, {
                 employeeId: user._id || user.id,
                 stationId
             });
-            toast.success('Successfully clocked in!');
+
+            toast.success('Successfully clocked in!', { id: toastId });
             fetchStatus();
             fetchHistory();
             setShowManualInput(false);
             setManualStationId('');
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Clock-in failed');
+            console.error('Clock-in error:', error);
+            const message = error.code === 1
+                ? 'Location permission denied. Please enable GPS to clock in.'
+                : (error.response?.data?.message || 'Clock-in failed');
+            toast.error(message, { id: toastId });
         }
     };
 
@@ -199,13 +262,10 @@ const EmployeePortal = () => {
                                             </button>
                                         ) : (
                                             <div className="space-y-3 p-4 bg-slate-50 rounded-2xl animate-in fade-in zoom-in duration-300">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Enter Station ID"
-                                                    value={manualStationId}
-                                                    onChange={(e) => setManualStationId(e.target.value)}
-                                                    className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                />
+                                                <div className="text-sm text-slate-600 mb-2">
+                                                    Check in to:<br />
+                                                    <strong className="text-slate-900 text-base">{assignedStationName || 'Your Assigned Station'}</strong>
+                                                </div>
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => setShowManualInput(false)}
@@ -214,13 +274,16 @@ const EmployeePortal = () => {
                                                         Cancel
                                                     </button>
                                                     <button
-                                                        onClick={() => handleClockIn(manualStationId)}
-                                                        disabled={!manualStationId}
+                                                        onClick={() => handleClockIn(user.stationId)}
+                                                        disabled={!user.stationId}
                                                         className="flex-[2] py-2 bg-slate-900 text-white font-bold rounded-xl disabled:opacity-50"
                                                     >
-                                                        Submit
+                                                        Confirm
                                                     </button>
                                                 </div>
+                                                {!user.stationId && (
+                                                    <p className="text-xs text-red-500 text-center mt-2">No station assigned to your profile.</p>
+                                                )}
                                             </div>
                                         )}
                                     </div>

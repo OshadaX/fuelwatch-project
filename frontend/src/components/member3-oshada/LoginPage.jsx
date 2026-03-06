@@ -19,7 +19,9 @@ const LoginPage = () => {
         if (result.success) {
             // Redirect based on role
             const user = JSON.parse(localStorage.getItem('fuelwatch_user'));
-            if (user.role === 'employee') {
+            if (user.role === 'super_admin') {
+                navigate('/super-admin-dashboard');
+            } else if (user.role === 'employee') {
                 navigate('/employee-portal');
             } else {
                 navigate('/live-fuel');

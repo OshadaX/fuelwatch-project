@@ -4,8 +4,10 @@ import { ChevronLeft, ChevronRight, LogIn, LogOut, UserCircle } from "lucide-rea
 import { useAuth } from "../../context/AuthContext";
 
 const Sidebar = ({ isCollapsed, onToggle }) => {
-    const navigate = useNavigate();
     const { user, login, logout } = useAuth();
+    const navigate = useNavigate();
+
+    if (user?.role === 'super_admin') return null;
 
     const menuItems = [
         {
