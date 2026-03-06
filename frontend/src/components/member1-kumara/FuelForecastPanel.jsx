@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
@@ -10,6 +11,7 @@ const MODE_OPTIONS = [
 ];
 
 export default function FuelForecastPanel() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState("weekly");
   const [file, setFile] = useState(null);
 
@@ -41,10 +43,10 @@ export default function FuelForecastPanel() {
     !file
       ? "Please upload a PDF report to generate a forecast."
       : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
-      ? "Only PDF files are allowed."
-      : file.size > 25 * 1024 * 1024
-      ? "PDF is too large (max 25MB)."
-      : "";
+        ? "Only PDF files are allowed."
+        : file.size > 25 * 1024 * 1024
+          ? "PDF is too large (max 25MB)."
+          : "";
 
   async function onCheckHealth() {
     try {
@@ -312,6 +314,44 @@ export default function FuelForecastPanel() {
                   </table>
                 </div>
               </>
+            )}
+
+            {/* ✅ Link to Member 3 Staff Prediction */}
+            {mode === "weekly" && daily && daily.length === 7 && (
+              <div
+                style={{
+                  marginTop: 24,
+                  padding: 20,
+                  borderRadius: 16,
+                  background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                  border: "1px solid #bfdbfe",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "between",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ margin: 0, color: "#1e40af", fontSize: 16 }}>🔮 Staffing Insight</h4>
+                  <p style={{ margin: "4px 0 0", color: "#3b82f6", fontSize: 13 }}>
+                    Predict how many employees you'll need based on this fuel forecast.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate("/staff-prediction", { state: { fuelForecast: daily } })}
+                  style={{
+                    backgroundColor: "#2563eb",
+                    color: "white",
+                    border: "none",
+                    padding: "10px 20px",
+                    borderRadius: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+                  }}
+                >
+                  Predict Staffing Impact
+                </button>
+              </div>
             )}
 
             {/* ✅ Annual: Month-wise breakdown (Jan..Dec) */}

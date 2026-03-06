@@ -57,7 +57,7 @@ const EmployeePortal = () => {
                     if (data.type === 'STATION_CHECKIN') {
                         scanner.clear();
                         setIsScanning(false);
-                        await handleClockIn(data.stationId);
+                        await handleClockIn(data.stationId, data.timestamp);
                     }
                 } catch (e) {
                     toast.error('Invalid QR Code');
@@ -68,12 +68,38 @@ const EmployeePortal = () => {
         }, 100);
     };
 
-    const handleClockIn = async (stationId) => {
+    const handleClockIn = async (stationId, timestamp = null) => {
+        setLoading(true);
         try {
+            // Get Geolocation
+            let location = { latitude: null, longitude: null };
+
+            if ("geolocation" in navigator) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        });
+                    });
+                    location = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+                } catch (geoError) {
+                    console.warn('Geolocation failed, proceeding without coordinates:', geoError);
+                    toast.error('Location access denied. Verification may fail.');
+                }
+            }
+
             await axios.post(`${API_URL}/attendance/clock-in`, {
                 employeeId: user._id || user.id,
-                stationId
+                stationId,
+                timestamp,
+                ...location
             });
+
             toast.success('Successfully clocked in!');
             fetchStatus();
             fetchHistory();
@@ -81,6 +107,8 @@ const EmployeePortal = () => {
             setManualStationId('');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Clock-in failed');
+        } finally {
+            setLoading(false);
         }
     };
 

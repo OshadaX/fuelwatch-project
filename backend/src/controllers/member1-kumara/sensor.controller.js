@@ -23,7 +23,7 @@ const getLatestReadings = async (_, res) => {
   try {
     const readings = await Sensor.find()
       .sort({ reading_time: -1 })
-      .limit(10);
+      .limit(40);
     res.json(readings);
   } catch (error) {
     res.status(500).json({ message: error.message });
