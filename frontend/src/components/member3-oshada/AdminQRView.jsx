@@ -19,7 +19,7 @@ const AdminQRView = () => {
         try {
             const response = await axios.get(`${API_URL}/station`);
             // The API returns { items: [...], total: X, page: X ... }
-            const data = response.data?.items || response.data?.data || [];
+            const data = response.data?.stations || response.data?.items || response.data?.data || [];
 
             // Ensure data is always an array
             if (Array.isArray(data)) {

@@ -88,7 +88,8 @@ const SuperAdminDashboard = () => {
                 axios.get(`${API_URL}/sensor`)
             ]);
 
-            setStations(stationsRes.data?.items || []);
+            const stationsData = stationsRes.data?.stations || stationsRes.data?.items || [];
+            setStations(stationsData);
             setReadings(sensorRes.data || []);
             setLoading(false);
         } catch (error) {

@@ -51,7 +51,7 @@ const EmployeeDashboard = () => {
     const fetchStations = async () => {
         try {
             const response = await axios.get(`${API_URL}/station`);
-            const data = response.data?.items || response.data?.data || [];
+            const data = response.data?.stations || response.data?.items || response.data?.data || [];
             if (Array.isArray(data)) {
                 setStations(data);
             } else {

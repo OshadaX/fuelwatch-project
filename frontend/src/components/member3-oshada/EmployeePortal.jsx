@@ -32,8 +32,8 @@ const EmployeePortal = () => {
     const fetchAssignedStation = async (stationId) => {
         try {
             const response = await axios.get(`${API_URL}/station`);
-            // The stations are typically returned in response.data.items or response.data based on earlier API structures
-            const stations = response.data.items || response.data;
+            // The stations are typically returned in response.data.stations
+            const stations = response.data.stations || response.data.items || response.data;
             const station = stations.find(s => s._id === stationId || s.id === stationId);
             if (station) {
                 setAssignedStationName(station.Name || station.name);
@@ -130,7 +130,7 @@ const EmployeePortal = () => {
             // distance check
             if (location.latitude && location.longitude) {
                 const response = await axios.get(`${API_URL}/station`);
-                const stations = response.data.items || response.data;
+                const stations = response.data.stations || response.data.items || response.data;
                 const station = stations.find(s => s._id === stationId || s.id === stationId);
 
                 if (station && station.latitude && station.longitude) {

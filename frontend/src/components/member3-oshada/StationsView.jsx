@@ -43,7 +43,7 @@ const StationsView = () => {
     const fetchStations = async () => {
         try {
             const response = await axios.get(`${API_URL}/station`);
-            const items = response.data.items || response.data;
+            const items = response.data.stations || response.data.items || response.data;
             setStations(items);
         } catch (error) {
             console.error('Error fetching stations:', error);

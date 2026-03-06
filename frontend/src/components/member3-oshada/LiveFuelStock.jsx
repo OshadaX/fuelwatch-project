@@ -63,9 +63,10 @@ const LiveFuelStock = () => {
             let stationTanks = [];
             try {
                 const stationsRes = await axios.get(`${API_URL}/station`);
-                if (stationsRes.data && stationsRes.data.items && stationsRes.data.items.length > 0) {
+                if (stationsRes.data && (stationsRes.data.stations || stationsRes.data.items)) {
                     // Assuming we are monitoring the first station for now
-                    stationTanks = stationsRes.data.items[0].tanks || [];
+                    const stationDataArr = stationsRes.data.stations || stationsRes.data.items;
+                    stationTanks = stationDataArr.length > 0 ? stationDataArr[0].tanks || [] : [];
                 }
             } catch (err) {
                 console.warn('Could not fetch station capacities, using defaults:', err);

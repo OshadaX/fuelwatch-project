@@ -1,5 +1,6 @@
 // src/controllers/member1-kumara/sensor.controller.js
 const SensorTest = require("../../models/member1-kumara/SensorTestModel");
+const Sensor = require("../../models/member1-kumara/SensorModel");
 const { computeHealthFeatures } = require("../../utils/healthFeatures");
 
 // Simple distance -> fuel (keep for now)

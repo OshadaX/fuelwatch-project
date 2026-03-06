@@ -1,6 +1,47 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
+import Swal from "sweetalert2";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LayoutDashboard,
+  BadgeCheck,
+  Moon,
+  Sun,
+  RefreshCw,
+  Download,
+  TrendingUp,
+  Loader2,
+  Activity,
+  Gauge,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  CalendarDays,
+  Settings2,
+  Filter,
+  Trash2,
+  CloudUpload,
+  Info,
+  Search,
+  X,
+  ChevronDown,
+  BarChart3,
+  LineChart as LineChartIcon,
+} from "lucide-react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
@@ -228,6 +269,60 @@ function Skeleton({ className }) {
   return <div className={cx("animate-pulse rounded-xl bg-slate-200/70 dark:bg-white/10", className)} />;
 }
 
+const styles = {
+  sectionTitle: {
+    fontSize: "1.25rem",
+    fontWeight: "900",
+    color: "#0f172a",
+    marginBottom: "1rem",
+  },
+};
+
+function DataTable({ rows = [], emptyText = "No data available." }) {
+  if (!rows.length) {
+    return (
+      <div className="grid h-40 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-400">
+        {emptyText}
+      </div>
+    );
+  }
+
+  const columns = Object.keys(rows[0]);
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+            {columns.map((c) => (
+              <th key={c} className="px-4 py-3">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr
+              key={idx}
+              className={cx(
+                "border-t border-slate-200 dark:border-white/10",
+                idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
+              )}
+            >
+              {columns.map((c) => (
+                <td key={c} className="px-4 py-3 tabular-nums">
+                  {typeof row[c] === "number" ? row[c].toLocaleString() : String(row[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Dropdown({ label, icon: Icon, items = [], disabled }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -383,6 +478,9 @@ export default function FuelForecastPanel() {
   const [compactTables, setCompactTables] = useState(false);
 
   const [selectedFuels, setSelectedFuels] = useState(() => new Set());
+  const [reduceMotion] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false
+  );
 
   // apply theme class
   useEffect(() => {
@@ -397,6 +495,49 @@ export default function FuelForecastPanel() {
   const daily = useMemo(() => forecastObj?.daily || [], [forecastObj]);
   const monthly = useMemo(() => forecastObj?.monthly || [], [forecastObj]);
   const isAnnual = mode === "annual";
+
+  const fuelKeys = useMemo(() => (totals ? Object.keys(totals) : []), [totals]);
+
+  const filteredFuelKeys = useMemo(() => {
+    if (!fuelSearch) return fuelKeys;
+    const q = fuelSearch.toLowerCase();
+    return fuelKeys.filter((k) => k.toLowerCase().includes(q));
+  }, [fuelKeys, fuelSearch]);
+
+  const grandTotal = useMemo(() => {
+    if (!totals) return 0;
+    return Object.values(totals).reduce((a, b) => a + (Number(b) || 0), 0);
+  }, [totals]);
+
+  const topFuel = useMemo(() => {
+    if (!totals || fuelKeys.length === 0) return null;
+    const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    return { fuel: sorted[0][0], value: sorted[0][1] };
+  }, [totals, fuelKeys]);
+
+  const totalsChartData = useMemo(() => {
+    if (!totals) return [];
+    return Object.entries(totals)
+      .map(([fuel, value]) => ({ fuel, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [totals]);
+
+  const dailyChartData = useMemo(() => {
+    if (!daily?.length) return [];
+    return daily.map((row) => ({
+      ...row,
+      DateLabel: shortDate(row.Date || row.date),
+    }));
+  }, [daily]);
+
+  const monthlyChartData = useMemo(() => {
+    if (!monthly?.length) return [];
+    return monthly;
+  }, [monthly]);
+
+  const headerFrom = useMemo(() => result?.from_date || result?.from || forecastObj?.from || null, [result, forecastObj]);
+  const headerTo = useMemo(() => result?.to_date || result?.to || forecastObj?.to || null, [result, forecastObj]);
+  const ingested = useMemo(() => result?.metadata?.filename || result?.filename || "Report PDF", [result]);
 
   const fileError =
     !file
@@ -1270,51 +1411,51 @@ export default function FuelForecastPanel() {
                         </span>
                       </div>
 
-            {/* ✅ Link to Member 3 Staff Prediction */}
-            {mode === "weekly" && daily && daily.length === 7 && (
-              <div
-                style={{
-                  marginTop: 24,
-                  padding: 20,
-                  borderRadius: 16,
-                  background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-                  border: "1px solid #bfdbfe",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "between",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: 0, color: "#1e40af", fontSize: 16 }}>🔮 Staffing Insight</h4>
-                  <p style={{ margin: "4px 0 0", color: "#3b82f6", fontSize: 13 }}>
-                    Predict how many employees you'll need based on this fuel forecast.
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate("/staff-prediction", { state: { fuelForecast: daily } })}
-                  style={{
-                    backgroundColor: "#2563eb",
-                    color: "white",
-                    border: "none",
-                    padding: "10px 20px",
-                    borderRadius: "12px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
-                  }}
-                >
-                  Predict Staffing Impact
-                </button>
-              </div>
-            )}
+                      {/* ✅ Link to Member 3 Staff Prediction */}
+                      {mode === "weekly" && daily && daily.length === 7 && (
+                        <div
+                          style={{
+                            marginTop: 24,
+                            padding: 20,
+                            borderRadius: 16,
+                            background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                            border: "1px solid #bfdbfe",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "between",
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: 0, color: "#1e40af", fontSize: 16 }}>🔮 Staffing Insight</h4>
+                            <p style={{ margin: "4px 0 0", color: "#3b82f6", fontSize: 13 }}>
+                              Predict how many employees you'll need based on this fuel forecast.
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => navigate("/staff-prediction", { state: { fuelForecast: daily } })}
+                            style={{
+                              backgroundColor: "#2563eb",
+                              color: "white",
+                              border: "none",
+                              padding: "10px 20px",
+                              borderRadius: "12px",
+                              fontWeight: "600",
+                              cursor: "pointer",
+                              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+                            }}
+                          >
+                            Predict Staffing Impact
+                          </button>
+                        </div>
+                      )}
 
-            {/* ✅ Annual: Month-wise breakdown (Jan..Dec) */}
-            {isAnnual && monthly && monthly.length > 0 && (
-              <>
-                <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Month-wise Breakdown (Annual)</h3>
-                <DataTable rows={monthly} emptyText="No month-wise data returned for annual forecast." />
-              </>
-            )}
+                      {/* ✅ Annual: Month-wise breakdown (Jan..Dec) */}
+                      {isAnnual && monthly && monthly.length > 0 && (
+                        <>
+                          <h3 style={{ ...styles.sectionTitle, marginTop: 18 }}>Month-wise Breakdown (Annual)</h3>
+                          <DataTable rows={monthly} emptyText="No month-wise data returned for annual forecast." />
+                        </>
+                      )}
 
                       <div className="mt-3 text-xs text-slate-600 dark:text-zinc-400">
                         Tip: Use <span className="font-black">Export → Totals CSV</span> for reporting.
