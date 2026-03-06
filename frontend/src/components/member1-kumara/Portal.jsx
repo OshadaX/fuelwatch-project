@@ -27,6 +27,18 @@ const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
 const http = axios.create({ baseURL: API_BASE, headers: { "Content-Type": "application/json" } });
 
 /* ----------------------------
+   ✅ Logged-in manager email helper (FIX)
+---------------------------- */
+const getManagerEmail = () => {
+  try {
+    const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+    return String(u?.email || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+/* ----------------------------
    SweetAlert (single place)
 ---------------------------- */
 const MySwal = withReactContent(Swal);
@@ -183,7 +195,8 @@ const S = {
       alignItems: "center",
     };
     if (tone === "primary") return { ...base, background: "#2563EB", border: "1px solid #1D4ED8", color: "#fff" };
-    if (tone === "danger") return { ...base, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.22)", color: "#DC2626" };
+    if (tone === "danger")
+      return { ...base, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.22)", color: "#DC2626" };
     if (tone === "soft") return { ...base, background: "rgba(15,23,42,0.04)" };
     return base;
   },
@@ -201,7 +214,14 @@ const S = {
   grid4: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 },
   divider: { height: 1, background: "rgba(15,23,42,0.10)", margin: "12px 0" },
   modalBg: { position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 50 },
-  modal: { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", zIndex: 60, width: "min(920px, calc(100vw - 28px))" },
+  modal: {
+    position: "fixed",
+    left: "50%",
+    top: "50%",
+    transform: "translate(-50%,-50%)",
+    zIndex: 60,
+    width: "min(920px, calc(100vw - 28px))",
+  },
 };
 
 function Field({ label, hint, error, children }) {
@@ -324,7 +344,9 @@ export default function Portal() {
     if (!isEditing) {
       const draft = localStorage.getItem("fuelwatch_portal_draft");
       if (draft) {
-        try { reset(JSON.parse(draft)); } catch {}
+        try {
+          reset(JSON.parse(draft));
+        } catch {}
       }
     }
   }, [reset, isEditing]);
@@ -338,7 +360,7 @@ export default function Portal() {
       const onlyMine = q ? items.filter((s) => (s.Id || "").toUpperCase() === q.toUpperCase()) : items;
 
       setStations(onlyMine);
-      setTotal(q ? onlyMine.length : (Array.isArray(data) ? data.length : (data.total ?? items.length)));
+      setTotal(q ? onlyMine.length : Array.isArray(data) ? data.length : data.total ?? items.length);
     } catch (e) {
       await alertErr("Failed", e?.response?.data?.message || "Failed to load stations");
     } finally {
@@ -393,7 +415,15 @@ export default function Portal() {
       activeStep === 0
         ? await trigger(["Id", "Name", "Location"])
         : activeStep === 1
-        ? await trigger(["person.Id", "person.PersonName", "person.PersonDesignation", "person.PersonEmail", "person.ContactNumber", "person.StartTime", "person.EndTime"])
+        ? await trigger([
+            "person.Id",
+            "person.PersonName",
+            "person.PersonDesignation",
+            "person.PersonEmail",
+            "person.ContactNumber",
+            "person.StartTime",
+            "person.EndTime",
+          ])
         : await trigger(["tanks"]);
 
     if (!ok) return alertErr("Validation", "Please fix the highlighted fields.");
@@ -413,10 +443,21 @@ export default function Portal() {
     await alertOk("Done", "Form cleared");
   }
 
+  /* ----------------------------
+     ✅ SUBMIT (FIX: send manager_email)
+  ---------------------------- */
   async function onSubmit(payload) {
     try {
+      const manager_email = getManagerEmail();
+
+      if (!manager_email) {
+        return alertErr("Unauthorized", "Login required: manager email not found in localStorage.");
+      }
+
       const normalized = {
         ...payload,
+        manager_email, // ✅ REQUIRED by backend createStation
+
         Id: payload.Id.trim().toUpperCase(),
         person: {
           ...payload.person,
@@ -426,6 +467,9 @@ export default function Portal() {
         },
         tanks: payload.tanks.map((t) => ({ ...t, fuel_type: t.fuel_type.trim() })),
       };
+
+      // Optional: debug once, then remove
+      // console.log("POST payload:", normalized);
 
       if (isEditing) {
         await http.put(`/station/${editingId}`, normalized);
@@ -535,8 +579,12 @@ export default function Portal() {
           <div style={S.divider} />
 
           <div style={S.tabs}>
-            <button type="button" style={S.tabBtn(activeTab === "portal")} onClick={() => setActiveTab("portal")}>Form</button>
-            <button type="button" style={S.tabBtn(activeTab === "registry")} onClick={() => setActiveTab("registry")}>Registry</button>
+            <button type="button" style={S.tabBtn(activeTab === "portal")} onClick={() => setActiveTab("portal")}>
+              Form
+            </button>
+            <button type="button" style={S.tabBtn(activeTab === "registry")} onClick={() => setActiveTab("registry")}>
+              Registry
+            </button>
           </div>
         </div>
 
@@ -545,7 +593,9 @@ export default function Portal() {
           <div style={{ ...S.row, justifyContent: "space-between" }}>
             <div />
             <div style={S.row}>
-              <button type="button" style={S.btn("soft")} onClick={clearForm}><X size={16} /> Reset</button>
+              <button type="button" style={S.btn("soft")} onClick={clearForm}>
+                <X size={16} /> Reset
+              </button>
               <button
                 type="button"
                 style={S.btn("primary")}
@@ -612,10 +662,7 @@ export default function Portal() {
                     disabled={locked}
                     onClick={() => {
                       if (locked) {
-                        alertErr(
-                          "Complete previous step",
-                          idx === 1 ? "Complete Station Details first." : "Complete Station + Contact Person details first."
-                        );
+                        alertErr("Complete previous step", idx === 1 ? "Complete Station Details first." : "Complete Station + Contact Person details first.");
                         return;
                       }
                       setActiveStep(idx);
@@ -623,7 +670,9 @@ export default function Portal() {
                     style={{ ...S.tabBtn(active), opacity: locked ? 0.5 : 1, cursor: locked ? "not-allowed" : "pointer" }}
                     title={locked ? "Complete previous step first" : ""}
                   >
-                    <span style={S.row}><Icon size={16} /> {s.title}</span>
+                    <span style={S.row}>
+                      <Icon size={16} /> {s.title}
+                    </span>
                   </button>
                 );
               })}
@@ -650,7 +699,11 @@ export default function Portal() {
                 <Field label="Location (District)" error={errors?.Location?.message}>
                   <Select icon={Filter} invalid={!!errors?.Location} {...register("Location")}>
                     <option value="">Select district...</option>
-                    {allowedDistricts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {allowedDistricts.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
               </div>
@@ -698,13 +751,21 @@ export default function Portal() {
                   <Field label="Start Time" error={errors?.person?.StartTime?.message}>
                     <Select invalid={!!errors?.person?.StartTime} {...register("person.StartTime")}>
                       <option value="">Select...</option>
-                      {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      {timeOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
                     </Select>
                   </Field>
                   <Field label="End Time" error={errors?.person?.EndTime?.message}>
                     <Select invalid={!!errors?.person?.EndTime} {...register("person.EndTime")}>
                       <option value="">Select...</option>
-                      {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      {timeOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
                     </Select>
                   </Field>
                 </div>
@@ -716,7 +777,11 @@ export default function Portal() {
               <div>
                 <div style={{ ...S.row, justifyContent: "space-between" }}>
                   <div style={{ fontSize: 12, opacity: 0.75 }}>Fuel type locked • unique tank index per fuel type</div>
-                  <button type="button" style={S.btn("primary")} onClick={() => append({ fuel_type: "", number_of_tanks: 1, tank_index: fields.length + 1, tank_capacity: 500 })}>
+                  <button
+                    type="button"
+                    style={S.btn("primary")}
+                    onClick={() => append({ fuel_type: "", number_of_tanks: 1, tank_index: fields.length + 1, tank_capacity: 500 })}
+                  >
                     <Plus size={16} /> Add Tank
                   </button>
                 </div>
@@ -741,7 +806,11 @@ export default function Portal() {
                         <Field label="Fuel Type" error={errors?.tanks?.[idx]?.fuel_type?.message}>
                           <Select icon={Droplets} invalid={!!errors?.tanks?.[idx]?.fuel_type} {...register(`tanks.${idx}.fuel_type`)}>
                             <option value="">Select fuel type...</option>
-                            {allowedFuelTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                            {allowedFuelTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
                           </Select>
                         </Field>
 
@@ -754,7 +823,14 @@ export default function Portal() {
                         </Field>
 
                         <Field label="Tank Capacity (L)" error={errors?.tanks?.[idx]?.tank_capacity?.message}>
-                          <Input type="number" min="500" max="100000" step="1" invalid={!!errors?.tanks?.[idx]?.tank_capacity} {...register(`tanks.${idx}.tank_capacity`)} />
+                          <Input
+                            type="number"
+                            min="500"
+                            max="100000"
+                            step="1"
+                            invalid={!!errors?.tanks?.[idx]?.tank_capacity}
+                            {...register(`tanks.${idx}.tank_capacity`)}
+                          />
                         </Field>
                       </div>
                     </div>
@@ -772,9 +848,7 @@ export default function Portal() {
               <div style={S.card}>
                 <div style={{ fontWeight: 950 }}>Registry is locked</div>
                 <div style={S.divider} />
-                <div style={{ fontSize: 13, opacity: 0.75 }}>
-                  Enter your PUCSL Station ID to view your station details only.
-                </div>
+                <div style={{ fontSize: 13, opacity: 0.75 }}>Enter your PUCSL Station ID to view your station details only.</div>
                 <div style={{ marginTop: 12 }}>
                   <button
                     type="button"
@@ -797,21 +871,11 @@ export default function Portal() {
                 <div style={{ ...S.row, justifyContent: "space-between" }}>
                   <div style={{ fontWeight: 980 }}>Registered Station</div>
                   <div style={S.row}>
-                    <button
-                      type="button"
-                      style={S.btn("soft")}
-                      onClick={() => fetchStations(1, pucslId)}
-                      disabled={loadingList}
-                    >
+                    <button type="button" style={S.btn("soft")} onClick={() => fetchStations(1, pucslId)} disabled={loadingList}>
                       <RefreshCw size={16} /> Refresh
                     </button>
 
-                    <button
-                      type="button"
-                      style={S.btn("soft")}
-                      onClick={exportStationsJSON}
-                      disabled={loadingList || !stations.length}
-                    >
+                    <button type="button" style={S.btn("soft")} onClick={exportStationsJSON} disabled={loadingList || !stations.length}>
                       <Download size={16} /> Export JSON
                     </button>
 
@@ -836,17 +900,16 @@ export default function Portal() {
                       <Filter size={18} style={{ opacity: 0.55, color: "#1D4ED8" }} />
                       <select style={{ ...S.input, cursor: "pointer" }} value={quickFuel} onChange={(e) => setQuickFuel(e.target.value)}>
                         <option value="all">All fuel types</option>
-                        {allowedFuelTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                        {allowedFuelTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    style={S.btn("primary")}
-                    onClick={() => fetchStations(1, pucslId)}
-                    disabled={loadingList}
-                  >
+                  <button type="button" style={S.btn("primary")} onClick={() => fetchStations(1, pucslId)} disabled={loadingList}>
                     Search
                   </button>
                 </div>
@@ -856,27 +919,46 @@ export default function Portal() {
                 <div style={S.divider} />
 
                 {shownStations.length === 0 ? (
-                  <div style={{ fontSize: 13, opacity: 0.75 }}>No station found for PUCSL ID: <b>{pucslId}</b></div>
+                  <div style={{ fontSize: 13, opacity: 0.75 }}>
+                    No station found for PUCSL ID: <b>{pucslId}</b>
+                  </div>
                 ) : (
                   <div style={{ overflowX: "auto", border: "1px solid rgba(15,23,42,0.10)", borderRadius: 10 }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
                       <thead>
                         <tr style={{ background: "rgba(15,23,42,0.04)" }}>
-                          <Th>Station</Th><Th>Id</Th><Th>Location</Th><Th>Contact</Th><Th>Tanks</Th><Th right>Actions</Th>
+                          <Th>Station</Th>
+                          <Th>Id</Th>
+                          <Th>Location</Th>
+                          <Th>Contact</Th>
+                          <Th>Tanks</Th>
+                          <Th right>Actions</Th>
                         </tr>
                       </thead>
                       <tbody>
                         {shownStations.map((s, idx) => (
                           <tr key={s._id || idx} style={{ borderTop: "1px solid rgba(15,23,42,0.10)" }}>
-                            <Td><b>{s.Name}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.PersonDesignation || "—"}</div></Td>
+                            <Td>
+                              <b>{s.Name}</b>
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.PersonDesignation || "—"}</div>
+                            </Td>
                             <Td>{s.Id}</Td>
                             <Td>{s.Location}</Td>
-                            <Td><b>{s.person?.PersonName || "—"}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.ContactNumber || "—"}</div></Td>
+                            <Td>
+                              <b>{s.person?.PersonName || "—"}</b>
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.ContactNumber || "—"}</div>
+                            </Td>
                             <Td>{(s.tanks || []).length}</Td>
                             <Td right>
-                              <button style={S.btn("soft")} onClick={() => { setPreviewRow(s); setPreviewOpen(true); }}><Eye size={16} /></button>
-                              <button style={S.btn()} onClick={() => startEdit(s)}><Pencil size={16} /></button>
-                              <button style={S.btn("danger")} onClick={() => removeStation(s._id || s.id)}><Trash2 size={16} /></button>
+                              <button style={S.btn("soft")} onClick={() => { setPreviewRow(s); setPreviewOpen(true); }}>
+                                <Eye size={16} />
+                              </button>
+                              <button style={S.btn()} onClick={() => startEdit(s)}>
+                                <Pencil size={16} />
+                              </button>
+                              <button style={S.btn("danger")} onClick={() => removeStation(s._id || s.id)}>
+                                <Trash2 size={16} />
+                              </button>
                             </Td>
                           </tr>
                         ))}
@@ -888,7 +970,6 @@ export default function Portal() {
             )}
           </>
         )}
-
       </div>
 
       {/* Preview Modal */}
@@ -916,15 +997,17 @@ export default function Portal() {
 /* table helpers */
 function Th({ children, right }) {
   return (
-    <th style={{
-      textAlign: right ? "right" : "left",
-      padding: "10px 10px",
-      fontSize: 12,
-      opacity: 0.75,
-      fontWeight: 950,
-      borderBottom: "1px solid rgba(15,23,42,0.10)",
-      whiteSpace: "nowrap",
-    }}>
+    <th
+      style={{
+        textAlign: right ? "right" : "left",
+        padding: "10px 10px",
+        fontSize: 12,
+        opacity: 0.75,
+        fontWeight: 950,
+        borderBottom: "1px solid rgba(15,23,42,0.10)",
+        whiteSpace: "nowrap",
+      }}
+    >
       {children}
     </th>
   );
