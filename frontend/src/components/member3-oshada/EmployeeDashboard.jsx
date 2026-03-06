@@ -22,6 +22,8 @@ const EmployeeDashboard = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [employeeToDelete, setEmployeeToDelete] = useState(null);
     const [formData, setFormData] = useState({
         employeeId: '',
         name: '',
@@ -162,15 +164,23 @@ const EmployeeDashboard = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this employee?')) {
+    const handleDeleteClick = (id) => {
+        setEmployeeToDelete(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (employeeToDelete) {
             try {
-                await axios.delete(`${API_URL}/employees/${id}`);
+                await axios.delete(`${API_URL}/employees/${employeeToDelete}`);
                 toast.success('Employee deleted successfully');
                 fetchEmployees();
             } catch (error) {
                 console.error('Error deleting employee:', error);
                 toast.error('Failed to delete employee');
+            } finally {
+                setIsDeleteModalOpen(false);
+                setEmployeeToDelete(null);
             }
         }
     };
@@ -399,7 +409,7 @@ const EmployeeDashboard = () => {
                                                             <Pencil size={16} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDelete(emp._id)}
+                                                            onClick={() => handleDeleteClick(emp._id)}
                                                             className={`p-2 rounded-xl transition-all ${isDark ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                                                         >
                                                             <Trash2 size={16} />
@@ -699,6 +709,38 @@ const EmployeeDashboard = () => {
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Delete Confirmation Modal */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+                        onClick={() => setIsDeleteModalOpen(false)}
+                    ></div>
+                    <div className={`relative w-full max-w-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-white'} border rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 p-8 text-center`}>
+                        <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <Trash2 size={32} />
+                        </div>
+                        <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} mb-2`}>Confirm Deletion</h3>
+                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} mb-8`}>
+                            This action cannot be undone. Are you sure you want to remove this employee from the system?
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                className={`flex-1 py-3 rounded-2xl text-sm font-semibold transition-all ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                className="flex-1 py-3 bg-red-500 text-white rounded-2xl text-sm font-semibold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                            >
+                                Delete
+                            </button>
                         </div>
                     </div>
                 </div>

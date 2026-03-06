@@ -4,6 +4,7 @@ import MainLayout from './components/shared/MainLayout';
 import LiveFuelStock from './components/member3-oshada/LiveFuelStock';
 import EmployeeDashboard from './components/member3-oshada/EmployeeDashboard';
 import Portal from './components/member1-kumara/Portal';
+import ReportsGenerator from './components/member1-kumara/ReportsGenerator';
 import Anomaly from './components/member1-kumara/Anomaly';
 import FuelForecastPanel from './components/member1-kumara/FuelForecastPanel';
 import SensorTest from './components/member1-kumara/SensorTest';
@@ -53,6 +54,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Hero onExplore={handleExplore} />} />
               <Route path="/portal" element={<Portal />} />
+              <Route path="/regen" element={<ReportsGenerator />} />
               <Route path="/anomaly" element={<Anomaly />} />
               <Route path="/fuel-forecast" element={<FuelForecastPanel />} />
               <Route path="/sensor-test" element={<SensorTest />} />

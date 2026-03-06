@@ -12,6 +12,8 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import OneHotEncoder
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
@@ -123,7 +125,50 @@ def train_model():
     print(f"R²:   {r2:.4f} (variance explained)")
     
     # ============================================
-    # 8. Feature Importance
+    # 8. Plot Performance Charts
+    # ============================================
+    print("\nGenerating performance charts...")
+    models_dir = os.path.join(base_dir, 'models')
+    if not os.path.exists(models_dir):
+        os.makedirs(models_dir)
+        
+    plt.figure(figsize=(14, 6))
+    
+    # 1. Scatter Plot (Actual vs Predicted)
+    plt.subplot(1, 2, 1)
+    sns.scatterplot(x=y_test, y=y_pred, alpha=0.6, color='blue', edgecolor='w', s=80)
+    
+    # Perfect prediction line
+    min_val = min(y_test.min(), y_pred.min())
+    max_val = max(y_test.max(), y_pred.max())
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='Perfect Prediction')
+    
+    plt.xlabel('Actual Employee Demand', fontsize=12)
+    plt.ylabel('Predicted Employee Demand', fontsize=12)
+    plt.title(f'Actual vs Predicted Demand\n(R²={r2:.3f}, MAE={mae:.3f})', fontsize=14)
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # 2. Residual Plot
+    plt.subplot(1, 2, 2)
+    residuals = y_test - y_pred
+    sns.histplot(residuals, kde=True, color='purple', bins=20)
+    plt.xlabel('Residuals (Actual - Predicted)', fontsize=12)
+    plt.ylabel('Frequency', fontsize=12)
+    plt.title('Distribution of Prediction Errors (Residuals)', fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Add zero error line
+    plt.axvline(x=0, color='r', linestyle='--', linewidth=2)
+    
+    plt.tight_layout()
+    chart_path = os.path.join(models_dir, 'performance_chart.png')
+    plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Performance chart saved: {chart_path}")
+    
+    # ============================================
+    # 9. Feature Importance
     # ============================================
     regressor = model.named_steps['regressor']
     

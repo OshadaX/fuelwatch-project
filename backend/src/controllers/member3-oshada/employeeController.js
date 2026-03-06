@@ -102,11 +102,24 @@ const createEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        const updatedEmployee = await Employee.findByIdAndUpdate(id, req.body, { new: true });
+        const updateData = { ...req.body };
+
+        // If password is being updated, hash it
+        if (updateData.password) {
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(updateData.password, salt);
+        }
+
+        const updatedEmployee = await Employee.findByIdAndUpdate(id, updateData, { new: true });
         if (!updatedEmployee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
-        res.status(200).json(updatedEmployee);
+
+        // Remove password from response
+        const employeeObj = updatedEmployee.toObject();
+        delete employeeObj.password;
+
+        res.status(200).json(employeeObj);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }

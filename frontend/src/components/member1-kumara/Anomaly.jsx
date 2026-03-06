@@ -1,4 +1,3 @@
-// src/components/member1-kumara/Anomaly.jsx
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
@@ -8,8 +7,6 @@ import {
   Button,
   TextField,
   MenuItem,
-  Snackbar,
-  Alert,
   CircularProgress,
   Table,
   TableHead,
@@ -19,11 +16,236 @@ import {
   TableContainer,
   Chip,
   Divider,
+  IconButton,
+  Tooltip,
+  Stack,
+  Tabs,
+  Tab,
+  InputAdornment,
+  LinearProgress,
+  Switch,
+  FormControlLabel,
+  Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
+import WhatshotRoundedIcon from "@mui/icons-material/WhatshotRounded";
+
+// ✅ SweetAlert2
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+
+const currentUser = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+const managerEmail = currentUser?.email || "";
+const MySwal = withReactContent(Swal);
+
+const Toast = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 4200,
+  timerProgressBar: true,
+  didOpen: (toast) => {
+    toast.addEventListener("mouseenter", Swal.stopTimer);
+    toast.addEventListener("mouseleave", Swal.resumeTimer);
+  },
+});
 
 const ML_API = "http://127.0.0.1:8090/ml/score-report";
+const BACKEND = "http://localhost:8081";
+
+// ==============================
+// Small utilities
+// ==============================
+function safeFixed(v, d = 3) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return (0).toFixed(d);
+  return n.toFixed(d);
+}
+
+function downloadJSON(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCSV(filename, rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return;
+
+  const keys = Object.keys(rows[0] || {});
+  const escape = (val) => {
+    const s = val == null ? "" : String(val);
+    const needsQuotes = /[",\n]/.test(s);
+    const escaped = s.replace(/"/g, '""');
+    return needsQuotes ? `"${escaped}"` : escaped;
+  };
+
+  const csv = [keys.join(","), ...rows.map((r) => keys.map((k) => escape(r?.[k])).join(","))].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==============================
+// Enterprise UI components
+// ==============================
+function EnterpriseCard({ children, sx }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 10 / 4,
+        border: `1px solid ${alpha(
+          isDark ? theme.palette.common.white : theme.palette.common.black,
+          isDark ? 0.1 : 0.08
+        )}`,
+        backgroundColor: isDark ? alpha("#0b1220", 0.75) : "#ffffff",
+        boxShadow: isDark ? "0 8px 28px rgba(0,0,0,0.35)" : "0 10px 30px rgba(16, 24, 40, 0.06)",
+        fontFamily: "Arial, Helvetica, sans-serif",
+        ...sx,
+      }}
+    >
+      {children}
+    </Paper>
+  );
+}
+
+function StatCard({ label, value, sub, tone = "primary", icon, sx }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  const palette =
+    tone === "danger"
+      ? theme.palette.error
+      : tone === "success"
+      ? theme.palette.success
+      : tone === "warning"
+      ? theme.palette.warning
+      : theme.palette.primary;
+
+  return (
+    <EnterpriseCard sx={{ p: 2, ...sx }}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            borderRadius: 2,
+            display: "grid",
+            placeItems: "center",
+            bgcolor: alpha(palette.main, isDark ? 0.2 : 0.12),
+            border: `1px solid ${alpha(palette.main, isDark ? 0.35 : 0.18)}`,
+            color: palette.main,
+          }}
+        >
+          {icon}
+        </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              color: "text.secondary",
+              fontWeight: 800,
+              letterSpacing: 0.2,
+              textTransform: "uppercase",
+              fontFamily: "Arial, Helvetica, sans-serif",
+            }}
+          >
+            {label}
+          </Typography>
+
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 900,
+              lineHeight: 1.1,
+              mt: 0.25,
+              fontFamily: "Arial, Helvetica, sans-serif",
+            }}
+          >
+            {value}
+          </Typography>
+
+          {sub ? (
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                mt: 0.25,
+                fontFamily: "Arial, Helvetica, sans-serif",
+              }}
+            >
+              {sub}
+            </Typography>
+          ) : null}
+        </Box>
+      </Stack>
+    </EnterpriseCard>
+  );
+}
+
+function SeverityChip({ pred }) {
+  const flagged = pred === 1 || pred === true;
+
+  return (
+    <Chip
+      label={flagged ? "FLAGGED" : "OK"}
+      size="small"
+      icon={flagged ? <WarningAmberRoundedIcon /> : <CheckCircleRoundedIcon />}
+      variant="outlined"
+      sx={{
+        fontWeight: 900,
+        borderRadius: 999,
+        fontFamily: "Arial, Helvetica, sans-serif",
+        ...(flagged
+          ? {
+              color: "error.main",
+              borderColor: (t) => alpha(t.palette.error.main, 0.35),
+              bgcolor: (t) => alpha(t.palette.error.main, t.palette.mode === "dark" ? 0.12 : 0.06),
+            }
+          : {
+              color: "success.main",
+              borderColor: (t) => alpha(t.palette.success.main, 0.3),
+              bgcolor: (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.12 : 0.06),
+            }),
+      }}
+    />
+  );
+}
 
 export default function Anomaly() {
+  const theme = useTheme();
+
   // -----------------------------
   // UI State
   // -----------------------------
@@ -33,31 +255,74 @@ export default function Anomaly() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
-
   // -----------------------------
   // Result State
   // -----------------------------
   const [scoredDays, setScoredDays] = useState([]);
   const [events, setEvents] = useState([]);
 
-  // Track last scanned file so threshold dropdown can rerun automatically
+  const [tab, setTab] = useState(0);
+  const [search, setSearch] = useState("");
+  const [showOnlyFlagged, setShowOnlyFlagged] = useState(false);
+  const [dense, setDense] = useState(false);
+
   const lastFileNameRef = useRef(null);
 
   // -----------------------------
-  // Helpers
+  // ✅ Notification Form State
+  // (NO station selection here)
   // -----------------------------
-  const openSnack = (message, severity = "success") => {
-    setSnackbar({ open: true, message, severity });
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifySeverity, setNotifySeverity] = useState("Warning"); // Advisory/Warning/Critical
+  const [notifyChannel, setNotifyChannel] = useState("email");
+  const [notifyRoles, setNotifyRoles] = useState(["SUPERVISOR", "MANAGER"]);
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifySending, setNotifySending] = useState(false);
+
+  // Station preview (derived from manager_email)
+  const [stationPreviewLoading, setStationPreviewLoading] = useState(false);
+  const [stationPreview, setStationPreview] = useState(null); // { Id, Name, Location, ... }
+  const [stationPreviewError, setStationPreviewError] = useState("");
+
+  // -----------------------------
+  // ✅ SweetAlert helpers
+  // -----------------------------
+  const loaderOpenRef = useRef(false);
+
+  const toast = (message, severity = "success") => {
+    const icon =
+      severity === "success"
+        ? "success"
+        : severity === "error"
+        ? "error"
+        : severity === "warning"
+        ? "warning"
+        : "info";
+    Toast.fire({ icon, title: message });
   };
 
-  const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
+  const showBlockingLoading = (title = "Processing…", text = "Please wait") => {
+    loaderOpenRef.current = true;
+    MySwal.fire({
+      title,
+      text,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+  };
 
-  // KPI: flagged days detection (supports multiple backend field names)
+  const closeBlockingLoading = () => {
+    if (!loaderOpenRef.current) return;
+    loaderOpenRef.current = false;
+    Swal.close();
+  };
+
+  // -----------------------------
+  // Derived stats
+  // -----------------------------
   const flaggedDays = useMemo(() => {
     return scoredDays.filter((r) => {
       const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
@@ -65,35 +330,117 @@ export default function Anomaly() {
     });
   }, [scoredDays]);
 
+  const avgScore = useMemo(() => {
+    if (!scoredDays.length) return 0;
+    const sum = scoredDays.reduce((acc, r) => {
+      const score = r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0;
+      return acc + (Number(score) || 0);
+    }, 0);
+    return sum / scoredDays.length;
+  }, [scoredDays]);
+
+  const maxScoreRow = useMemo(() => {
+    if (!scoredDays.length) return null;
+    let best = null;
+    for (const r of scoredDays) {
+      const s = Number(r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0) || 0;
+      if (!best || s > best._score) best = { ...r, _score: s };
+    }
+    return best;
+  }, [scoredDays]);
+
+  const filteredScoredDays = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return scoredDays.filter((r) => {
+      const day = String(r.day || r.date || r.timestamp || "").toLowerCase();
+      const station = String(
+        r.station_name ||
+          r.stationName ||
+          r.site_name ||
+          r.site ||
+          r.tank_name ||
+          r.tankName ||
+          r.station_id ||
+          r.stationId ||
+          ""
+      ).toLowerCase();
+      const fuel = String(r.fuel_type || r.fuelType || r.item || "").toLowerCase();
+      const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+
+      const matchesQuery = !q || day.includes(q) || station.includes(q) || fuel.includes(q);
+      const matchesFlag = !showOnlyFlagged || pred === 1 || pred === true;
+      return matchesQuery && matchesFlag;
+    });
+  }, [scoredDays, search, showOnlyFlagged]);
+
   // -----------------------------
-  // ✅ RUN ML SCAN (functional threshold)
+  // Row mapper
+  // -----------------------------
+  const mapRow = (r) => {
+    const day = r.day || r.date || r.timestamp || "-";
+    const station =
+      r.station_name ||
+      r.stationName ||
+      r.site_name ||
+      r.site ||
+      r.tank_name ||
+      r.tankName ||
+      r.station_id ||
+      r.stationId ||
+      "-";
+    const fuel = r.fuel_type || r.fuelType || r.item || "-";
+    const score = r.prob ?? r.prob_irregular ?? r.score ?? r.irregularity_score ?? 0;
+    const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+    const reason = r.reason || r.modelReason || r.note || "";
+    return { day, station, fuel, score, pred, reason };
+  };
+
+  // -----------------------------
+  // Helper: current manager email
+  // -----------------------------
+  const getManagerEmail = () => {
+  try {
+    const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+    const email = u?.email || "";
+    return String(email).trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+  // -----------------------------
+  // ✅ RUN ML SCAN
   // -----------------------------
   const handleRunScan = useCallback(async () => {
     if (!file) {
-      openSnack("Please choose a CSV/XLSX file first.", "warning");
+      toast("Please choose a CSV/XLSX file first.", "warning");
       return;
     }
 
     setLoading(true);
     setError("");
 
+    showBlockingLoading("Running ML Scan…", "Uploading file and scoring days");
+
     try {
       const form = new FormData();
       form.append("file", file);
 
-      // IMPORTANT: threshold affects pred on backend
       const url = `${ML_API}?threshold=${decisionThreshold}`;
       const res = await fetch(url, { method: "POST", body: form });
-      const data = await res.json();
 
-      console.log("✅ ML RESPONSE:", data);
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
 
       if (!res.ok) {
-        const msg = data?.detail?.message || data?.detail || "Scan failed";
+        const msg = data?.detail?.message || data?.detail || data?.error || "Scan failed";
         throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
       }
 
-      // Defensive extraction (supports many backend response shapes)
       const scored =
         data?.scored_days ||
         data?.scoredDays ||
@@ -113,286 +460,1035 @@ export default function Anomaly() {
 
       setScoredDays(Array.isArray(scored) ? scored : []);
       setEvents(Array.isArray(grouped) ? grouped : []);
-
-      // mark last scanned file for threshold auto-rerun
       lastFileNameRef.current = file?.name || null;
 
-      openSnack("✅ ML Scan Completed Successfully", "success");
+      closeBlockingLoading();
+      toast("✅ ML Scan Completed Successfully", "success");
+      setTab(0);
+
+      await MySwal.fire({
+        icon: "success",
+        title: "Scan completed",
+        html: `
+          <div style="text-align:left">
+            <div><b>Scored days:</b> ${Array.isArray(scored) ? scored.length : 0}</div>
+            <div><b>Events:</b> ${Array.isArray(grouped) ? grouped.length : 0}</div>
+            <div><b>Threshold:</b> ${decisionThreshold}</div>
+          </div>
+        `,
+        confirmButtonText: "OK",
+      });
     } catch (e) {
-      console.error("❌ Scan error:", e);
       const msg = e?.message || "Unknown error";
       setError(msg);
       setScoredDays([]);
       setEvents([]);
-      openSnack(`❌ ${msg}`, "error");
+
+      closeBlockingLoading();
+      toast(`❌ ${msg}`, "error");
+
+      await MySwal.fire({
+        icon: "error",
+        title: "Scan failed",
+        text: msg,
+        confirmButtonText: "Close",
+      });
     } finally {
+      closeBlockingLoading();
       setLoading(false);
     }
   }, [file, decisionThreshold]);
 
-  // -----------------------------
-  // ✅ AUTO re-run scan when threshold changes (if same file already scanned)
-  // -----------------------------
+  // Auto-rerun when threshold changes AND the same file was already scanned
   useEffect(() => {
     if (!file) return;
-
-    // only auto rerun if this file was already scanned at least once
     if (lastFileNameRef.current === file.name) {
-      const t = setTimeout(() => {
-        handleRunScan();
-      }, 350);
+      const t = setTimeout(() => handleRunScan(), 350);
       return () => clearTimeout(t);
     }
   }, [decisionThreshold, file, handleRunScan]);
 
-  // If user picks a new file, clear old results & allow a fresh scan
   const onPickFile = (f) => {
     setFile(f);
     setError("");
     setScoredDays([]);
     setEvents([]);
-    lastFileNameRef.current = null; // new file not scanned yet
+    setSearch("");
+    setShowOnlyFlagged(false);
+    lastFileNameRef.current = null;
+
+    if (f) toast(`Selected: ${f.name}`, "info");
+  };
+
+  const onReset = async () => {
+    const result = await MySwal.fire({
+      icon: "warning",
+      title: "Reset page state?",
+      text: "This will clear the selected file and all results.",
+      showCancelButton: true,
+      confirmButtonText: "Yes, reset",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: theme.palette.error.main,
+    });
+
+    if (!result.isConfirmed) return;
+
+    onPickFile(null);
+    toast("Reset completed", "info");
+  };
+
+  // -----------------------------
+  // ✅ Open notify form (SAFE)
+  // - station is derived from manager email via backend
+  // - no manual station selection
+  // -----------------------------
+  const openNotifyForm = async () => {
+    if (!scoredDays.length) {
+      toast("Run a scan first to notify staff.", "warning");
+      return;
+    }
+
+    const managerEmail = getManagerEmail();
+    setStationPreview(null);
+    setStationPreviewError("");
+    setStationPreviewLoading(true);
+
+    // Default message based on max score row
+    setNotifyMessage(
+      maxScoreRow?.reason
+        ? `Detected anomaly: ${String(maxScoreRow.reason).slice(0, 180)}`
+        : "Please review the detected anomalies and take action."
+    );
+
+    setNotifyOpen(true);
+
+    try {
+      // ✅ expects backend route: GET /api/station/by-manager/:email
+      const res = await fetch(`${BACKEND}/api/station/by-manager/${encodeURIComponent(managerEmail)}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        const msg = data?.message || data?.error || "Cannot find station for this manager email";
+        setStationPreviewError(msg);
+        toast(msg, "error");
+        return;
+      }
+
+      setStationPreview(data.station || null);
+      toast("Station verified for this manager.", "success");
+    } catch (e) {
+      const msg = e?.message || "Station verification failed";
+      setStationPreviewError(msg);
+      toast(msg, "error");
+    } finally {
+      setStationPreviewLoading(false);
+    }
+  };
+
+  // -----------------------------
+  // ✅ Send manual notification
+  // - DOES NOT send station id from UI
+  // - backend derives station from manager_email
+  // -----------------------------
+  const handleSendManual = async () => {
+    if (!notifyRoles.length) {
+      toast("Select at least one role.", "warning");
+      return;
+    }
+
+    if (!stationPreview?.Id) {
+      toast("Station is not verified. Please register a station first (or login as the correct manager).", "error");
+      return;
+    }
+
+    const confirm = await MySwal.fire({
+      icon: "question",
+      title: "Send alert now?",
+      html: `
+        <div style="text-align:left">
+          <div><b>Manager:</b> ${getManagerEmail()}</div>
+          <div><b>Station:</b> ${stationPreview?.Id || "—"} (${stationPreview?.Name || "—"})</div>
+          <div><b>Severity:</b> ${notifySeverity}</div>
+          <div><b>Channel:</b> ${notifyChannel}</div>
+          <div><b>Roles:</b> ${notifyRoles.join(", ")}</div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Send",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: theme.palette.error.main,
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    setNotifySending(true);
+    showBlockingLoading("Sending alert…", "Contacting notification service");
+
+    try {
+      const payload = {
+        station_id: stationPreview?.Id, // ✅ REQUIRED
+        manager_email: getManagerEmail(),
+
+        severity: notifySeverity,
+        channel: notifyChannel,
+        message: notifyMessage,
+
+        threshold: decisionThreshold,
+        file_name: file?.name || "",
+        rows: scoredDays,
+        events: events
+      };
+
+      const res = await fetch(`${BACKEND}/api/notifications/send-manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "Failed to send alert");
+      }
+
+      const ok = data?.status === "sent" || data?.ok === true;
+
+      closeBlockingLoading();
+      toast(data?.message || (ok ? "Alert sent" : "Alert processed"), ok ? "success" : "warning");
+
+      await MySwal.fire({
+        icon: ok ? "success" : "warning",
+        title: ok ? "Alert sent" : "Alert processed",
+        text: data?.message || "Done",
+        confirmButtonText: "OK",
+      });
+
+      setNotifyOpen(false);
+    } catch (e) {
+      closeBlockingLoading();
+      toast(`❌ ${e?.message || "Error"}`, "error");
+      await MySwal.fire({
+        icon: "error",
+        title: "Failed to send alert",
+        text: e?.message || "Unknown error",
+        confirmButtonText: "Close",
+      });
+    } finally {
+      closeBlockingLoading();
+      setNotifySending(false);
+    }
   };
 
   // -----------------------------
   // Render
   // -----------------------------
   return (
-    <Box sx={{ p: 3, maxWidth: 1400 }}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Fuel Dispensing Irregularities
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        Upload monthly report → run ML scan → view scored days + grouped events (threshold dropdown updates results)
-      </Typography>
+    <Box
+      sx={{
+        p: { xs: 2, md: 3 },
+        maxWidth: 1500,
+        mx: "auto",
+        bgcolor: (t) => (t.palette.mode === "dark" ? "transparent" : "#f5f7fb"),
+        minHeight: "100vh",
+        borderRadius: 2,
+        fontFamily: "Arial, Helvetica, sans-serif",
+      }}
+    >
+      {/* Header */}
+      <EnterpriseCard sx={{ mb: 2 }}>
+        <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between">
+            <Box sx={{ minWidth: 0 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 2,
+                    display: "grid",
+                    placeItems: "center",
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.1),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
+                    color: "primary.main",
+                  }}
+                >
+                  <InsightsRoundedIcon />
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="overline"
+                    sx={{
+                      letterSpacing: 0.8,
+                      fontWeight: 900,
+                      color: "text.secondary",
+                      display: "block",
+                      lineHeight: 1.2,
+                      fontFamily: "Arial, Helvetica, sans-serif",
+                    }}
+                  >
+                    FuelWatch
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 950, lineHeight: 1.15, fontFamily: "Arial, Helvetica, sans-serif" }}>
+                    Fuel Dispensing Irregularities Monitoring
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Tooltip title="Export current results (JSON)">
+                <span>
+                  <IconButton
+                    onClick={() => {
+                      downloadJSON("anomaly_results.json", { scoredDays, events, threshold: decisionThreshold });
+                      toast("Exported JSON.", "success");
+                    }}
+                    disabled={!scoredDays.length && !events.length}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.18 : 0.08)}`,
+                      bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                    }}
+                  >
+                    <DownloadRoundedIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
 
-      {/* Upload + Threshold */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={8}>
-            <Button variant="outlined" component="label" fullWidth>
-              {file ? `SELECTED: ${file.name}` : "UPLOAD CSV / XLSX"}
-              <input
-                hidden
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+              <Tooltip title="Reset page state">
+                <IconButton
+                  onClick={onReset}
+                  sx={{
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.18 : 0.08)}`,
+                    bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  }}
+                >
+                  <RestartAltRoundedIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Button
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <PlayArrowRoundedIcon />}
+                onClick={handleRunScan}
+                disabled={loading || !file}
+                sx={{
+                  borderRadius: 2,
+                  px: 2.2,
+                  py: 1.05,
+                  fontWeight: 900,
+                  textTransform: "none",
+                  boxShadow: "none",
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                }}
+              >
+                {loading ? "Scanning…" : "Proceed"}
+              </Button>
+            </Stack>
+          </Stack>
+
+          {loading ? (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgress
+                sx={{
+                  height: 10,
+                  borderRadius: 999,
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.1),
+                  "& .MuiLinearProgress-bar": { borderRadius: 999 },
+                }}
               />
-            </Button>
-          </Grid>
+              <Typography variant="caption" sx={{ display: "block", mt: 0.8, color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Process in progress…
+              </Typography>
+            </Box>
+          ) : null}
+        </Box>
+      </EnterpriseCard>
 
-          <Grid item xs={12} md={2}>
-            <TextField
-              select
-              label="Decision Threshold"
-              size="small"
-              fullWidth
-              value={decisionThreshold}
-              onChange={(e) => setDecisionThreshold(parseFloat(e.target.value))}
-              helperText={file && lastFileNameRef.current === file.name ? "Auto updates" : "Run scan after change"}
-            >
-              {[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85].map((v) => (
-                <MenuItem key={v} value={v}>
-                  {v}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
+      {error ? (
+        <EnterpriseCard sx={{ mb: 2, p: 2 }}>
+          <Typography sx={{ color: theme.palette.error.main, fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}>
+            {error}
+          </Typography>
+        </EnterpriseCard>
+      ) : null}
 
-          <Grid item xs={12} md={2}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleRunScan}
-              disabled={loading}
-              sx={{ height: 40 }}
-            >
-              {loading ? (
-                <>
-                  <CircularProgress size={18} sx={{ mr: 1 }} />
-                  Scanning...
-                </>
-              ) : (
-                "RUN ML SCAN"
-              )}
-            </Button>
+      {/* Controls */}
+      <EnterpriseCard sx={{ mb: 2 }}>
+        <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <Button
+                variant="outlined"
+                fullWidth
+                component="label"
+                startIcon={<UploadFileRoundedIcon />}
+                sx={{
+                  borderRadius: 2,
+                  py: 1.25,
+                  fontWeight: 900,
+                  textTransform: "none",
+                  borderColor: alpha(theme.palette.primary.main, 0.25),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.1 : 0.05),
+                  "&:hover": {
+                    borderColor: alpha(theme.palette.primary.main, 0.4),
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.14 : 0.07),
+                  },
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                }}
+              >
+                {file ? `Selected: ${file.name}` : "Upload CSV / XLSX"}
+                <input hidden type="file" accept=".csv,.xlsx,.xls" onChange={(e) => onPickFile(e.target.files?.[0] || null)} />
+              </Button>
+
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                <InfoOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
+                  Important: Upload only CSV reports
+                </Typography>
+              </Stack>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <TextField
+                select
+                label="Decision Threshold"
+                size="medium"
+                fullWidth
+                value={decisionThreshold}
+                onChange={(e) => setDecisionThreshold(parseFloat(e.target.value))}
+                helperText={file && lastFileNameRef.current === file.name ? "Auto updates after scan" : "Run scan after change"}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <TuneRoundedIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 2,
+                    bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                    fontFamily: "Arial, Helvetica, sans-serif",
+                  },
+                  "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                  "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                }}
+              >
+                {[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85].map((v) => (
+                  <MenuItem key={v} value={v} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                    {v}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <Stack spacing={1}>
+                <TextField
+                  label="Search (day / station / fuel)"
+                  size="medium"
+                  fullWidth
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon />
+                      </InputAdornment>
+                    ),
+                    endAdornment: search ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearch("")}>
+                          <RestartAltRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                      bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                      fontFamily: "Arial, Helvetica, sans-serif",
+                    },
+                    "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                  }}
+                />
+
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                  <FormControlLabel
+                    control={<Switch checked={showOnlyFlagged} onChange={(e) => setShowOnlyFlagged(e.target.checked)} />}
+                    label="Only flagged"
+                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13, fontFamily: "Arial, Helvetica, sans-serif" } }}
+                  />
+                  <FormControlLabel
+                    control={<Switch checked={dense} onChange={(e) => setDense(e.target.checked)} />}
+                    label="Dense"
+                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13, fontFamily: "Arial, Helvetica, sans-serif" } }}
+                  />
+                </Stack>
+              </Stack>
+            </Grid>
           </Grid>
-        </Grid>
-      </Paper>
+        </Box>
+      </EnterpriseCard>
 
       {/* KPI Cards */}
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, borderLeft: "5px solid #351B65" }}>
-            <Typography variant="body2" color="text.secondary">
-              Scored Days
-            </Typography>
-            <Typography variant="h4" fontWeight="bold">
-              {scoredDays.length}
-            </Typography>
-          </Paper>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard label="Scored Days" value={scoredDays.length} sub="Processed count" tone="primary" icon={<TableChartRoundedIcon />} />
         </Grid>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, borderLeft: "5px solid #D32F2F" }}>
-            <Typography variant="body2" color="text.secondary">
-              Flagged Days
-            </Typography>
-            <Typography variant="h4" fontWeight="bold" color="error.main">
-              {flaggedDays.length}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard label="Flagged Days" value={flaggedDays.length} sub="Predicted irregularities" tone="danger" icon={<WarningAmberRoundedIcon />} />
         </Grid>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, borderLeft: "5px solid #2E7D32" }}>
-            <Typography variant="body2" color="text.secondary">
-              Threshold
-            </Typography>
-            <Typography variant="h4" fontWeight="bold" color="success.main">
-              {decisionThreshold}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            label="Threshold"
+            value={decisionThreshold}
+            sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set threshold"}
+            tone="success"
+            icon={<TuneRoundedIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            label="Avg Score"
+            value={safeFixed(avgScore)}
+            sub={maxScoreRow ? `Max: ${safeFixed(maxScoreRow._score)} (${String(maxScoreRow.day || maxScoreRow.date || "").slice(0, 10)})` : "Predicted average"}
+            tone="warning"
+            icon={<WhatshotRoundedIcon />}
+          />
         </Grid>
       </Grid>
 
-      {/* Top Events */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" fontWeight="bold">
-          Top Events (Grouped)
-        </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          Consecutive flagged days grouped into events.
-        </Typography>
+      {/* Tabs + Content */}
+      <EnterpriseCard sx={{ mb: 2 }}>
+        <Box sx={{ px: 2, pt: 1.5 }}>
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              px: 1,
+              fontFamily: "Arial, Helvetica, sans-serif",
+              "& .MuiTab-root": {
+                fontWeight: 900,
+                textTransform: "none",
+                minHeight: 48,
+                borderRadius: 1.5,
+                mx: 0.5,
+                fontFamily: "Arial, Helvetica, sans-serif",
+              },
+              "& .MuiTabs-indicator": { height: 3, borderRadius: 999 },
+            }}
+          >
+            <Tab
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <InsightsRoundedIcon fontSize="small" />
+                  <span>Overview</span>
+                </Stack>
+              }
+            />
+            <Tab
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Badge color="error" badgeContent={events.length} max={999}>
+                    <WarningAmberRoundedIcon fontSize="small" />
+                  </Badge>
+                  <span>Events</span>
+                </Stack>
+              }
+            />
+            <Tab
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Badge color="primary" badgeContent={filteredScoredDays.length} max={9999}>
+                    <TableChartRoundedIcon fontSize="small" />
+                  </Badge>
+                  <span>Scored Days</span>
+                </Stack>
+              }
+            />
+          </Tabs>
+        </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider sx={{ opacity: 0.8 }} />
 
-        {events.length === 0 ? (
-          <Typography color="text.secondary">
-            No events yet. Upload a report and run scan.
-          </Typography>
-        ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Event</TableCell>
-                  <TableCell>Start Day</TableCell>
-                  <TableCell>End Day</TableCell>
-                  <TableCell>Days</TableCell>
-                  <TableCell>Max Score</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {events.slice(0, 10).map((ev, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>#{idx + 1}</TableCell>
-                    <TableCell>{ev.start_day || ev.start || ev.startDay || "-"}</TableCell>
-                    <TableCell>{ev.end_day || ev.end || ev.endDay || "-"}</TableCell>
-                    <TableCell>{ev.days || ev.length || "-"}</TableCell>
-                    <TableCell>
-                      {String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+        {tab === 0 ? (
+          <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={7}>
+                <EnterpriseCard sx={{ p: 2.25 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <InsightsRoundedIcon color="primary" />
+                    <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                      General Outputs
+                    </Typography>
+                  </Stack>
 
-      {/* Scored Days Table */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          Scored Days
-        </Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
+                    <Chip
+                      icon={<TuneRoundedIcon />}
+                      label={`Threshold: ${decisionThreshold}`}
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 900,
+                        borderColor: alpha(theme.palette.primary.main, 0.25),
+                        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                        fontFamily: "Arial, Helvetica, sans-serif",
+                      }}
+                    />
+                    <Chip
+                      icon={<WarningAmberRoundedIcon />}
+                      label={`Flagged: ${flaggedDays.length}`}
+                      color="error"
+                      variant="outlined"
+                      sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}
+                    />
+                    <Chip
+                      icon={<TableChartRoundedIcon />}
+                      label={`Scored: ${scoredDays.length}`}
+                      color="primary"
+                      variant="outlined"
+                      sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}
+                    />
+                  </Stack>
 
-        {scoredDays.length === 0 ? (
-          <Typography color="text.secondary">
-            No scored days yet. Upload a report and run scan.
-          </Typography>
-        ) : (
-          <TableContainer sx={{ maxHeight: 500 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Day</TableCell>
-                  <TableCell>Station</TableCell>
-                  <TableCell>Fuel</TableCell>
-                  <TableCell align="right">Score</TableCell>
-                  <TableCell>Pred</TableCell>
-                  <TableCell>Reason</TableCell>
-                </TableRow>
-              </TableHead>
+                  <Divider sx={{ my: 2, opacity: 0.8 }} />
 
-              <TableBody>
-                {scoredDays.slice(0, 300).map((r, idx) => {
-                  const day = r.day || r.date || r.timestamp || "-";
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadRoundedIcon />}
+                      disabled={!filteredScoredDays.length}
+                      onClick={() => {
+                        downloadCSV("scored_days_filtered.csv", filteredScoredDays.map(mapRow));
+                        toast("Exported filtered scored days.", "success");
+                      }}
+                      sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
+                    >
+                      Export filtered scored days
+                    </Button>
 
-                  // ✅ FIX nan station mapping: support many possible backend keys
-                  const station =
-                    r.station_name ||
-                    r.stationName ||
-                    r.site_name ||
-                    r.site ||
-                    r.tank_name ||
-                    r.tankName ||
-                    r.station_id ||
-                    r.stationId ||
-                    "-";
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadRoundedIcon />}
+                      disabled={!events.length}
+                      onClick={() => {
+                        downloadCSV("events.csv", events);
+                        toast("Exported events.", "success");
+                      }}
+                      sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
+                    >
+                      Export events
+                    </Button>
 
-                  const fuel = r.fuel_type || r.fuelType || r.item || "-";
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={<WarningAmberRoundedIcon />}
+                      disabled={!scoredDays.length}
+                      onClick={openNotifyForm}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 900,
+                        textTransform: "none",
+                        boxShadow: "none",
+                        fontFamily: "Arial, Helvetica, sans-serif",
+                      }}
+                    >
+                      Notify Responsible Staff
+                    </Button>
+                  </Stack>
+                </EnterpriseCard>
+              </Grid>
 
-                  // ✅ FIX score always 0.000: backend often returns "prob"
-                  const score =
-                    r.prob ??
-                    r.prob_irregular ??
-                    r.score ??
-                    r.irregularity_score ??
-                    0;
+              <Grid item xs={12} md={5}>
+                <EnterpriseCard sx={{ p: 2.25 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <WarningAmberRoundedIcon color="error" />
+                    <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                      Highest score snapshot
+                    </Typography>
+                  </Stack>
 
-                  const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
+                  {!maxScoreRow ? (
+                    <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                      No data yet. Upload a report and run scan.
+                    </Typography>
+                  ) : (
+                    (() => {
+                      const row = mapRow(maxScoreRow);
+                      return (
+                        <Stack spacing={1.2}>
+                          <Chip
+                            icon={<WhatshotRoundedIcon />}
+                            label={`Max score: ${safeFixed(row.score)} `}
+                            variant="outlined"
+                            sx={{
+                              width: "fit-content",
+                              fontWeight: 900,
+                              borderColor: alpha(theme.palette.warning.main, 0.25),
+                              bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                              fontFamily: "Arial, Helvetica, sans-serif",
+                            }}
+                          />
+                          <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                            <b>Day:</b> {String(row.day)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                            <b>Station (from ML row):</b> {String(row.station)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                            <b>Fuel:</b> {String(row.fuel)}
+                          </Typography>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}>
+                              Prediction:
+                            </Typography>
+                            <SeverityChip pred={row.pred} />
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                            {row.reason ? String(row.reason).slice(0, 180) : "—"}
+                          </Typography>
+                        </Stack>
+                      );
+                    })()
+                  )}
+                </EnterpriseCard>
+              </Grid>
+            </Grid>
+          </Box>
+        ) : null}
 
-                  // backend may return reason or not
-                  const reason = r.reason || r.modelReason || r.note || "";
+        {/* Events tab */}
+        {tab === 1 ? (
+          <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <WarningAmberRoundedIcon color="error" />
+              <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Top Events (Grouped)
+              </Typography>
+              <Chip
+                label={`${events.length} total`}
+                size="small"
+                variant="outlined"
+                sx={{
+                  ml: 1,
+                  fontWeight: 900,
+                  borderColor: alpha(theme.palette.error.main, 0.25),
+                  bgcolor: alpha(theme.palette.error.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                }}
+              />
+            </Stack>
 
-                  return (
-                    <TableRow key={idx} hover>
-                      <TableCell>{String(day)}</TableCell>
-                      <TableCell>{String(station)}</TableCell>
-                      <TableCell>{String(fuel)}</TableCell>
-                      <TableCell align="right">{Number(score || 0).toFixed(3)}</TableCell>
-                      <TableCell>
-                        {pred === 1 || pred === true ? (
-                          <Chip label="FLAG" color="error" size="small" />
-                        ) : (
-                          <Chip label="OK" color="success" size="small" />
-                        )}
-                      </TableCell>
-                      <TableCell>{String(reason).slice(0, 180)}</TableCell>
+            <Divider sx={{ mb: 2, opacity: 0.8 }} />
+
+            {events.length === 0 ? (
+              <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                No events yet. Upload a report and run scan.
+              </Typography>
+            ) : (
+              <TableContainer
+                component={Paper}
+                elevation={0}
+                sx={{
+                  borderRadius: 2.25,
+                  border: (t) => `1px solid ${alpha(t.palette.common.black, t.palette.mode === "dark" ? 0.15 : 0.08)}`,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                }}
+              >
+                <Table size={dense ? "small" : "medium"}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Event</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Start Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>End Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Days</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Max Score</TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+                  </TableHead>
+                  <TableBody>
+                    {events.slice(0, 20).map((ev, idx) => (
+                      <TableRow key={idx} hover>
+                        <TableCell sx={{ fontWeight: 900, fontFamily: "Arial, Helvetica, sans-serif" }}>#{idx + 1}</TableCell>
+                        <TableCell sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{ev.start_day || ev.start || ev.startDay || "-"}</TableCell>
+                        <TableCell sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{ev.end_day || ev.end || ev.endDay || "-"}</TableCell>
+                        <TableCell sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{ev.days || ev.length || "-"}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={String(ev.max_score ?? ev.maxScore ?? ev.score ?? "-")}
+                            sx={{
+                              fontWeight: 900,
+                              borderColor: alpha(theme.palette.primary.main, 0.25),
+                              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                              fontFamily: "Arial, Helvetica, sans-serif",
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        ) : null}
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={closeSnack}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: "100%" }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+        {/* Scored days tab */}
+        {tab === 2 ? (
+          <Box sx={{ p: { xs: 2.25, md: 3 } }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <TableChartRoundedIcon color="primary" />
+              <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Scored Days
+              </Typography>
+
+              <Chip
+                label={`${filteredScoredDays.length} shown`}
+                size="small"
+                variant="outlined"
+                sx={{
+                  ml: 1,
+                  fontWeight: 900,
+                  borderColor: alpha(theme.palette.primary.main, 0.25),
+                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                }}
+              />
+            </Stack>
+
+            <Divider sx={{ mb: 2, opacity: 0.8 }} />
+
+            {filteredScoredDays.length === 0 ? (
+              <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                No scored days yet. Upload a report and run scan.
+              </Typography>
+            ) : (
+              <TableContainer
+                component={Paper}
+                elevation={0}
+                sx={{
+                  maxHeight: 560,
+                  borderRadius: 2.25,
+                  border: (t) => `1px solid ${alpha(t.palette.common.black, t.palette.mode === "dark" ? 0.15 : 0.08)}`,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                }}
+              >
+                <Table stickyHeader size={dense ? "small" : "medium"}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Day</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Station</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Fuel</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
+                        Score
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Pred</TableCell>
+                      <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Reason</TableCell>
+                    </TableRow>
+                  </TableHead>
+
+                  <TableBody>
+                    {filteredScoredDays.slice(0, 500).map((r, idx) => {
+                      const row = mapRow(r);
+                      return (
+                        <TableRow key={idx} hover>
+                          <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "Arial, Helvetica, sans-serif" }}>{String(row.day)}</TableCell>
+                          <TableCell sx={{ maxWidth: 280 }}>
+                            <Typography noWrap fontWeight={800} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                              {String(row.station)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={String(row.fuel)}
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                fontWeight: 900,
+                                borderColor: alpha(theme.palette.secondary.main, 0.22),
+                                bgcolor: alpha(theme.palette.secondary.main, theme.palette.mode === "dark" ? 0.1 : 0.06),
+                                fontFamily: "Arial, Helvetica, sans-serif",
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 900 }}>
+                            {safeFixed(row.score)}
+                          </TableCell>
+                          <TableCell>
+                            <SeverityChip pred={row.pred} />
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 520 }}>
+                            <Typography variant="body2" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
+                              {String(row.reason || "").slice(0, 220) || "—"}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        ) : null}
+      </EnterpriseCard>
+
+      {/* ✅ Notification Dialog (SAFE: station derived from manager email) */}
+      <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
+          Send Notification to Responsible Staff
+        </DialogTitle>
+
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Manager Email (Logged in)"
+              value={getManagerEmail()}
+              fullWidth
+              InputProps={{ readOnly: true }}
+            />
+
+            <TextField
+              label="Station (Auto from manager)"
+              value={
+                stationPreviewLoading
+                  ? "Loading station..."
+                  : stationPreview?.Id
+                  ? `${stationPreview.Id} - ${stationPreview.Name || ""}`
+                  : "Not verified"
+              }
+              fullWidth
+              InputProps={{ readOnly: true }}
+              helperText={
+                stationPreviewError
+                  ? stationPreviewError
+                  : "Station is derived from manager_email (no manual selection)."
+              }
+              error={!!stationPreviewError}
+            />
+
+            <TextField
+              select
+              label="Severity"
+              value={notifySeverity}
+              onChange={(e) => setNotifySeverity(e.target.value)}
+              fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
+            >
+              <MenuItem value="Advisory" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Advisory
+              </MenuItem>
+              <MenuItem value="Warning" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Warning
+              </MenuItem>
+              <MenuItem value="Critical" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Critical
+              </MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Channel"
+              value={notifyChannel}
+              onChange={(e) => setNotifyChannel(e.target.value)}
+              fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
+            >
+              <MenuItem value="email" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                Email
+              </MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Recipient Roles"
+              fullWidth
+              SelectProps={{
+                multiple: true,
+                renderValue: (selected) => selected.join(", "),
+              }}
+              value={notifyRoles}
+              onChange={(e) => setNotifyRoles(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
+            >
+              {["MANAGER"].map((role) => (
+                <MenuItem key={role} value={role} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+                  <Checkbox checked={notifyRoles.indexOf(role) > -1} />
+                  <ListItemText primary={role} />
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Message"
+              value={notifyMessage}
+              onChange={(e) => setNotifyMessage(e.target.value)}
+              fullWidth
+              multiline
+              minRows={4}
+              placeholder="Explain what was detected and what action is required."
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                },
+                "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
+              }}
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setNotifyOpen(false)}
+            sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleSendManual}
+            disabled={notifySending || stationPreviewLoading || !stationPreview?.Id}
+            startIcon={notifySending ? <CircularProgress size={18} color="inherit" /> : <WarningAmberRoundedIcon />}
+            sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", boxShadow: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
+          >
+            {notifySending ? "Sending…" : "Send Alert"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

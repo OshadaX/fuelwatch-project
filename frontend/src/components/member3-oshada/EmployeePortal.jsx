@@ -75,7 +75,7 @@ const EmployeePortal = () => {
                     if (data.type === 'STATION_CHECKIN') {
                         scanner.clear();
                         setIsScanning(false);
-                        await handleClockIn(data.stationId);
+                        await handleClockIn(data.stationId, data.timestamp);
                     }
                 } catch (e) {
                     toast.error('Invalid QR Code');
@@ -101,36 +101,53 @@ const EmployeePortal = () => {
         return R * c; // in metres
     };
 
-    const handleClockIn = async (stationId) => {
+    const handleClockIn = async (stationId, timestamp = null) => {
         const toastId = toast.loading('Verifying location...');
+        setLoading(true);
         try {
-            // 1. Get current position
-            const position = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject);
-            });
+            // Get Geolocation
+            let location = { latitude: null, longitude: null };
 
-            const { latitude: userLat, longitude: userLon } = position.coords;
-
-            // 2. Fetch station details to get its coordinates
-            const response = await axios.get(`${API_URL}/station`);
-            const stations = response.data.items || response.data;
-            const station = stations.find(s => s._id === stationId || s.id === stationId);
-
-            if (!station || !station.latitude || !station.longitude) {
-                toast.error('Station location not configured. Proceeding with caution...', { id: toastId });
-                // If no station coords, we let it pass for now as requested in plan
-            } else {
-                const distance = calculateDistance(userLat, userLon, station.latitude, station.longitude);
-                if (distance > 500) {
-                    toast.error(`Check-in blocked. You are ${Math.round(distance)}m away from the station.`, { id: toastId });
-                    return;
+            if ("geolocation" in navigator) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        });
+                    });
+                    location = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+                } catch (geoError) {
+                    console.warn('Geolocation failed, proceeding without coordinates:', geoError);
+                    toast.error('Location access denied. Verification may fail.', { id: toastId });
                 }
             }
 
-            // 3. Proceed with clock-in
+            // distance check
+            if (location.latitude && location.longitude) {
+                const response = await axios.get(`${API_URL}/station`);
+                const stations = response.data.items || response.data;
+                const station = stations.find(s => s._id === stationId || s.id === stationId);
+
+                if (station && station.latitude && station.longitude) {
+                    const distance = calculateDistance(location.latitude, location.longitude, station.latitude, station.longitude);
+                    if (distance > 500) {
+                        toast.error(`Check-in blocked. You are ${Math.round(distance)}m away from the station.`, { id: toastId });
+                        setLoading(false);
+                        return;
+                    }
+                }
+            }
+
             await axios.post(`${API_URL}/attendance/clock-in`, {
                 employeeId: user._id || user.id,
-                stationId
+                stationId,
+                timestamp,
+                ...location
             });
 
             toast.success('Successfully clocked in!', { id: toastId });
@@ -144,6 +161,8 @@ const EmployeePortal = () => {
                 ? 'Location permission denied. Please enable GPS to clock in.'
                 : (error.response?.data?.message || 'Clock-in failed');
             toast.error(message, { id: toastId });
+        } finally {
+            setLoading(false);
         }
     };
 
