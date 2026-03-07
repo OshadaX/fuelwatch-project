@@ -13,18 +13,14 @@ import {
   CloudUpload,
   Download,
   FileText,
-  Filter,
   Gauge,
   Info,
   LayoutDashboard,
   LineChart as LineChartIcon,
   Loader2,
-  Moon,
   RefreshCw,
   Search,
-  Settings2,
   Sparkles,
-  Sun,
   Trash2,
   TrendingUp,
   X,
@@ -52,11 +48,8 @@ const MODE_OPTIONS = [
   { value: "annual", label: "Annual", hint: "Annually Planning", badge: "365d" },
 ];
 
-/**
- * FuelWatch portal theme
- */
 const BRAND = {
-  primary: "#2563eb", // FuelWatch blue
+  primary: "#2563eb",
   primaryDark: "#1d4ed8",
   success: "#10b981",
   warn: "#f59e0b",
@@ -99,11 +92,6 @@ function niceBytes(bytes) {
   return `${b.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-/**
- * ✅ SweetAlert2 helper (ALWAYS LIGHT THEME)
- * - success/info: auto close
- * - errors/warnings: require confirm (no timer)
- */
 function showAlert({ icon = "success", title = "", text = "", timer = 1800, confirm = false }) {
   const isConfirm = confirm || icon === "error" || icon === "warning";
   return Swal.fire({
@@ -115,12 +103,9 @@ function showAlert({ icon = "success", title = "", text = "", timer = 1800, conf
     confirmButtonText: "OK",
     confirmButtonColor: BRAND.primary,
     timerProgressBar: !isConfirm,
-
-    // ✅ FORCE LIGHT LOOK ALWAYS
     background: "#ffffff",
     color: "#0f172a",
     backdrop: "rgba(15, 23, 42, 0.35)",
-
     customClass: {
       popup: "rounded-2xl",
       title: "font-black",
@@ -129,9 +114,6 @@ function showAlert({ icon = "success", title = "", text = "", timer = 1800, conf
   });
 }
 
-/**
- * ✅ SweetAlert2 loading modal (ALWAYS LIGHT THEME)
- */
 function showLoading({ title = "Processing...", text = "Please wait while we generate the forecast" }) {
   return Swal.fire({
     title,
@@ -141,13 +123,10 @@ function showLoading({ title = "Processing...", text = "Please wait while we gen
     didOpen: () => {
       Swal.showLoading();
     },
-
-    // ✅ FORCE LIGHT LOOK ALWAYS
     background: "#ffffff",
     color: "#0f172a",
     confirmButtonColor: BRAND.primary,
     backdrop: "rgba(15, 23, 42, 0.35)",
-
     customClass: {
       popup: "rounded-2xl",
       title: "font-black",
@@ -161,32 +140,27 @@ function GlassCard({ children, className }) {
       className={cx(
         "relative overflow-hidden rounded-2xl border bg-white shadow-[0_10px_24px_-18px_rgba(0,0,0,0.35)]",
         "border-slate-200/80",
-        "dark:bg-zinc-950 dark:border-white/10 dark:shadow-[0_14px_32px_-22px_rgba(0,0,0,0.55)]",
         className
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-50/70 via-transparent to-transparent dark:from-white/5" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-50/70 via-transparent to-transparent" />
       <div className="relative">{children}</div>
     </div>
   );
 }
 
 function SoftDivider() {
-  return <div className="my-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-white/10" />;
+  return <div className="my-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />;
 }
 
 function NeonButton({ icon: Icon, children, onClick, disabled, variant = "primary", title }) {
   const base =
     "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-extrabold shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2";
   const variants = {
-    primary:
-      "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-blue-400 dark:focus:ring-offset-zinc-950",
-    ghost:
-      "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-white/5 dark:focus:ring-white/20 dark:focus:ring-offset-zinc-950",
-    subtle:
-      "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 focus:ring-slate-300 focus:ring-offset-white dark:border-white/10 dark:bg-zinc-950/40 dark:text-zinc-100 dark:hover:bg-white/5 dark:focus:ring-white/20 dark:focus:ring-offset-zinc-950",
-    danger:
-      "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500 focus:ring-offset-white dark:focus:ring-offset-zinc-950",
+    primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white",
+    ghost: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white",
+    subtle: "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 focus:ring-slate-300 focus:ring-offset-white",
+    danger: "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500 focus:ring-offset-white",
   };
 
   return (
@@ -199,24 +173,24 @@ function NeonButton({ icon: Icon, children, onClick, disabled, variant = "primar
 
 function StatPill({ icon: Icon, label, value, sub, tone = "default" }) {
   const toneMap = {
-    default: "bg-slate-900 text-white dark:bg-white dark:text-zinc-900",
+    default: "bg-slate-900 text-white",
     success: "bg-emerald-600 text-white",
     danger: "bg-rose-600 text-white",
     info: "bg-blue-600 text-white",
     warn: "bg-amber-500 text-white",
   };
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_24px_-20px_rgba(0,0,0,0.35)] dark:border-white/10 dark:bg-zinc-950">
-      <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-blue-600/8 blur-2xl dark:bg-blue-500/10" />
-      <div className="pointer-events-none absolute -left-16 -bottom-16 h-36 w-36 rounded-full bg-emerald-500/6 blur-2xl dark:bg-emerald-400/10" />
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_24px_-20px_rgba(0,0,0,0.35)]">
+      <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-blue-600/8 blur-2xl" />
+      <div className="pointer-events-none absolute -left-16 -bottom-16 h-36 w-36 rounded-full bg-emerald-500/6 blur-2xl" />
       <div className="relative flex items-center gap-3">
         <div className={cx("grid h-10 w-10 place-items-center rounded-xl", toneMap[tone] || toneMap.default)}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-zinc-400">{label}</div>
-          <div className="truncate text-lg font-black text-slate-900 dark:text-zinc-50">{value}</div>
-          {sub ? <div className="truncate text-xs text-slate-500 dark:text-zinc-400">{sub}</div> : null}
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</div>
+          <div className="truncate text-lg font-black text-slate-900">{value}</div>
+          {sub ? <div className="truncate text-xs text-slate-500">{sub}</div> : null}
         </div>
       </div>
     </div>
@@ -225,7 +199,7 @@ function StatPill({ icon: Icon, label, value, sub, tone = "default" }) {
 
 function Segmented({ value, onChange, options, disabled }) {
   return (
-    <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 dark:border-white/10 dark:bg-zinc-950">
+    <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white p-2">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -236,9 +210,7 @@ function Segmented({ value, onChange, options, disabled }) {
             className={cx(
               "group relative overflow-hidden rounded-xl px-4 py-2 text-sm font-extrabold transition",
               "disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2",
-              active
-                ? "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white dark:focus:ring-blue-400 dark:focus:ring-offset-zinc-950"
-                : "text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white dark:text-zinc-200 dark:hover:bg-white/5 dark:focus:ring-white/20 dark:focus:ring-offset-zinc-950"
+              active ? "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white" : "text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white"
             )}
             title={o.hint}
             type="button"
@@ -247,7 +219,7 @@ function Segmented({ value, onChange, options, disabled }) {
             <span
               className={cx(
                 "relative z-10 ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black",
-                active ? "bg-white/20 text-white" : "bg-slate-900/5 text-slate-600 dark:bg-white/10 dark:text-zinc-300"
+                active ? "bg-white/20 text-white" : "bg-slate-900/5 text-slate-600"
               )}
             >
               {o.badge}
@@ -256,7 +228,7 @@ function Segmented({ value, onChange, options, disabled }) {
             {active ? (
               <span className="pointer-events-none absolute inset-0 opacity-100">
                 <span className="absolute -left-6 -top-6 h-20 w-20 rounded-full bg-white/15 blur-2xl" />
-                <span className="absolute -right-6 -bottom-6 h-20 w-20 rounded-full bg-black/10 blur-2xl dark:bg-white/10" />
+                <span className="absolute -right-6 -bottom-6 h-20 w-20 rounded-full bg-black/10 blur-2xl" />
               </span>
             ) : null}
           </button>
@@ -267,7 +239,7 @@ function Segmented({ value, onChange, options, disabled }) {
 }
 
 function Skeleton({ className }) {
-  return <div className={cx("animate-pulse rounded-xl bg-slate-200/70 dark:bg-white/10", className)} />;
+  return <div className={cx("animate-pulse rounded-xl bg-slate-200/70", className)} />;
 }
 
 function Dropdown({ label, icon: Icon, items = [], disabled }) {
@@ -293,8 +265,7 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
           "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-extrabold shadow-sm transition",
           "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
           "disabled:cursor-not-allowed disabled:opacity-60",
-          "focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-white",
-          "dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-white/5 dark:focus:ring-white/20 dark:focus:ring-offset-zinc-950"
+          "focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-white"
         )}
       >
         {Icon ? <Icon className="h-4 w-4" /> : null}
@@ -308,7 +279,7 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
             initial={{ opacity: 0, y: 8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-30px_rgba(0,0,0,0.45)] dark:border-white/10 dark:bg-zinc-950"
+            className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-30px_rgba(0,0,0,0.45)]"
           >
             {items.map((it, idx) => (
               <button
@@ -319,15 +290,11 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
                   it.onClick?.();
                 }}
                 disabled={it.disabled}
-                className={cx(
-                  "flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold transition",
-                  "hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60",
-                  "dark:hover:bg-white/5"
-                )}
+                className={cx("flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold transition", "hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60")}
               >
                 {it.icon ? <it.icon className="h-4 w-4" /> : null}
                 <span className="flex-1">{it.label}</span>
-                {it.hint ? <span className="text-xs text-slate-500 dark:text-zinc-400">{it.hint}</span> : null}
+                {it.hint ? <span className="text-xs text-slate-500">{it.hint}</span> : null}
               </button>
             ))}
           </motion.div>
@@ -340,14 +307,14 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
 function ChartCard({ title, subtitle, actions, children, icon: Icon }) {
   return (
     <GlassCard className="p-0">
-      <div className="flex flex-col gap-3 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+      <div className="flex flex-col gap-3 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
-            {Icon ? <Icon className="h-5 w-5 text-slate-700 dark:text-zinc-100" /> : <Sparkles className="h-5 w-5" />}
+          <div className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 bg-slate-50">
+            {Icon ? <Icon className="h-5 w-5 text-slate-700" /> : <Sparkles className="h-5 w-5" />}
           </div>
           <div>
-            <div className="text-lg font-black tracking-tight text-slate-900 dark:text-zinc-50">{title}</div>
-            {subtitle ? <div className="text-sm text-slate-600 dark:text-zinc-400">{subtitle}</div> : null}
+            <div className="text-lg font-black tracking-tight text-slate-900">{title}</div>
+            {subtitle ? <div className="text-sm text-slate-600">{subtitle}</div> : null}
           </div>
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -363,14 +330,14 @@ function FuelLegendChips({ fuelKeys, selected, onToggle, onAll, onNone }) {
       <button
         type="button"
         onClick={onAll}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-white/5"
+        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50"
       >
         All
       </button>
       <button
         type="button"
         onClick={onNone}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-white/5"
+        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50"
       >
         None
       </button>
@@ -385,9 +352,7 @@ function FuelLegendChips({ fuelKeys, selected, onToggle, onAll, onNone }) {
             onClick={() => onToggle(fuel)}
             className={cx(
               "inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-black transition",
-              active
-                ? "border-blue-600/20 bg-blue-600 text-white hover:bg-blue-700 dark:border-blue-500/25 dark:bg-blue-500 dark:hover:bg-blue-600"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-white/5"
+              active ? "border-blue-600/20 bg-blue-600 text-white hover:bg-blue-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             )}
             title={active ? "Hide series" : "Show series"}
           >
@@ -412,28 +377,9 @@ export default function FuelForecastPanel() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  // UI controls
-  const [dark, setDark] = useState(() => {
-    const saved = typeof window !== "undefined" ? window.localStorage.getItem("fuel_forecast_dark") : null;
-    return saved ? saved === "1" : true;
-  });
-
-  const [activeTab, setActiveTab] = useState("charts"); // charts | tables
-  const [chartStyle, setChartStyle] = useState("modern"); // modern | classic
-  const [showGrid, setShowGrid] = useState(true);
-  const [tableLimit, setTableLimit] = useState(60);
+  const [activeTab, setActiveTab] = useState("charts");
   const [fuelSearch, setFuelSearch] = useState("");
-  const [compactTables, setCompactTables] = useState(false);
-
   const [selectedFuels, setSelectedFuels] = useState(() => new Set());
-
-  // apply theme class
-  useEffect(() => {
-    const root = document.documentElement;
-    if (dark) root.classList.add("dark");
-    else root.classList.remove("dark");
-    window.localStorage.setItem("fuel_forecast_dark", dark ? "1" : "0");
-  }, [dark]);
 
   const forecastObj = useMemo(() => result?.forecast || result || null, [result]);
   const totals = useMemo(() => forecastObj?.totals || null, [forecastObj]);
@@ -453,7 +399,6 @@ export default function FuelForecastPanel() {
     return "";
   }, [file]);
 
-  // data transforms
   const totalsChartData = useMemo(() => {
     if (!totals) return [];
     return Object.entries(totals)
@@ -678,12 +623,11 @@ export default function FuelForecastPanel() {
     setSelectedFuels(new Set());
   }
 
-  const gridDash = chartStyle === "modern" ? "2 10" : "3 3";
-  const lineWidth = chartStyle === "modern" ? 3.25 : 2.75;
+  const gridDash = "2 10";
+  const lineWidth = 3.25;
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 dark:bg-zinc-950 dark:text-zinc-50">
-      {/* Subtle dashboard aura */}
+    <div className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <motion.div
           aria-hidden
@@ -716,7 +660,6 @@ export default function FuelForecastPanel() {
       </div>
 
       <div className="relative mx-auto w-full max-w-6xl">
-        {/* Top bar */}
         <div className="sticky top-3 z-40 mb-6">
           <GlassCard className="px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -726,25 +669,21 @@ export default function FuelForecastPanel() {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-black tracking-tight text-blue-600 dark:text-blue-400">FUELWATCH</span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
+                    <span className="text-sm font-black tracking-tight text-blue-600">FUELWATCH</span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700">
                       Fuel Demand Forecasting
                     </span>
                     {result?.ok ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:text-emerald-200">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-700">
                         <BadgeCheck className="h-3.5 w-3.5" /> Ready
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-xs text-slate-600 dark:text-zinc-400">Upload PDF → Generate → Analyze → Export</div>
+                  <div className="truncate text-xs text-slate-600">Upload PDF → Generate → Analyze → Export</div>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <NeonButton variant="ghost" icon={dark ? Moon : Sun} onClick={() => setDark((v) => !v)} title="Toggle theme">
-                  {dark ? "Dark" : "Light"}
-                </NeonButton>
-
                 <NeonButton variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading} title="Check ML service">
                   Check Service
                 </NeonButton>
@@ -779,19 +718,11 @@ export default function FuelForecastPanel() {
           </GlassCard>
         </div>
 
-        {/* Main header */}
         <div className="mb-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700 shadow-sm dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200">
-            <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            Forecasting • Charts • Exports
-          </div>
           <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Fuelwatch - Fuel Quantity Predictions</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-zinc-400">
-            Weekly | Monthly | Annually Fuel Demand Analyzer With The Premium Enginnering Features
-          </p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600">Weekly | Monthly | Annually Fuel Demand Analyzer With The Premium Enginnering Features</p>
         </div>
 
-        {/* KPI Row */}
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatPill
             icon={Gauge}
@@ -829,16 +760,14 @@ export default function FuelForecastPanel() {
           />
         </div>
 
-        {/* Controls / Upload */}
         <GlassCard>
           <div className="p-5 sm:p-6">
             <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              {/* Mode */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="text-sm font-black text-slate-900 dark:text-zinc-50">Forecast Mode</div>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
-                    <CalendarDays className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Choose horizon
+                  <div className="text-sm font-black text-slate-900">Forecast Mode</div>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700">
+                    <CalendarDays className="h-3.5 w-3.5 text-blue-600" /> Choose horizon
                   </span>
                 </div>
 
@@ -853,98 +782,11 @@ export default function FuelForecastPanel() {
                   options={MODE_OPTIONS}
                   disabled={loading}
                 />
-
-                <SoftDivider />
-
-                {/* Chart controls */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-950">
-                    <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-600 dark:text-zinc-400">
-                      <Settings2 className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Chart style
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setChartStyle("modern")}
-                        className={cx(
-                          "flex-1 rounded-xl border px-3 py-2 text-xs font-black transition focus:outline-none focus:ring-2 focus:ring-offset-2",
-                          chartStyle === "modern"
-                            ? "border-blue-600/30 bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white dark:focus:ring-offset-zinc-950"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-white/5 dark:focus:ring-offset-zinc-950"
-                        )}
-                      >
-                        Modern
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChartStyle("classic")}
-                        className={cx(
-                          "flex-1 rounded-xl border px-3 py-2 text-xs font-black transition focus:outline-none focus:ring-2 focus:ring-offset-2",
-                          chartStyle === "classic"
-                            ? "border-blue-600/30 bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white dark:focus:ring-offset-zinc-950"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-white/5 dark:focus:ring-offset-zinc-950"
-                        )}
-                      >
-                        Classic
-                      </button>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400">
-                      <span>Grid</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowGrid((v) => !v)}
-                        className={cx(
-                          "rounded-full border px-3 py-1 font-black transition focus:outline-none focus:ring-2 focus:ring-offset-2",
-                          showGrid
-                            ? "border-emerald-600/25 bg-emerald-500/10 text-emerald-700 focus:ring-emerald-400 focus:ring-offset-white dark:text-emerald-200 dark:focus:ring-offset-zinc-950"
-                            : "border-slate-200 bg-white text-slate-700 focus:ring-slate-300 focus:ring-offset-white dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:focus:ring-offset-zinc-950"
-                        )}
-                      >
-                        {showGrid ? "On" : "Off"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-950">
-                    <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-600 dark:text-zinc-400">
-                      <Filter className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Table view
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-black text-slate-700 dark:text-zinc-200">Rows</span>
-                      <input
-                        type="range"
-                        min={20}
-                        max={200}
-                        value={tableLimit}
-                        onChange={(e) => setTableLimit(Number(e.target.value))}
-                        className="w-full accent-blue-600"
-                      />
-                      <span className="w-12 text-right text-xs font-black text-slate-700 dark:text-zinc-200">{tableLimit}</span>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400">
-                      <span>Compact</span>
-                      <button
-                        type="button"
-                        onClick={() => setCompactTables((v) => !v)}
-                        className={cx(
-                          "rounded-full border px-3 py-1 font-black transition focus:outline-none focus:ring-2 focus:ring-offset-2",
-                          compactTables
-                            ? "border-blue-600/25 bg-blue-600/10 text-blue-700 focus:ring-blue-400 focus:ring-offset-white dark:text-blue-200 dark:focus:ring-offset-zinc-950"
-                            : "border-slate-200 bg-white text-slate-700 focus:ring-slate-300 focus:ring-offset-white dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:focus:ring-offset-zinc-950"
-                        )}
-                      >
-                        {compactTables ? "Yes" : "No"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              {/* Upload */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="text-sm font-black text-slate-900 dark:text-zinc-50">PDF Report (Required)</div>
+                  <div className="text-sm font-black text-slate-900">PDF Report (Required)</div>
                   {file ? (
                     <NeonButton variant="subtle" icon={Trash2} onClick={onClearFile} title="Remove selected file">
                       Clear
@@ -960,18 +802,18 @@ export default function FuelForecastPanel() {
                   onDrop={handleDrop}
                   className={cx(
                     "group relative flex min-h-[170px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed p-4 transition",
-                    fileError ? "border-rose-400/70 bg-rose-50/80 dark:bg-rose-500/10" : "border-slate-300 bg-slate-50/70 hover:bg-white dark:border-white/15 dark:bg-white/5 dark:hover:bg-white/5"
+                    fileError ? "border-rose-400/70 bg-rose-50/80" : "border-slate-300 bg-slate-50/70 hover:bg-white"
                   )}
                   onClick={() => document.getElementById("fuel-forecast-file")?.click()}
                   role="button"
                   tabIndex={0}
                 >
                   <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-emerald-500/5 to-purple-600/8 dark:from-blue-500/8 dark:via-emerald-400/6 dark:to-purple-500/8" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-emerald-500/5 to-purple-600/8" />
                   </div>
 
-                  <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-600/8 blur-3xl dark:bg-blue-500/10" />
-                  <div className="pointer-events-none absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-emerald-500/7 blur-3xl dark:bg-emerald-400/10" />
+                  <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-600/8 blur-3xl" />
+                  <div className="pointer-events-none absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-emerald-500/7 blur-3xl" />
 
                   <input
                     id="fuel-forecast-file"
@@ -985,7 +827,6 @@ export default function FuelForecastPanel() {
                       setResult(null);
                       setHealth(null);
                       setError("");
-
                       setFuelSearch("");
                       setSelectedFuels(new Set());
 
@@ -1025,8 +866,8 @@ export default function FuelForecastPanel() {
                       <CloudUpload className="h-6 w-6" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-900 dark:text-zinc-50">{file ? "PDF selected" : "Drag & drop a PDF here"}</div>
-                      <div className="mt-1 text-xs text-slate-600 dark:text-zinc-400">
+                      <div className="text-sm font-black text-slate-900">{file ? "PDF selected" : "Drag & drop a PDF here"}</div>
+                      <div className="mt-1 text-xs text-slate-600">
                         {file ? (
                           <>
                             <span className="font-black">{file.name}</span>
@@ -1039,8 +880,8 @@ export default function FuelForecastPanel() {
                           </>
                         )}
                       </div>
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200">
-                        <Info className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm">
+                        <Info className="h-3.5 w-3.5 text-blue-600" />
                         PDF
                       </div>
                     </div>
@@ -1053,7 +894,7 @@ export default function FuelForecastPanel() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 8 }}
-                      className="mt-3 flex items-start gap-2 rounded-xl border border-rose-300/70 bg-rose-50/80 p-3 text-sm font-bold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                      className="mt-3 flex items-start gap-2 rounded-xl border border-rose-300/70 bg-rose-50/80 p-3 text-sm font-bold text-rose-700"
                     >
                       <AlertCircle className="mt-0.5 h-5 w-5" />
                       <div>{fileError}</div>
@@ -1063,7 +904,6 @@ export default function FuelForecastPanel() {
               </div>
             </div>
 
-            {/* Status banners */}
             <div className="mt-5 grid gap-3 lg:grid-cols-2">
               <AnimatePresence>
                 {health ? (
@@ -1071,7 +911,7 @@ export default function FuelForecastPanel() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
-                    className="flex items-start gap-2 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-4 text-sm text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100"
+                    className="flex items-start gap-2 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-4 text-sm text-emerald-800"
                   >
                     <CheckCircle2 className="mt-0.5 h-5 w-5" />
                     <div>
@@ -1083,7 +923,7 @@ export default function FuelForecastPanel() {
                     </div>
                   </motion.div>
                 ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                     Tip: Click <span className="font-black">Check Service</span> regularly.
                   </div>
                 )}
@@ -1095,7 +935,7 @@ export default function FuelForecastPanel() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
-                    className="flex items-start gap-2 rounded-2xl border border-rose-300/70 bg-rose-50/80 p-4 text-sm text-rose-800 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-100"
+                    className="flex items-start gap-2 rounded-2xl border border-rose-300/70 bg-rose-50/80 p-4 text-sm text-rose-800"
                   >
                     <AlertCircle className="mt-0.5 h-5 w-5" />
                     <div>
@@ -1104,7 +944,7 @@ export default function FuelForecastPanel() {
                     </div>
                   </motion.div>
                 ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                     Upload a PDF and click <span className="font-black">Generate</span> to view charts & tables.
                   </div>
                 )}
@@ -1113,48 +953,46 @@ export default function FuelForecastPanel() {
           </div>
         </GlassCard>
 
-        {/* Results + Loading + Footer */}
         <AnimatePresence>
           {forecastObj && totals ? (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mt-6 space-y-5">
-              {/* Summary strip + Tabs */}
               <GlassCard>
                 <div className="p-5 sm:p-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <Sparkles className="h-5 w-5 text-blue-600" />
                         <div className="text-lg font-black tracking-tight">Forecast Summary</div>
                       </div>
 
-                      <div className="mt-3 grid gap-2 text-sm text-slate-700 dark:text-zinc-200 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
-                          <div className="text-xs font-black uppercase text-slate-500 dark:text-zinc-400">Mode</div>
+                      <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="text-xs font-black uppercase text-slate-500">Mode</div>
                           <div className="mt-1 font-black">{forecastObj?.mode || mode}</div>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
-                          <div className="text-xs font-black uppercase text-slate-500 dark:text-zinc-400">From</div>
+                        <div className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="text-xs font-black uppercase text-slate-500">From</div>
                           <div className="mt-1 font-black">{shortDate(headerFrom)}</div>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
-                          <div className="text-xs font-black uppercase text-slate-500 dark:text-zinc-400">To</div>
+                        <div className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="text-xs font-black uppercase text-slate-500">To</div>
                           <div className="mt-1 font-black">{shortDate(headerTo)}</div>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
-                          <div className="text-xs font-black uppercase text-slate-500 dark:text-zinc-400">PDF Ingested</div>
+                        <div className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="text-xs font-black uppercase text-slate-500">PDF Ingested</div>
                           <div className="mt-1 font-black">{ingested}</div>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      <div className="flex overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-zinc-950">
+                      <div className="flex overflow-hidden rounded-2xl border border-slate-200 bg-white p-1">
                         <button
                           type="button"
                           onClick={() => setActiveTab("charts")}
                           className={cx(
                             "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition",
-                            activeTab === "charts" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-white/5"
+                            activeTab === "charts" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50"
                           )}
                         >
                           <BarChart3 className="h-4 w-4" />
@@ -1165,7 +1003,7 @@ export default function FuelForecastPanel() {
                           onClick={() => setActiveTab("tables")}
                           className={cx(
                             "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition",
-                            activeTab === "tables" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-white/5"
+                            activeTab === "tables" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50"
                           )}
                         >
                           <FileText className="h-4 w-4" />
@@ -1205,21 +1043,16 @@ export default function FuelForecastPanel() {
 
                   <SoftDivider />
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-zinc-950">
-                      <Search className="h-4 w-4 text-slate-600 dark:text-zinc-300" />
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                      <Search className="h-4 w-4 text-slate-600" />
                       <input
                         value={fuelSearch}
                         onChange={(e) => setFuelSearch(e.target.value)}
                         placeholder="Search fuel type…"
-                        className="w-64 bg-transparent text-sm font-bold text-slate-900 outline-none placeholder:text-slate-500 dark:text-zinc-50 dark:placeholder:text-zinc-400"
+                        className="w-64 bg-transparent text-sm font-bold text-slate-900 outline-none placeholder:text-slate-500"
                       />
                       {fuelSearch ? (
-                        <button
-                          type="button"
-                          onClick={() => setFuelSearch("")}
-                          className="rounded-lg p-1 hover:bg-slate-50 dark:hover:bg-white/5"
-                          title="Clear search"
-                        >
+                        <button type="button" onClick={() => setFuelSearch("")} className="rounded-lg p-1 hover:bg-slate-50" title="Clear search">
                           <X className="h-4 w-4" />
                         </button>
                       ) : null}
@@ -1230,7 +1063,6 @@ export default function FuelForecastPanel() {
                 </div>
               </GlassCard>
 
-              {/* CHARTS */}
               {activeTab === "charts" ? (
                 <>
                   <ChartCard
@@ -1239,23 +1071,23 @@ export default function FuelForecastPanel() {
                     subtitle="Predicted aggregate quantities per fuel type (sorted by total)."
                     actions={
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
-                          <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
+                          <TrendingUp className="h-4 w-4 text-blue-600" />
                           Grand total: {formatNumber(grandTotal)} L
                         </span>
                         {topFuel ? (
-                          <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
-                            <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
+                            <Sparkles className="h-4 w-4 text-blue-600" />
                             Top: {topFuel.fuel}
                           </span>
                         ) : null}
                       </div>
                     }
                   >
-                    <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
+                    <div className="h-[360px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={totalsChartData}>
-                          {showGrid ? <CartesianGrid strokeDasharray={gridDash} /> : null}
+                          <CartesianGrid strokeDasharray={gridDash} />
                           <XAxis dataKey="fuel" />
                           <YAxis />
                           <Tooltip />
@@ -1272,17 +1104,17 @@ export default function FuelForecastPanel() {
                       title="Daily Forecast Trend"
                       subtitle="Fuel-wise day-to-day predictions (use chips to show/hide series)."
                       actions={
-                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
-                          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
+                          <Info className="h-4 w-4 text-blue-600" />
                           Showing: {selectedFuels.size}/{fuelKeys.length}
                         </span>
                       }
                     >
-                      <div className="h-[380px] w-full rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
+                      <div className="h-[380px] w-full rounded-2xl border border-slate-200 bg-white p-3">
                         {dailyChartData.length ? (
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={dailyChartData}>
-                              {showGrid ? <CartesianGrid strokeDasharray={gridDash} /> : null}
+                              <CartesianGrid strokeDasharray={gridDash} />
                               <XAxis dataKey="DateLabel" />
                               <YAxis />
                               <Tooltip />
@@ -1304,7 +1136,7 @@ export default function FuelForecastPanel() {
                             </LineChart>
                           </ResponsiveContainer>
                         ) : (
-                          <div className="grid h-full place-items-center text-sm text-slate-600 dark:text-zinc-300">No daily forecast data available for this run.</div>
+                          <div className="grid h-full place-items-center text-sm text-slate-600">No daily forecast data available for this run.</div>
                         )}
                       </div>
                     </ChartCard>
@@ -1316,17 +1148,17 @@ export default function FuelForecastPanel() {
                       title="Month-wise Forecast (Jan–Dec)"
                       subtitle="Annual plan view with fuel-wise monthly predictions."
                       actions={
-                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
-                          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
+                          <Info className="h-4 w-4 text-blue-600" />
                           Toggle fuels in chips
                         </span>
                       }
                     >
-                      <div className="h-[400px] w-full rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-zinc-950">
+                      <div className="h-[400px] w-full rounded-2xl border border-slate-200 bg-white p-3">
                         {monthlyChartData.length ? (
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={monthlyChartData}>
-                              {showGrid ? <CartesianGrid strokeDasharray={gridDash} /> : null}
+                              <CartesianGrid strokeDasharray={gridDash} />
                               <XAxis dataKey="Month" />
                               <YAxis />
                               <Tooltip />
@@ -1346,7 +1178,7 @@ export default function FuelForecastPanel() {
                             </BarChart>
                           </ResponsiveContainer>
                         ) : (
-                          <div className="grid h-full place-items-center text-sm text-slate-600 dark:text-zinc-300">No monthly forecast data available for this run.</div>
+                          <div className="grid h-full place-items-center text-sm text-slate-600">No monthly forecast data available for this run.</div>
                         )}
                       </div>
                     </ChartCard>
@@ -1354,49 +1186,40 @@ export default function FuelForecastPanel() {
                 </>
               ) : null}
 
-              {/* TABLES */}
               {activeTab === "tables" ? (
                 <div className="grid gap-5 lg:grid-cols-2">
                   <GlassCard>
                     <div className="p-5 sm:p-6">
                       <div className="mb-3 flex items-center justify-between">
                         <div className="text-lg font-black tracking-tight">Totals Table</div>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
-                          Sorted by total
-                        </span>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700">Sorted by total</span>
                       </div>
 
-                      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
-                        <table className={cx("w-full border-collapse text-sm", compactTables ? "text-xs" : "")}>
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                        <table className="w-full border-collapse text-sm">
                           <thead>
-                            <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
-                              <th className={cx("px-4 py-3", compactTables ? "py-2" : "")}>Fuel Type</th>
-                              <th className={cx("px-4 py-3", compactTables ? "py-2" : "")}>Predicted Total (L)</th>
+                            <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600">
+                              <th className="px-4 py-3">Fuel Type</th>
+                              <th className="px-4 py-3">Predicted Total (L)</th>
                             </tr>
                           </thead>
                           <tbody>
                             {totalsChartData.map((row, idx) => (
-                              <tr
-                                key={row.fuel}
-                                className={cx(
-                                  "border-t border-slate-200 dark:border-white/10",
-                                  idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
-                                )}
-                              >
-                                <td className={cx("px-4 py-3 font-black", compactTables ? "py-2" : "")}>
+                              <tr key={row.fuel} className={cx("border-t border-slate-200", idx % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
+                                <td className="px-4 py-3 font-black">
                                   <div className="flex items-center gap-2">
                                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: FUEL_COLORS[idx % FUEL_COLORS.length] }} />
                                     {row.fuel}
                                   </div>
                                 </td>
-                                <td className={cx("px-4 py-3 tabular-nums", compactTables ? "py-2" : "")}>{formatNumber(row.value)}</td>
+                                <td className="px-4 py-3 tabular-nums">{formatNumber(row.value)}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
 
-                      <div className="mt-3 text-xs text-slate-600 dark:text-zinc-400">
+                      <div className="mt-3 text-xs text-slate-600">
                         Tip: Use <span className="font-black">Export → Totals CSV</span> for reporting.
                       </div>
                     </div>
@@ -1406,35 +1229,26 @@ export default function FuelForecastPanel() {
                     <div className="p-5 sm:p-6">
                       <div className="mb-3 flex items-center justify-between">
                         <div className="text-lg font-black tracking-tight">{isAnnual ? "Month-wise Table (Annual)" : "Daily Breakdown"}</div>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
-                          Showing up to {tableLimit} rows
-                        </span>
                       </div>
 
                       {!isAnnual ? (
-                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                           {daily?.length ? (
-                            <table className={cx("w-full border-collapse text-sm", compactTables ? "text-xs" : "")}>
+                            <table className="w-full border-collapse text-sm">
                               <thead>
-                                <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+                                <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600">
                                   {Object.keys(daily[0]).map((k) => (
-                                    <th key={k} className={cx("px-4 py-3", compactTables ? "py-2" : "")}>
+                                    <th key={k} className="px-4 py-3">
                                       {k}
                                     </th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
-                                {daily.slice(0, tableLimit).map((row, idx) => (
-                                  <tr
-                                    key={idx}
-                                    className={cx(
-                                      "border-t border-slate-200 dark:border-white/10",
-                                      idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
-                                    )}
-                                  >
+                                {daily.map((row, idx) => (
+                                  <tr key={idx} className={cx("border-t border-slate-200", idx % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
                                     {Object.keys(daily[0]).map((k) => (
-                                      <td key={k} className={cx("px-4 py-3 tabular-nums", compactTables ? "py-2" : "")}>
+                                      <td key={k} className="px-4 py-3 tabular-nums">
                                         {k === "Date" ? shortDate(row[k]) : typeof row[k] === "number" ? formatNumber(row[k]) : String(row[k])}
                                       </td>
                                     ))}
@@ -1443,33 +1257,27 @@ export default function FuelForecastPanel() {
                               </tbody>
                             </table>
                           ) : (
-                            <div className="grid h-[260px] place-items-center text-sm text-slate-600 dark:text-zinc-300">No daily breakdown for this mode/run.</div>
+                            <div className="grid h-[260px] place-items-center text-sm text-slate-600">No daily breakdown for this mode/run.</div>
                           )}
                         </div>
                       ) : (
-                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                           {monthly?.length ? (
-                            <table className={cx("w-full border-collapse text-sm", compactTables ? "text-xs" : "")}>
+                            <table className="w-full border-collapse text-sm">
                               <thead>
-                                <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+                                <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600">
                                   {Object.keys(monthly[0]).map((k) => (
-                                    <th key={k} className={cx("px-4 py-3", compactTables ? "py-2" : "")}>
+                                    <th key={k} className="px-4 py-3">
                                       {k}
                                     </th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
-                                {monthly.slice(0, tableLimit).map((row, idx) => (
-                                  <tr
-                                    key={idx}
-                                    className={cx(
-                                      "border-t border-slate-200 dark:border-white/10",
-                                      idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
-                                    )}
-                                  >
+                                {monthly.map((row, idx) => (
+                                  <tr key={idx} className={cx("border-t border-slate-200", idx % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
                                     {Object.keys(monthly[0]).map((k) => (
-                                      <td key={k} className={cx("px-4 py-3 tabular-nums", compactTables ? "py-2" : "")}>
+                                      <td key={k} className="px-4 py-3 tabular-nums">
                                         {typeof row[k] === "number" ? formatNumber(row[k]) : String(row[k])}
                                       </td>
                                     ))}
@@ -1478,16 +1286,10 @@ export default function FuelForecastPanel() {
                               </tbody>
                             </table>
                           ) : (
-                            <div className="grid h-[260px] place-items-center text-sm text-slate-600 dark:text-zinc-300">No month-wise breakdown for this annual run.</div>
+                            <div className="grid h-[260px] place-items-center text-sm text-slate-600">No month-wise breakdown for this annual run.</div>
                           )}
                         </div>
                       )}
-
-                      {!isAnnual && daily?.length > tableLimit ? (
-                        <div className="mt-3 text-xs text-slate-600 dark:text-zinc-400">
-                          Showing first <span className="font-black">{tableLimit}</span> rows only. Export CSV for full data.
-                        </div>
-                      ) : null}
                     </div>
                   </GlassCard>
                 </div>
@@ -1502,10 +1304,10 @@ export default function FuelForecastPanel() {
               <GlassCard>
                 <div className="p-5 sm:p-6">
                   <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                     <div className="text-sm font-black">Generating forecast…</div>
-                    <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200">
-                      <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700">
+                      <Sparkles className="h-3.5 w-3.5 text-blue-600" />
                       Please Wait. Forecast generation in progress !
                     </span>
                   </div>
@@ -1523,7 +1325,7 @@ export default function FuelForecastPanel() {
           ) : null}
         </AnimatePresence>
 
-        <div className="mt-10 text-center text-xs text-slate-500 dark:text-zinc-400">FuelWatch Fuel Quantity Predictions • Enhanced Premium Experience</div>
+        <div className="mt-10 text-center text-xs text-slate-500">FuelWatch Fuel Quantity Predictions • Enhanced Premium Experience</div>
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ import {
   Eye,
   Mail,
   Phone,
+  MapPin,
 } from "lucide-react";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
@@ -127,6 +128,7 @@ const schema = z
       .string()
       .trim()
       .regex(stationNameRegex, "Only letters + spaces (no numbers/special chars)"),
+    Address: z.string().trim().min(1, "Address is required"),
     Location: z
       .string()
       .trim()
@@ -407,6 +409,7 @@ export default function Portal() {
     () => ({
       Id: "",
       Name: "",
+      Address: "",
       Location: "",
       person: {
         Id: "",
@@ -521,7 +524,7 @@ export default function Portal() {
   async function nextStep() {
     const ok =
       activeStep === 0
-        ? await trigger(["Id", "Name", "Location"])
+        ? await trigger(["Id", "Name", "Address", "Location"])
         : activeStep === 1
         ? await trigger([
             "person.Id",
@@ -564,6 +567,9 @@ export default function Portal() {
         manager_email,
 
         Id: payload.Id.trim().toUpperCase(),
+        Name: payload.Name.trim(),
+        Address: payload.Address.trim(),
+        Location: payload.Location.trim(),
         person: {
           ...payload.person,
           Id: payload.person.Id.trim(),
@@ -601,6 +607,7 @@ export default function Portal() {
     reset({
       Id: row.Id || "",
       Name: row.Name || "",
+      Address: row.Address || "",
       Location: row.Location || "",
       person: row.person || defaultValues.person,
       tanks: (row.tanks?.length ? row.tanks : defaultValues.tanks).map((t) => ({
@@ -627,7 +634,12 @@ export default function Portal() {
     }
   }
 
-  const doneStation = !!getValues("Id") && !!getValues("Name") && !!getValues("Location");
+  const doneStation =
+    !!getValues("Id") &&
+    !!getValues("Name") &&
+    !!getValues("Address") &&
+    !!getValues("Location");
+
   const donePerson =
     !!getValues("person.Id") &&
     !!getValues("person.PersonName") &&
@@ -637,7 +649,9 @@ export default function Portal() {
     !!getValues("person.StartTime") &&
     !!getValues("person.EndTime");
 
-  const stationStepOk = !errors.Id && !errors.Name && !errors.Location && doneStation;
+  const stationStepOk =
+    !errors.Id && !errors.Name && !errors.Address && !errors.Location && doneStation;
+
   const personStepOk =
     !errors?.person?.Id &&
     !errors?.person?.PersonName &&
@@ -812,7 +826,7 @@ export default function Portal() {
             <div style={S.divider} />
 
             {activeStep === 0 && (
-              <div style={S.grid3}>
+              <div style={S.grid2}>
                 <Field label="Station Id" hint="Enter PUCSL ID" error={errors?.Id?.message}>
                   <Input
                     icon={Building2}
@@ -830,6 +844,15 @@ export default function Portal() {
                     placeholder="Sample Filling Station"
                     invalid={!!errors?.Name}
                     {...register("Name")}
+                  />
+                </Field>
+
+                <Field label="Address" error={errors?.Address?.message}>
+                  <Input
+                    icon={MapPin}
+                    placeholder="Enter station address"
+                    invalid={!!errors?.Address}
+                    {...register("Address")}
                   />
                 </Field>
 
@@ -1154,6 +1177,7 @@ export default function Portal() {
                         <tr style={{ background: "rgba(15,23,42,0.04)" }}>
                           <Th>Station</Th>
                           <Th>Id</Th>
+                          <Th>Address</Th>
                           <Th>Location</Th>
                           <Th>Contact</Th>
                           <Th>Tanks</Th>
@@ -1173,6 +1197,7 @@ export default function Portal() {
                               </div>
                             </Td>
                             <Td>{s.Id}</Td>
+                            <Td>{s.Address || "—"}</Td>
                             <Td>{s.Location}</Td>
                             <Td>
                               <b>{s.person?.PersonName || "—"}</b>

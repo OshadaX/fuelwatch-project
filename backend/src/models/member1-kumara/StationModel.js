@@ -46,6 +46,8 @@ const StationSchema = new mongoose.Schema(
 
     Name: { type: String, required: true },
 
+    Address: { type: String, required: true },
+
     Location: { type: String, required: true },
 
     // 🔐 Manager who registered this station
