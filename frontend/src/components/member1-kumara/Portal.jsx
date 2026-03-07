@@ -1,4 +1,3 @@
-// src/pages/member1-kumara/Portal.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -32,9 +31,8 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-/* ----------------------------
-   Logged-in manager email helper
----------------------------- */
+
+//Logged-in manager email helper
 const getManagerEmail = () => {
   try {
     const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
@@ -44,9 +42,8 @@ const getManagerEmail = () => {
   }
 };
 
-/* ----------------------------
-   SweetAlert
----------------------------- */
+
+//SweetAlert
 const MySwal = withReactContent(Swal);
 const alertOk = (title, text = "") =>
   MySwal.fire({ icon: "success", title, text, confirmButtonText: "OK" });
@@ -67,9 +64,8 @@ const confirmBox = async (title, text = "Are you sure?") => {
   return r.isConfirmed;
 };
 
-/* ----------------------------
-   Allowed Districts
----------------------------- */
+
+//Allowed Districts
 const allowedDistricts = [
   "Ampara",
   "Anuradhapura",
@@ -98,9 +94,8 @@ const allowedDistricts = [
   "Vavuniya",
 ];
 
-/* ----------------------------
-   Validation Regex
----------------------------- */
+
+//Validation Regex
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/;
 const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
@@ -118,16 +113,13 @@ const allowedFuelTypes = [
   "Kerosene",
 ];
 
-/* ----------------------------
-   ZOD Schema
----------------------------- */
 const schema = z
   .object({
-    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/1234/202X only"),
+    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/XXXX/XXXX only"),
     Name: z
       .string()
       .trim()
-      .regex(stationNameRegex, "Only letters + spaces (no numbers/special chars)"),
+      .regex(stationNameRegex, "Only letters & spaces allowed"),
     Address: z.string().trim().min(1, "Address is required"),
     Location: z
       .string()
@@ -135,30 +127,30 @@ const schema = z
       .min(1, "District is required")
       .refine(
         (v) => allowedDistricts.includes(v),
-        "Select a valid Sri Lanka district (First letter capital)"
+        "Select a valid Sri Lanka district"
       ),
 
     person: z.object({
       Id: z
         .string()
         .trim()
-        .regex(personIdRegex, "NIC must be 9 digits + V/v OR 12 digits"),
+        .regex(personIdRegex, "Enter NIC number"),
       PersonName: z
         .string()
         .trim()
-        .regex(personNameRegex, "Use 2 names with capitals (Ex: Alen Smith)"),
+        .regex(personNameRegex, "Only two names with first letter capital"),
       PersonDesignation: z
         .string()
         .trim()
-        .regex(designationRegex, "Only MANAGER is allowed"),
+        .regex(designationRegex, "Designation must be 'MANAGER'"),
       PersonEmail: z
         .string()
         .trim()
-        .regex(gmailRegex, "Only xxxxx@gmail.com allowed (no capitals)"),
+        .regex(gmailRegex, "Enter correct email format"),
       ContactNumber: z
         .string()
         .trim()
-        .regex(phoneRegex, "Use 071-1234-567 format (2nd digit cannot be 0)"),
+        .regex(phoneRegex, "Format must be 0xx-xxxx-xxx"),
       StartTime: z.string().trim().regex(timeRegex, "Select a time"),
       EndTime: z.string().trim().regex(timeRegex, "Select a time"),
     }),
@@ -216,9 +208,8 @@ const schema = z
     });
   });
 
-/* ----------------------------
-   Time dropdown
----------------------------- */
+
+//Time dropdown
 const timeOptions = Array.from({ length: 48 }, (_, i) => {
   const mins = i * 30;
   const h = String(Math.floor(mins / 60)).padStart(2, "0");
@@ -226,9 +217,8 @@ const timeOptions = Array.from({ length: 48 }, (_, i) => {
   return `${h}:${m}`;
 });
 
-/* ----------------------------
-   UI helpers
----------------------------- */
+
+//UI helpers
 const S = {
   app: { minHeight: "100vh", background: "#F3F6FB", color: "#0F172A" },
   wrap: { maxWidth: 1100, margin: "0 auto", padding: 16 },
@@ -383,7 +373,7 @@ function Modal({ open, title, onClose, children }) {
 
 const steps = [
   { key: "station", title: "Station Details", icon: Building2 },
-  { key: "person", title: "Contact Person", icon: UserRound },
+  { key: "person", title: "Contact Person Details", icon: UserRound },
   { key: "tanks", title: "Tank Details", icon: Droplets },
 ];
 
@@ -492,14 +482,14 @@ export default function Portal() {
       icon: "info",
       title: "Enter your PUCSL Station ID",
       input: "text",
-      inputPlaceholder: "PUCSL/PRL/0005/2026",
+      inputPlaceholder: "PUCSL/PRL/xxxx/xxxx",
       showCancelButton: true,
       confirmButtonText: "Continue",
       cancelButtonText: "Cancel",
       inputValidator: (val) => {
         const v = (val || "").trim().toUpperCase();
         if (!v) return "PUCSL ID is required";
-        if (!stationIdRegex.test(v)) return "Invalid format. Use PUCSL/PRL/1234/202X";
+        if (!stationIdRegex.test(v)) return "Invalid format";
         const formId = (getValues("Id") || "").trim().toUpperCase();
         if (formId && formId !== v) return "PUCSL must match the Station ID in Station Details";
         return null;
@@ -559,7 +549,7 @@ export default function Portal() {
       const manager_email = getManagerEmail();
 
       if (!manager_email) {
-        return alertErr("Unauthorized", "Login required: manager email not found in localStorage.");
+        return alertErr("Unauthorized", "Login required: manager email not found.");
       }
 
       const normalized = {
@@ -692,7 +682,7 @@ export default function Portal() {
             <div>
               <div style={{ fontWeight: 980, fontSize: 18 }}>FuelWatch Portal</div>
               <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
-                Fuelwatch - Filling Station Registering Dashboard
+                Fuelwatch - Filling Station Registration Dashboard
               </div>
             </div>
           </div>
@@ -705,7 +695,7 @@ export default function Portal() {
               style={S.tabBtn(activeTab === "portal")}
               onClick={() => setActiveTab("portal")}
             >
-              Form
+              General Information Form
             </button>
             <button
               type="button"
@@ -729,7 +719,7 @@ export default function Portal() {
                 style={S.btn("primary")}
                 onClick={handleSubmit(onSubmit)}
                 disabled={isSubmitting || !isValid}
-                title={!isValid ? "Fix all validation errors before saving" : ""}
+                title={!isValid ? "Fix all errors before saving" : ""}
               >
                 <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update" : "Register"}
               </button>
@@ -905,7 +895,7 @@ export default function Portal() {
 
                 <Field
                   label="Responsible Person's Email"
-                  hint="This address will receive email alerts"
+                  hint="This email will receive alerts"
                   error={errors?.person?.PersonEmail?.message}
                 >
                   <Input
@@ -923,7 +913,7 @@ export default function Portal() {
                 <Field label="Contact Number" error={errors?.person?.ContactNumber?.message}>
                   <Input
                     icon={Phone}
-                    placeholder="071-1234-567"
+                    placeholder="xxx-xxxx-xxx"
                     invalid={!!errors?.person?.ContactNumber}
                     {...register("person.ContactNumber")}
                   />
@@ -932,7 +922,7 @@ export default function Portal() {
                 <div style={S.grid2}>
                   <Field label="Start Time" error={errors?.person?.StartTime?.message}>
                     <Select invalid={!!errors?.person?.StartTime} {...register("person.StartTime")}>
-                      <option value="">Select...</option>
+                      <option value="">Select</option>
                       {timeOptions.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -943,7 +933,7 @@ export default function Portal() {
 
                   <Field label="End Time" error={errors?.person?.EndTime?.message}>
                     <Select invalid={!!errors?.person?.EndTime} {...register("person.EndTime")}>
-                      <option value="">Select...</option>
+                      <option value="">Select</option>
                       {timeOptions.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -958,9 +948,6 @@ export default function Portal() {
             {activeStep === 2 && (
               <div>
                 <div style={{ ...S.row, justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>
-                    Fuel type locked • unique tank index per fuel type
-                  </div>
                   <button
                     type="button"
                     style={S.btn("primary")}
@@ -992,7 +979,7 @@ export default function Portal() {
                           disabled={fields.length === 1}
                           title={fields.length === 1 ? "At least one tank required" : "Remove"}
                         >
-                          <Trash2 size={16} /> Remove
+                          <Trash2 size={16} /> Remove Tanks
                         </button>
                       </div>
 
@@ -1003,7 +990,7 @@ export default function Portal() {
                             invalid={!!errors?.tanks?.[idx]?.fuel_type}
                             {...register(`tanks.${idx}.fuel_type`)}
                           >
-                            <option value="">Select fuel type...</option>
+                            <option value="">Select fuel type</option>
                             {allowedFuelTypes.map((t) => (
                               <option key={t} value={t}>
                                 {t}
@@ -1083,7 +1070,7 @@ export default function Portal() {
                     style={{ ...S.btn("soft"), marginLeft: 8 }}
                     onClick={() => setActiveTab("portal")}
                   >
-                    Back to Form
+                    Back
                   </button>
                 </div>
               </div>

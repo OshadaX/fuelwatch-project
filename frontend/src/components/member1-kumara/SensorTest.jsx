@@ -1,4 +1,4 @@
-// src/pages/SensorTest.jsx - Fuelwatch-style UI + MongoDB Logging (updated: removed config card, station summary card, and station table column)
+// src/pages/SensorTest.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
@@ -38,11 +38,11 @@ import CloudDownloadRoundedIcon from "@mui/icons-material/CloudDownloadRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import StraightenRoundedIcon from "@mui/icons-material/StraightenRounded";
 import LocalGasStationRoundedIcon from "@mui/icons-material/LocalGasStationRounded";
+import Swal from "sweetalert2";
 
 const API_BASE = "http://localhost:8081";
 
 function SensorTest() {
-  // ===== Theme (local dark toggle, Fuelwatch-like) =====
   const [dark, setDark] = useState(false);
 
   const theme = useMemo(() => {
@@ -66,7 +66,6 @@ function SensorTest() {
     });
   }, [dark]);
 
-  // ===== State =====
   const [testResult, setTestResult] = useState(null);
   const [testLogs, setTestLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -74,7 +73,7 @@ function SensorTest() {
   const [stationId] = useState("ST001");
   const [tankCapacity] = useState(32);
 
-  const [serviceStatus, setServiceStatus] = useState("Not checked"); // "OK" | "Down" | "Not checked"
+  const [serviceStatus, setServiceStatus] = useState("Not checked");
   const [checkingService, setCheckingService] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
@@ -83,14 +82,35 @@ function SensorTest() {
     severity: "info"
   });
 
-  // Table controls
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL | OK | FAILED
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // ===== API =====
+  const showToast = (icon, title) => {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon,
+      title,
+      showConfirmButton: false,
+      timer: 1600,
+      timerProgressBar: true
+    });
+  };
+
+  const showPopup = (icon, title, text = "") => {
+    Swal.fire({
+      icon,
+      title,
+      text,
+      confirmButtonColor: "#2F6BFF",
+      background: dark ? "#0F1730" : "#FFFFFF",
+      color: dark ? "#FFFFFF" : "#111827"
+    });
+  };
+
   const loadTestLogs = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/sensor/logs`);
@@ -105,11 +125,14 @@ function SensorTest() {
       }
     } catch (error) {
       console.error("Failed to load logs:", error);
+      showToast("error", "Failed to load logs");
     }
   }, []);
 
   const runSensorTest = async () => {
+    showToast("info", "Run Test clicked");
     setLoading(true);
+
     try {
       const response = await fetch(`${API_BASE}/api/sensor/test`, {
         method: "POST",
@@ -128,6 +151,7 @@ function SensorTest() {
         severity: "success"
       });
 
+      showPopup("success", "Test Completed", data.message || "Sensor test completed successfully.");
       loadTestLogs();
     } catch (error) {
       setSnackbar({
@@ -135,22 +159,29 @@ function SensorTest() {
         message: `❌ ${error.message}`,
         severity: "error"
       });
+
+      showPopup("error", "Test Failed", error.message);
     } finally {
       setLoading(false);
     }
   };
 
   const checkService = async () => {
+    showToast("info", "Check Service clicked");
     setCheckingService(true);
+
     try {
       const res = await fetch(`${API_BASE}/api/sensor/logs`, { method: "GET" });
       if (!res.ok) throw new Error("Service responded with error");
+
       setServiceStatus("OK");
       setSnackbar({
         open: true,
         message: "✅ Service is reachable",
         severity: "success"
       });
+
+      showPopup("success", "Service Online", "API service is reachable.");
     } catch (e) {
       setServiceStatus("Down");
       setSnackbar({
@@ -158,19 +189,19 @@ function SensorTest() {
         message: "❌ Service is not reachable",
         severity: "error"
       });
+
+      showPopup("error", "Service Down", "API service is not reachable.");
     } finally {
       setCheckingService(false);
     }
   };
 
-  // ===== Effects =====
   useEffect(() => {
     loadTestLogs();
     const interval = setInterval(loadTestLogs, 5000);
     return () => clearInterval(interval);
   }, [loadTestLogs]);
 
-  // ===== Derived stats =====
   const lastLog = useMemo(() => (testLogs.length ? testLogs[0] : null), [testLogs]);
 
   const totals = useMemo(() => {
@@ -179,7 +210,6 @@ function SensorTest() {
     return { ok, failed, total: testLogs.length };
   }, [testLogs]);
 
-  // ===== Filters + pagination =====
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
     return testLogs.filter((log) => {
@@ -210,8 +240,9 @@ function SensorTest() {
     setPage(0);
   }, [query, statusFilter]);
 
-  // ===== Export CSV =====
   const exportCSV = () => {
+    showToast("info", "Export clicked");
+
     const rows = filteredLogs.map((l) => ({
       timestamp: l.timestamp,
       stationId: l.stationId,
@@ -249,9 +280,20 @@ function SensorTest() {
       message: "⬇️ Exported CSV",
       severity: "success"
     });
+
+    showPopup("success", "Export Complete", "CSV file exported successfully.");
   };
 
-  // ===== UI helpers =====
+  const handleToggleTheme = () => {
+    showToast("info", dark ? "Switched to Light Mode" : "Switched to Dark Mode");
+    setDark((v) => !v);
+  };
+
+  const handleRefreshLogs = () => {
+    showToast("info", "Refreshing logs");
+    loadTestLogs();
+  };
+
   const glassCardSx = (tone = "primary") => ({
     borderRadius: 4,
     overflow: "hidden",
@@ -314,7 +356,6 @@ function SensorTest() {
                ${theme.palette.background.default}`
         }}
       >
-        {/* TOP BAR */}
         <Paper elevation={0} sx={topBarSx}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={5}>
@@ -365,7 +406,7 @@ function SensorTest() {
                 <Button
                   variant="outlined"
                   startIcon={dark ? <LightModeIcon /> : <DarkModeIcon />}
-                  onClick={() => setDark((v) => !v)}
+                  onClick={handleToggleTheme}
                   sx={{ borderRadius: 999, textTransform: "none", fontWeight: 800 }}
                 >
                   {dark ? "Light" : "Dark"}
@@ -421,7 +462,6 @@ function SensorTest() {
           </Grid>
         </Paper>
 
-        {/* PAGE TITLE */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="h3" sx={{ mb: 0.6 }}>
             Ultrasonic Sensor Test
@@ -431,7 +471,6 @@ function SensorTest() {
           </Typography>
         </Box>
 
-        {/* SUMMARY CARDS */}
         <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("secondary") }}>
@@ -545,7 +584,6 @@ function SensorTest() {
           </Grid>
         </Grid>
 
-        {/* MAIN */}
         <Grid container spacing={2.5}>
           <Grid item xs={12}>
             <Paper sx={{ p: 2.6, borderRadius: 4 }}>
@@ -571,19 +609,25 @@ function SensorTest() {
                       size="small"
                       placeholder="Search..."
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        showToast("info", "Search updated");
+                      }}
                     />
                     <TextField
                       size="small"
                       select
                       value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        showToast("info", `Filter: ${e.target.value}`);
+                      }}
                     >
                       <MenuItem value="ALL">All</MenuItem>
                       <MenuItem value="OK">OK</MenuItem>
                       <MenuItem value="FAILED">Failed</MenuItem>
                     </TextField>
-                    <IconButton onClick={loadTestLogs}>
+                    <IconButton onClick={handleRefreshLogs}>
                       <AutorenewRoundedIcon />
                     </IconButton>
                   </Stack>
@@ -623,6 +667,18 @@ function SensorTest() {
                         <TableRow
                           key={log._id || log.id || `${log.stationId}_${log.timestamp}`}
                           hover
+                          onClick={() =>
+                            showPopup(
+                              log.status === "FAILED" ? "error" : "success",
+                              "Log Details",
+                              `Distance: ${
+                                log.reading != null ? `${Number(log.reading).toFixed(1)} cm` : "—"
+                              }, Fuel: ${
+                                log.fuelLevel != null ? `${Number(log.fuelLevel).toFixed(1)} L` : "—"
+                              }, Status: ${log.status || "OK"}`
+                            )
+                          }
+                          sx={{ cursor: "pointer" }}
                         >
                           <TableCell>
                             {log.timestamp
@@ -671,11 +727,16 @@ function SensorTest() {
                   component="div"
                   count={filteredLogs.length}
                   page={page}
-                  onPageChange={(e, newPage) => setPage(newPage)}
+                  onPageChange={(e, newPage) => {
+                    setPage(newPage);
+                    showToast("info", `Page changed to ${newPage + 1}`);
+                  }}
                   rowsPerPage={rowsPerPage}
                   onRowsPerPageChange={(e) => {
-                    setRowsPerPage(parseInt(e.target.value, 10));
+                    const value = parseInt(e.target.value, 10);
+                    setRowsPerPage(value);
                     setPage(0);
+                    showToast("info", `Rows per page: ${value}`);
                   }}
                   rowsPerPageOptions={[5, 10, 25, 50]}
                 />
@@ -684,7 +745,6 @@ function SensorTest() {
           </Grid>
         </Grid>
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={5500}
