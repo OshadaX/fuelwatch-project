@@ -44,6 +44,10 @@ import {
 } from "recharts";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
+import axios from "axios";
+
+// API Base URL for backend
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8081/api";
 
 const MODE_OPTIONS = [
   { value: "weekly", label: "Weekly", hint: "Weekly Planning", badge: "7d" },
@@ -616,6 +620,7 @@ export default function FuelForecastPanel() {
           title: "Forecast Generated",
           text: "Fuel prediction completed successfully",
         });
+
       }
     } catch (e) {
       Swal.close();
@@ -630,6 +635,33 @@ export default function FuelForecastPanel() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSyncToDatabase() {
+    if (!result?.ok || !result?.forecast?.daily) return;
+
+    try {
+      const stationId = "STATION_001";
+      await axios.post(`${API_BASE_URL}/reports/fuel-prediction`, {
+        stationId,
+        mode: "weekly",
+        predictions: result.forecast.daily
+      });
+      showAlert({
+        icon: "success",
+        title: "Synced to Member 3",
+        text: "Forecast successfully passed to the Staff Prediction module!",
+        confirm: true,
+      });
+    } catch (saveErr) {
+      console.error("Failed to sync forecast:", saveErr);
+      showAlert({
+        icon: "error",
+        title: "Sync Failed",
+        text: "Failed to sync to database",
+        confirm: true,
+      });
     }
   }
 
@@ -990,11 +1022,18 @@ export default function FuelForecastPanel() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <div className="text-sm font-black text-slate-900 dark:text-zinc-50">PDF Report (Required)</div>
-                  {file ? (
-                    <NeonButton variant="subtle" icon={Trash2} onClick={onClearFile} title="Remove selected file">
-                      Clear
-                    </NeonButton>
-                  ) : null}
+                  <div className="flex gap-2">
+                    {mode === "weekly" && result?.ok && result?.forecast?.daily && (
+                      <NeonButton variant="primary" icon={CloudUpload} onClick={handleSyncToDatabase} title="Push 7-Day Forecast to Staff Prediction">
+                        Sync to Member 3
+                      </NeonButton>
+                    )}
+                    {file ? (
+                      <NeonButton variant="subtle" icon={Trash2} onClick={onClearFile} title="Remove selected file">
+                        Clear
+                      </NeonButton>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div

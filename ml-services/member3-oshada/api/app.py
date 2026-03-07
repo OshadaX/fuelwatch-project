@@ -70,9 +70,11 @@ def prepare_features(date_str: str, fuel_demand: float, weather: str = None, tem
     If weather/temperature not provided, fetches from API or simulates.
     """
     try:
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        # Handle formats like "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS..."
+        date_str_clean = str(date_str).strip().split('T')[0].split(' ')[0]
+        date_obj = datetime.strptime(date_str_clean, "%Y-%m-%d")
     except ValueError:
-        raise ValueError("Invalid date format. Expected YYYY-MM-DD")
+        raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD")
     
     # Get weather data if not provided
     if weather is None or temperature is None:
@@ -246,6 +248,12 @@ def predict_batch():
             if not date_str or fuel_demand is None:
                 continue
             
+            # Force truncation of date string explicitly for Member 1 prediction
+            if date_str and "T" in str(date_str):
+                date_str = str(date_str).split("T")[0]
+            elif date_str and " " in str(date_str):
+                date_str = str(date_str).split(" ")[0]
+                
             # Prepare and predict
             df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
             prediction = model.predict(df)[0]
