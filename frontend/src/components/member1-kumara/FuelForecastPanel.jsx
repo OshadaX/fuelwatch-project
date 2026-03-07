@@ -45,9 +45,9 @@ import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
 const MODE_OPTIONS = [
-  { value: "weekly", label: "Weekly", hint: "Weekly Planning", badge: "7d" },
-  { value: "monthly", label: "Monthly", hint: "Monthly Planning", badge: "30d" },
-  { value: "annual", label: "Annual", hint: "Annually Planning", badge: "365d" },
+  { value: "weekly", label: "Weekly"},
+  { value: "monthly", label: "Monthly"},
+  { value: "annual", label: "Annual"},
 ];
 
 const BRAND = {
@@ -123,7 +123,7 @@ function showAlert({ icon = "success", title = "", text = "", timer = 1800, conf
   });
 }
 
-function showLoading({ title = "Processing...", text = "Please wait while we generate the forecast" }) {
+function showLoading({ title = "Processing...", text = "Please wait while generating the forecast" }) {
   return Swal.fire({
     title,
     text,
@@ -521,12 +521,12 @@ export default function FuelForecastPanel() {
 
       showAlert({
         icon: "success",
-        title: "Service Online",
+        title: "Service Status - Online",
         text: "Service is reachable",
       });
     } catch (e) {
       setHealth(null);
-      const msg = e?.response?.data?.detail || e.message || "Health check failed";
+      const msg = e?.response?.data?.detail || e.message || "Health check - Failed";
       setError(msg);
 
       showAlert({
@@ -579,7 +579,7 @@ export default function FuelForecastPanel() {
         showAlert({
           icon: "success",
           title: "Forecast Generated",
-          text: "Fuel prediction completed successfully",
+          text: "Fuel quantity prediction completed successfully",
         });
       }
     } catch (e) {
@@ -614,7 +614,7 @@ export default function FuelForecastPanel() {
 
       showLoading({
         title: "Saving Forecast",
-        text: "Please wait while we store the forecast in the database.",
+        text: "Please wait",
       });
 
       const payload = {
@@ -635,7 +635,7 @@ export default function FuelForecastPanel() {
       showAlert({
         icon: "success",
         title: "Saved",
-        text: "Forecast stored successfully in the database.",
+        text: "Forecast saved successfully.",
       });
     } catch (e) {
       Swal.close();
@@ -711,7 +711,7 @@ export default function FuelForecastPanel() {
 
     if (!isPdfByMime && !isPdfByExt) {
       setFile(null);
-      const msg = "Only PDF files are allowed. Please upload a .pdf report.";
+      const msg = "Only PDF files are allowed. Please upload a .pdf file.";
       setError(msg);
       showAlert({ icon: "error", title: "Invalid File", text: msg, confirm: true });
       return;
@@ -792,9 +792,9 @@ export default function FuelForecastPanel() {
 
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-base font-black tracking-tight text-slate-900">FuelWatch</span>
+                  <span className="text-base font-black tracking-tight text-slate-900">Fuelwatch</span>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
-                    Enterprise Forecast Workspace
+                    Upcoming Fuel Quantity Predictions
                   </span>
                   {result?.ok ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
@@ -803,14 +803,11 @@ export default function FuelForecastPanel() {
                     </span>
                   ) : null}
                 </div>
-                <div className="mt-1 text-sm text-slate-500">
-                  Upload PDF, generate predictions, review analytics, and save forecasts to the database.
-                </div>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <PrimaryButton variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading || savingForecast} title="Check ML service">
+              <PrimaryButton variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading || savingForecast} title="Check service">
                 Check Service
               </PrimaryButton>
 
@@ -829,24 +826,7 @@ export default function FuelForecastPanel() {
                   },
                 ]}
               />
-
-              <PrimaryButton
-                variant="primary"
-                icon={Save}
-                onClick={onSaveForecast}
-                disabled={!forecastObj || !totals || loading || savingForecast}
-                title={!forecastObj || !totals ? "Generate forecast first" : "Save forecast"}
-              >
-                {savingForecast ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Forecast"
-                )}
-              </PrimaryButton>
-
+              
               <PrimaryButton
                 variant="blue"
                 icon={TrendingUp}
@@ -879,7 +859,7 @@ export default function FuelForecastPanel() {
             icon={FileText}
             label="Document Status"
             value={file ? "Ready" : "Missing"}
-            sub={file ? `${file.name} • ${niceBytes(file.size)}` : "Upload a PDF report to continue"}
+            sub={file ? `${file.name} • ${niceBytes(file.size)}` : "Upload a PDF file"}
             tone={file ? "success" : "danger"}
           />
           <KpiCard
@@ -898,7 +878,7 @@ export default function FuelForecastPanel() {
                 ? topFuel
                   ? `Top: ${topFuel.fuel} (${formatNumber(topFuel.value)} L)`
                   : `Fuel types: ${fuelKeys.length}`
-                : "Generate forecast to view totals"
+                : "General forecast"
             }
             tone={totals ? "default" : "warn"}
           />
@@ -910,12 +890,11 @@ export default function FuelForecastPanel() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-black tracking-tight text-slate-900">Forecast Mode</div>
-                  <div className="mt-1 text-sm text-slate-500">Select the planning horizon for the prediction request.</div>
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600">
                   <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
-                  Choose horizon
+                  Choose forecasting mode
                 </div>
               </div>
 
@@ -941,9 +920,6 @@ export default function FuelForecastPanel() {
                         </div>
                         <div>
                           <div className="text-sm font-black text-slate-900">Service Verification</div>
-                          <div className="mt-1 text-sm text-slate-500">
-                            Validate the ML service before submitting a forecast job.
-                          </div>
                           <div className="mt-4">
                             <PrimaryButton variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading || savingForecast}>
                               Check Service
@@ -960,9 +936,6 @@ export default function FuelForecastPanel() {
                         </div>
                         <div>
                           <div className="text-sm font-black text-slate-900">Forecast Execution</div>
-                          <div className="mt-1 text-sm text-slate-500">
-                            Run the selected mode once a valid PDF report is attached.
-                          </div>
                           <div className="mt-4">
                             <PrimaryButton
                               variant="blue"
@@ -981,18 +954,15 @@ export default function FuelForecastPanel() {
 
                   <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5">
                     <div className="text-sm font-black text-slate-900">Workflow Guidance</div>
-                    <div className="mt-2 grid gap-3 sm:grid-cols-4">
+                    <div className="mt-2 grid gap-3 sm:grid-cols-3">
                       <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                        <span className="font-black text-slate-900">1.</span> Upload the source PDF report.
+                        <span className="font-black text-slate-900">1.</span> Upload PDF report.
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                        <span className="font-black text-slate-900">2.</span> Verify service availability.
+                        <span className="font-black text-slate-900">2.</span> Verify service status.
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                        <span className="font-black text-slate-900">3.</span> Generate and review analytics.
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                        <span className="font-black text-slate-900">4.</span> Save forecast to database.
+                        <span className="font-black text-slate-900">3.</span> Review analytics.
                       </div>
                     </div>
                   </div>
@@ -1004,7 +974,6 @@ export default function FuelForecastPanel() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-black tracking-tight text-slate-900">PDF Report</div>
-                  <div className="mt-1 text-sm text-slate-500">Upload the report used for demand extraction and forecasting.</div>
                 </div>
 
                 {file ? (
@@ -1099,15 +1068,11 @@ export default function FuelForecastPanel() {
                         {niceBytes(file.size)}
                       </>
                     ) : (
-                      <>Or click to browse from your device. Maximum file size is {MAX_FILE_MB}MB.</>
+                      <>click to browse from your device. Maximum file size is {MAX_FILE_MB}MB.</>
                     )}
                   </div>
 
                   <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600 shadow-sm">
-                      <Info className="h-3.5 w-3.5 text-blue-600" />
-                      PDF Only
-                    </span>
                     <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600 shadow-sm">
                       <CloudUpload className="h-3.5 w-3.5 text-blue-600" />
                       Secure Upload
@@ -1138,7 +1103,7 @@ export default function FuelForecastPanel() {
                     title="Service OK"
                     text={
                       <>
-                        Status: <span className="font-black">{health.status || "ok"}</span> • Model loaded:{" "}
+                        Status: <span className="font-black">{health.status || "ok"}</span> • Process loaded:{" "}
                         <span className="font-black">{String(health.model_loaded)}</span>
                       </>
                     }
@@ -1160,7 +1125,7 @@ export default function FuelForecastPanel() {
                   icon={Sparkles}
                   text={
                     <>
-                      Upload a PDF and click <span className="font-black">Generate Forecast</span> to review charts, tables, and save to database.
+                      Upload a PDF and click <span className="font-black">Generate Forecast</span> to review details.
                     </>
                   }
                 />
@@ -1182,7 +1147,6 @@ export default function FuelForecastPanel() {
                         </div>
                         <div>
                           <div className="text-lg font-black tracking-tight text-slate-900">Forecast Summary</div>
-                          <div className="mt-1 text-sm text-slate-500">Execution metadata and result overview.</div>
                         </div>
                       </div>
 
@@ -1248,9 +1212,6 @@ export default function FuelForecastPanel() {
                             },
                           ]}
                         />
-                        <PrimaryButton variant="primary" icon={Save} onClick={onSaveForecast} disabled={savingForecast}>
-                          {savingForecast ? "Saving..." : "Save Forecast"}
-                        </PrimaryButton>
                         <PrimaryButton
                           variant="subtle"
                           icon={RefreshCw}
@@ -1292,7 +1253,7 @@ export default function FuelForecastPanel() {
                   <ChartCard
                     icon={BarChart3}
                     title="Totals by Fuel Type"
-                    subtitle="Predicted aggregate quantities per fuel type, sorted by total volume."
+                    subtitle="Predicted quantities per fuel type, sorted by total volume."
                     actions={
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
@@ -1449,7 +1410,7 @@ export default function FuelForecastPanel() {
                       </div>
 
                       <div className="mt-3 text-xs text-slate-500">
-                        Tip: Use <span className="font-black text-slate-700">Export → Totals CSV</span> for reporting.
+                        Tip: Use <span className="font-black text-slate-700">Export | Totals CSV</span> for reporting.
                       </div>
                     </div>
                   </SectionCard>
@@ -1566,7 +1527,7 @@ export default function FuelForecastPanel() {
         </AnimatePresence>
 
         <div className="mt-8 text-center text-xs font-medium text-slate-400">
-          FuelWatch Fuel Quantity Predictions • Enterprise Interface
+          Upcoming Fuel Quantity Predictions • Fuelwatch
         </div>
       </div>
     </div>
