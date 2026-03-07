@@ -1,4 +1,4 @@
-// src/pages/SensorTest.jsx - Fuelwatch-style UI + MongoDB Logging (NO Grid2)
+// src/pages/SensorTest.jsx - Fuelwatch-style UI + MongoDB Logging (updated: removed config card, station summary card, and station table column)
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
@@ -8,7 +8,6 @@ import {
   Chip,
   Snackbar,
   Alert,
-  Fab,
   Table,
   TableBody,
   TableCell,
@@ -18,12 +17,8 @@ import {
   TablePagination,
   TextField,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
   Button,
   IconButton,
-  Tooltip,
   Divider,
   Stack,
   Avatar
@@ -41,10 +36,8 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorRoundedIcon from "@mui/icons-material/ErrorRounded";
 import CloudDownloadRoundedIcon from "@mui/icons-material/CloudDownloadRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import StraightenRoundedIcon from "@mui/icons-material/StraightenRounded";
 import LocalGasStationRoundedIcon from "@mui/icons-material/LocalGasStationRounded";
-import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 
 const API_BASE = "http://localhost:8081";
 
@@ -78,8 +71,8 @@ function SensorTest() {
   const [testLogs, setTestLogs] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [stationId, setStationId] = useState("ST001");
-  const [tankCapacity, setTankCapacity] = useState(32);
+  const [stationId] = useState("ST001");
+  const [tankCapacity] = useState(32);
 
   const [serviceStatus, setServiceStatus] = useState("Not checked"); // "OK" | "Down" | "Not checked"
   const [checkingService, setCheckingService] = useState(false);
@@ -96,20 +89,6 @@ function SensorTest() {
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL"); // ALL | OK | FAILED
-
-  const stations = useMemo(
-    () => [
-      { id: "ST001", name: "Ceypetco - Colombo 7", capacity: 32 },
-      { id: "ST002", name: "Ceypetco - Maharagama", capacity: 32 },
-      { id: "ST003", name: "LIOC - Borella", capacity: 45 }
-    ],
-    []
-  );
-
-  const selectedStation = useMemo(
-    () => stations.find((s) => s.id === stationId),
-    [stations, stationId]
-  );
 
   // ===== API =====
   const loadTestLogs = useCallback(async () => {
@@ -303,7 +282,7 @@ function SensorTest() {
     backdropFilter: "blur(10px)",
     backgroundColor: alpha(
       dark ? theme.palette.background.paper : "#FFFFFF",
-      dark ? 0.75 : 0.75
+      0.75
     )
   };
 
@@ -338,7 +317,7 @@ function SensorTest() {
         {/* TOP BAR */}
         <Paper elevation={0} sx={topBarSx}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={5}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
                   variant="rounded"
@@ -354,7 +333,7 @@ function SensorTest() {
                 </Avatar>
 
                 <Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
                       FUELWATCH
                     </Typography>
@@ -376,7 +355,7 @@ function SensorTest() {
               </Stack>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={7}>
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1}
@@ -454,38 +433,7 @@ function SensorTest() {
 
         {/* SUMMARY CARDS */}
         <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
-          <Grid item xs={12} md={3}>
-            <Paper sx={{ p: 2.2, ...glassCardSx("primary") }}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Avatar
-                  variant="rounded"
-                  sx={{
-                    bgcolor: alpha(theme.palette.primary.main, 0.18),
-                    color: theme.palette.primary.main
-                  }}
-                >
-                  <LocationOnRoundedIcon />
-                </Avatar>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Station
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 900, lineHeight: 1.15 }}
-                    noWrap
-                  >
-                    {selectedStation?.name || stationId}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {stationId} • Tank {tankCapacity}L
-                  </Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("secondary") }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
@@ -505,7 +453,7 @@ function SensorTest() {
                   <Typography variant="caption" color="text.secondary">
                     Service
                   </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
                       {serviceStatus}
                     </Typography>
@@ -536,7 +484,7 @@ function SensorTest() {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("primary") }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
@@ -567,7 +515,7 @@ function SensorTest() {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("secondary") }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
@@ -599,106 +547,7 @@ function SensorTest() {
 
         {/* MAIN */}
         <Grid container spacing={2.5}>
-          {/* LEFT */}
-          <Grid item xs={12} lg={4}>
-            <Paper sx={{ p: 2.6, borderRadius: 4 }}>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={1.2} alignItems="center">
-                  <Avatar
-                    variant="rounded"
-                    sx={{
-                      bgcolor: alpha(theme.palette.primary.main, 0.12),
-                      color: theme.palette.primary.main
-                    }}
-                  >
-                    <ArticleRoundedIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5">Test Configuration</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Choose station & capacity, then run a test
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                <Divider />
-
-                <FormControl fullWidth>
-                  <InputLabel>Station</InputLabel>
-                  <Select
-                    value={stationId}
-                    label="Station"
-                    onChange={(e) => {
-                      const station = stations.find((s) => s.id === e.target.value);
-                      setStationId(e.target.value);
-                      if (station) setTankCapacity(station.capacity);
-                    }}
-                    sx={{ borderRadius: 3 }}
-                  >
-                    {stations.map((s) => (
-                      <MenuItem key={s.id} value={s.id}>
-                        {s.name} ({s.capacity}L)
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  fullWidth
-                  label="Tank Capacity"
-                  type="number"
-                  value={tankCapacity}
-                  onChange={(e) => setTankCapacity(parseFloat(e.target.value) || 32)}
-                  helperText="Liters"
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3 } }}
-                />
-
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  <Chip label={`Station: ${stationId}`} size="small" />
-                  <Chip label={`Tank: ${tankCapacity}L`} size="small" />
-                </Stack>
-
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 4,
-                    border: `1px dashed ${alpha(theme.palette.primary.main, 0.25)}`,
-                    background: alpha(theme.palette.primary.main, 0.04)
-                  }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Typography sx={{ fontWeight: 900 }}>Quick Run</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Runs test and saves a log entry
-                      </Typography>
-                    </Box>
-
-                    <Tooltip title="Run Test">
-                      <span>
-                        <Fab
-                          color="primary"
-                          onClick={runSensorTest}
-                          disabled={loading}
-                          sx={{ width: 72, height: 72 }}
-                        >
-                          {loading ? (
-                            <CircularProgress size={32} />
-                          ) : (
-                            <PlayArrowIcon sx={{ fontSize: 34 }} />
-                          )}
-                        </Fab>
-                      </span>
-                    </Tooltip>
-                  </Stack>
-                </Paper>
-              </Stack>
-            </Paper>
-          </Grid>
-
-          {/* RIGHT */}
-          <Grid item xs={12} lg={8}>
+          <Grid item xs={12}>
             <Paper sx={{ p: 2.6, borderRadius: 4 }}>
               <Stack spacing={2}>
                 <Stack
@@ -742,12 +591,27 @@ function SensorTest() {
 
                 <Divider />
 
+                {testResult && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 3,
+                      bgcolor: alpha(theme.palette.primary.main, 0.06),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      Latest test response: {testResult.message || "Completed successfully"}
+                    </Typography>
+                  </Paper>
+                )}
+
                 <TableContainer sx={{ maxHeight: 520 }}>
                   <Table stickyHeader>
                     <TableHead>
                       <TableRow>
                         <TableCell sx={{ fontWeight: 900 }}>Time</TableCell>
-                        <TableCell sx={{ fontWeight: 900 }}>Station</TableCell>
                         <TableCell sx={{ fontWeight: 900 }}>Distance</TableCell>
                         <TableCell sx={{ fontWeight: 900 }}>Fuel Level</TableCell>
                         <TableCell sx={{ fontWeight: 900 }}>Status</TableCell>
@@ -764,9 +628,6 @@ function SensorTest() {
                             {log.timestamp
                               ? new Date(log.timestamp).toLocaleString()
                               : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Chip label={log.stationId} size="small" />
                           </TableCell>
                           <TableCell>
                             {log.reading != null
@@ -790,7 +651,7 @@ function SensorTest() {
 
                       {paginatedLogs.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5}>
+                          <TableCell colSpan={4}>
                             <Box sx={{ py: 6, textAlign: "center" }}>
                               <Typography sx={{ fontWeight: 900, mb: 0.5 }}>
                                 No logs found
