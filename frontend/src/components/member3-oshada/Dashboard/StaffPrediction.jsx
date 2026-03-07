@@ -12,7 +12,7 @@ import {
     ResponsiveContainer, AreaChart, Area, Cell, Legend,
     ComposedChart, Line
 } from 'recharts';
-import { predictStaffBatch } from '../../services/mlService';
+import { predictStaffBatch } from '../../../services/mlService';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
 
