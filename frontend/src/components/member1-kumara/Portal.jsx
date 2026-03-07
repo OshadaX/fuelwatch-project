@@ -99,6 +99,7 @@ const allowedDistricts = [
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/;
 const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+const addressRegex = /^[A-Za-z0-9/', ]+$/;
 const personIdRegex = /^(?:\d{9}[Vv]|\d{12})$/;
 const personNameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/;
 const designationRegex = /^MANAGER$/;
@@ -120,7 +121,16 @@ const schema = z
       .string()
       .trim()
       .regex(stationNameRegex, "Only letters & spaces allowed"),
-    Address: z.string().trim().min(1, "Address is required"),
+    
+
+  Address: z
+  .string()
+  .trim()
+  .min(1, "Address is required")
+  .regex(
+    addressRegex,
+    "Must contain only letters, (0-9)digits, slash (/), apostrophe (') and comma (,)"
+  ),
     Location: z
       .string()
       .trim()
