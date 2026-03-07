@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, ArrowRight, Zap, ChevronLeft, BatteryCharging, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import AIAssistant from './AIAssistant';
 
 const EVFinder = () => {
     const navigate = useNavigate();
@@ -431,6 +432,9 @@ const EVFinder = () => {
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* AI Smart Assistant */}
+            <AIAssistant contextData={{ nearestStation: result }} />
         </div>
     );
 };

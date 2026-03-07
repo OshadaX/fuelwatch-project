@@ -49,71 +49,82 @@ const StationMap = () => {
 
     const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
 
+    const geocodeAddress = async (query) => {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+            }
+        } catch (err) {
+            console.warn(`Geocoding failed for: ${query}`, err);
+        }
+        return null;
+    };
+
     useEffect(() => {
-        const fetchStations = async () => {
+        const fetchAllStations = async () => {
+            setLoading(true);
             try {
                 // 1. Fetch registered FUEL stations from backend
-                const response = await fetch(`${API_BASE}/station?limit=200`);
-                const data = await response.json();
-                const stationsList = Array.isArray(data) ? data : (data.items || []);
+                const fuelRes = await fetch(`${API_BASE}/station?limit=200`);
+                const fuelData = await fuelRes.json();
+                const fuelStationsList = fuelData.stations || [];
 
-                const mappedFuelStations = stationsList.map((st, i) => {
-                    const baseLat = 6.9271;
-                    const baseLng = 79.8612;
-                    const offset = (st.Id?.length || 5) * 0.005;
-                    return {
-                        id: st._id || st.Id || i,
+                // 2. Fetch registered EV stations from backend
+                const evRes = await fetch(`${API_BASE}/ev-stations`);
+                const evStationsList = await evRes.json();
+
+                const mappedFuelStations = [];
+                for (let i = 0; i < fuelStationsList.length; i++) {
+                    const st = fuelStationsList[i];
+
+                    // Simple deterministic offset as fallback if geocoding fails or is slow
+                    let coords = await geocodeAddress(`${st.Name}, ${st.Address}, ${st.Location}, Sri Lanka`);
+                    if (!coords) coords = await geocodeAddress(`${st.Address}, ${st.Location}, Sri Lanka`);
+                    if (!coords && st.Location) coords = await geocodeAddress(`${st.Location}, Sri Lanka`);
+
+                    const finalLat = coords ? coords.lat : 6.9271 + ((i % 5) * 0.01);
+                    const finalLng = coords ? coords.lng : 79.8612 + ((i % 7) * 0.01);
+
+                    mappedFuelStations.push({
+                        id: `fuel-${st._id || st.Id || i}`,
                         name: st.Name || "Unnamed Station",
-                        lat: baseLat + ((i % 5) * offset * (i % 2 === 0 ? 1 : -1)),
-                        lng: baseLng + ((i % 7) * offset * (i % 3 === 0 ? 1 : -1)),
-                        location: st.Location || "Unknown Location",
+                        lat: finalLat,
+                        lng: finalLng,
+                        location: st.Location || st.Address || "Unknown Location",
                         type: "Fuel",
-                        brand: st.Name?.includes("IOC") ? "IOC" : st.Name?.includes("Sinopec") ? "Sinopec" : "Ceypetco",
+                        brand: st.Name?.toLowerCase().includes("ioc") ? "IOC" :
+                            st.Name?.toLowerCase().includes("sinopec") ? "Sinopec" : "Ceypetco",
                         idTag: st.Id || "ST-UNKNOWN",
                         person: st.person?.PersonName || "Admin"
-                    };
-                });
+                    });
 
-                // 2. Read EV stations registered via EVStationPortal (localStorage)
-                const stored = localStorage.getItem('evStations');
-                const evStations = stored ? JSON.parse(stored) : [];
-                const mappedEvStations = evStations.map(st => ({
-                    id: st.id,
+                    // Pace the geocoding requests to avoid hitting search limits
+                    if (fuelStationsList.length > 3) await new Promise(r => setTimeout(r, 450));
+                }
+
+                const mappedEvStations = (evStationsList || []).map(st => ({
+                    id: `ev-${st._id || st.id}`,
                     name: st.name,
-                    lat: st.lat ? parseFloat(st.lat) : 6.9271 + (Math.random() * 0.06 - 0.03),
-                    lng: st.lng ? parseFloat(st.lng) : 79.8612 + (Math.random() * 0.06 - 0.03),
+                    lat: st.lat ? parseFloat(st.lat) : 6.9271 + (Math.random() * 0.1 - 0.05),
+                    lng: st.lng ? parseFloat(st.lng) : 79.8612 + (Math.random() * 0.1 - 0.05),
                     location: st.location,
                     type: "EV Charging",
                     brand: st.operator || "EV Station",
-                    idTag: st.id,
+                    idTag: st.id || "EV-ST",
                     person: st.phone || "—"
                 }));
 
-                // 3. Static seed EV stations
-                const mockEvStations = [
-                    { id: 'ev-seed-1', name: "ChargeNet — Odel Hub", lat: 6.9147, lng: 79.8647, location: "Colombo 07", type: "EV Charging", brand: "ChargeNet", idTag: "EV-SEED-001", person: "Automated" },
-                    { id: 'ev-seed-2', name: "Vega Innovations L2", lat: 6.9400, lng: 79.8600, location: "Colombo 03", type: "EV Charging", brand: "Vega", idTag: "EV-SEED-002", person: "Automated" }
-                ];
-
-                setStations([...mappedFuelStations, ...mappedEvStations, ...mockEvStations]);
-                setLoading(false);
+                setStations([...mappedFuelStations, ...mappedEvStations]);
             } catch (err) {
                 console.error("Failed to fetch map stations", err);
-                // Fallback: still show EV stations from localStorage
-                const stored = localStorage.getItem('evStations');
-                const evStations = stored ? JSON.parse(stored) : [];
-                setStations(evStations.map(st => ({
-                    id: st.id, name: st.name,
-                    lat: st.lat ? parseFloat(st.lat) : 6.9271,
-                    lng: st.lng ? parseFloat(st.lng) : 79.8612,
-                    location: st.location, type: "EV Charging",
-                    brand: st.operator || "EV", idTag: st.id, person: st.phone
-                })));
+            } finally {
                 setLoading(false);
             }
         };
 
-        fetchStations();
+        fetchAllStations();
     }, [API_BASE]);
 
     const filteredStations = stations.filter(station =>

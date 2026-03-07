@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, ArrowRight, Fuel, ChevronLeft, Search, CheckCircle, XCircle, Droplet, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import AIAssistant from './AIAssistant';
 
 // ─── CPC / Ceypetco official fuel prices (LKR per litre) ────────────────────
 // Source: Ceylon Petroleum Corporation announcements (updated 1st of each month)
@@ -699,7 +700,10 @@ const FuelFinder = () => {
                     )}
                 </AnimatePresence>
             </div>
-        </div >
+
+            {/* AI Assistant for Fuel Stations */}
+            <AIAssistant contextData={{ nearestStation: result }} type="fuel" />
+        </div>
     );
 };
 
