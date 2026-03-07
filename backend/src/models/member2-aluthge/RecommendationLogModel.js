@@ -23,8 +23,13 @@ const RecommendationLogSchema = new mongoose.Schema(
         },
         submissionDate: { type: String, default: '' },         // YYYY-MM-DD
         submissionTime: { type: String, default: '' },         // HH:MM
+        feedback: {
+            rating: { type: Number, default: 0 },
+            wasEasyToFind: { type: Boolean, default: null },
+            comment: { type: String, default: '' }
+        }
     },
     { timestamps: true }
 );
 
-module.exports = mongoose.model('RecommendationLog', RecommendationLogSchema);
+module.exports = mongoose.model('RecommendationLog', RecommendationLogSchema, 'recomendded stations');

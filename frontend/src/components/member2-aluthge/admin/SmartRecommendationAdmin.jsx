@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     CheckCircle, XCircle, Clock, MapPin, Search,
     Filter, FileText, Download, Zap, Fuel, Trash2, AlertCircle,
-    Navigation, Calendar, Milestone
+    Navigation, Calendar, Milestone, Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -14,13 +14,18 @@ const SmartRecommendationAdmin = () => {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    // ── Load only real localStorage recommendation logs ──────────────────────
+    // ── Load directly from the Backend Database ───────────────────────────────
     useEffect(() => {
-        setTimeout(() => {
-            const raw = localStorage.getItem('guestSubmissions');
-            setSubmissions(raw ? JSON.parse(raw) : []);
-            setIsLoading(false);
-        }, 400);
+        fetch('http://localhost:8081/api/recommendations')
+            .then(res => res.json())
+            .then(data => {
+                setSubmissions(Array.isArray(data) ? data : []);
+                setIsLoading(false);
+            })
+            .catch(err => {
+                console.error("Failed to fetch logs from DB", err);
+                setIsLoading(false);
+            });
     }, []);
 
     // ── Filter ───────────────────────────────────────────────────────────────
@@ -32,7 +37,7 @@ const SmartRecommendationAdmin = () => {
 
         const q = searchTerm.toLowerCase();
         const matchesSearch =
-            sub.id?.toLowerCase().includes(q) ||
+            sub.logId?.toLowerCase().includes(q) ||
             sub.currentLocation?.toLowerCase().includes(q) ||
             sub.recommendedStation?.toLowerCase().includes(q) ||
             sub.stationAddress?.toLowerCase().includes(q) ||
@@ -57,11 +62,17 @@ const SmartRecommendationAdmin = () => {
     // ── Delete ───────────────────────────────────────────────────────────────
     const requestDelete = (id) => { setItemToDelete(id); setDeleteModalOpen(true); };
     const confirmDelete = () => {
-        const updated = submissions.filter(s => s.id !== itemToDelete);
-        setSubmissions(updated);
-        localStorage.setItem('guestSubmissions', JSON.stringify(updated));
-        setDeleteModalOpen(false);
-        setItemToDelete(null);
+        fetch(`http://localhost:8081/api/recommendations/${itemToDelete}`, { method: 'DELETE' })
+            .then(() => {
+                setSubmissions(submissions.filter(s => s._id !== itemToDelete));
+                setDeleteModalOpen(false);
+                setItemToDelete(null);
+            })
+            .catch(err => {
+                console.error(err);
+                setDeleteModalOpen(false);
+                setItemToDelete(null);
+            });
     };
     const cancelDelete = () => { setDeleteModalOpen(false); setItemToDelete(null); };
 
@@ -69,7 +80,7 @@ const SmartRecommendationAdmin = () => {
     const exportCSV = () => {
         const headers = ['ID', 'Type', 'Location', 'Preference', 'Station', 'Address', 'Distance (km)', 'Status', 'Date', 'Time'];
         const rows = filteredSubmissions.map(s => [
-            s.id, s.type, s.currentLocation, s.preference,
+            s.logId, s.type, s.currentLocation, s.preference,
             s.recommendedStation, s.stationAddress || '',
             s.distanceKm != null ? s.distanceKm : '',
             s.status, s.submissionDate, s.submissionTime
@@ -183,13 +194,14 @@ const SmartRecommendationAdmin = () => {
                                     <th className="px-5 py-4 font-semibold">Distance</th>
                                     <th className="px-5 py-4 font-semibold">Date &amp; Time</th>
                                     <th className="px-5 py-4 font-semibold">Status</th>
+                                    <th className="px-5 py-4 font-semibold">Feedback</th>
                                     <th className="px-5 py-4 font-semibold text-center">Del</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan="9" className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan="10" className="px-6 py-16 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
                                                 <p>Loading records…</p>
@@ -198,7 +210,7 @@ const SmartRecommendationAdmin = () => {
                                     </tr>
                                 ) : filteredSubmissions.length === 0 ? (
                                     <tr>
-                                        <td colSpan="9" className="px-6 py-20 text-center">
+                                        <td colSpan="10" className="px-6 py-20 text-center">
                                             <div className="flex flex-col items-center gap-3 text-slate-400">
                                                 <Navigation size={48} className="text-slate-200" />
                                                 <p className="font-medium text-slate-500">No recommendation records yet.</p>
@@ -211,7 +223,7 @@ const SmartRecommendationAdmin = () => {
                                         {filteredSubmissions.map((sub, idx) => (
                                             <motion.tr
                                                 layout
-                                                key={sub.id}
+                                                key={sub._id}
                                                 initial={{ opacity: 0, y: 8 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0, backgroundColor: '#fee2e2' }}
@@ -219,7 +231,7 @@ const SmartRecommendationAdmin = () => {
                                                 className="border-b border-slate-100 hover:bg-blue-50/20 transition-colors"
                                             >
                                                 {/* ID */}
-                                                <td className="px-5 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{sub.id}</td>
+                                                <td className="px-5 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{sub.logId}</td>
 
                                                 {/* Type badge */}
                                                 <td className="px-5 py-4">
@@ -278,10 +290,28 @@ const SmartRecommendationAdmin = () => {
                                                     </span>
                                                 </td>
 
+                                                {/* Feedback */}
+                                                <td className="px-5 py-4 whitespace-nowrap">
+                                                    {sub.feedback ? (
+                                                        <div className="flex flex-col gap-1" title={sub.feedback.comment || "No comments"}>
+                                                            <div className="flex items-center gap-0.5 text-amber-500">
+                                                                {Array.from({ length: 5 }).map((_, i) => (
+                                                                    <Star key={i} size={12} className={i < sub.feedback.rating ? 'fill-amber-500' : 'text-slate-200'} />
+                                                                ))}
+                                                            </div>
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${sub.feedback.wasEasyToFind ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                {sub.feedback.wasEasyToFind ? 'Found Easily' : 'Hard to Find'}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300 italic">Pending Trip</span>
+                                                    )}
+                                                </td>
+
                                                 {/* Delete */}
                                                 <td className="px-5 py-4 text-center">
                                                     <button
-                                                        onClick={() => requestDelete(sub.id)}
+                                                        onClick={() => requestDelete(sub._id)}
                                                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="Delete record"
                                                     >

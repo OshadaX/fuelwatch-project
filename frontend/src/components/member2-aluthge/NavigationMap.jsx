@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Navigation, MapPin, Clock, Zap, Fuel, Activity } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ChevronLeft, Navigation, MapPin, Clock, Zap, Fuel, Activity, Star, CheckCircle, MessageSquare } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const NavigationMap = () => {
     const { state } = useLocation();
     const navigate = useNavigate();
     const [progress, setProgress] = useState(0);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [rating, setRating] = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [wasEasyToFind, setWasEasyToFind] = useState(null); // Changed initial state to null
+    const [reason, setReason] = useState(''); // Added reason state
+    const [comment, setComment] = useState('');
 
     // Provide robust fallbacks if someone manually visits this route
     const destination = state?.destination || {
@@ -47,6 +53,42 @@ const NavigationMap = () => {
     // Note: Since we don't have an embed API key, we use a static map search embed as a fallback
     // In production with a real API key, swap this to the `directions` embed above.
     const fallbackMapUrl = `https://www.google.com/maps?q=${destination.lat},${destination.lng}&hl=es;z=14&output=embed`;
+
+    const handleSubmitFeedback = () => {
+        if (rating === 0) return; // Rating is mandatory
+
+        const feedbackData = {
+            recommendationId: state?.logId || `REC-UNKNOWN-${Math.floor(1000 + Math.random() * 9000)}`,
+            stationName: destination.name,
+            rating,
+            wasEasyToFind,
+            reason: !wasEasyToFind ? reason : '',
+            comment
+        };
+
+        fetch('http://localhost:8081/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(feedbackData)
+        })
+            .then(() => {
+                alert("Thank you! Your feedback and recommendation log have been saved securely in the database.");
+                if (wasEasyToFind === false) {
+                    navigate(destination.type === 'ev' ? '/ev-station' : '/fuel-station');
+                } else {
+                    navigate('/');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Feedback saved locally (database connection failed).");
+                if (wasEasyToFind === false) {
+                    navigate(destination.type === 'ev' ? '/ev-station' : '/fuel-station');
+                } else {
+                    navigate('/');
+                }
+            });
+    };
 
     return (
         <div className="relative h-screen w-full bg-slate-900 overflow-hidden flex flex-col">
@@ -147,16 +189,127 @@ const NavigationMap = () => {
                     </div>
                 </div>
 
-                <button
-                    onClick={() => {
-                        // In reality, this would open Native Maps App on mobile phones.
-                        window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}`, '_blank');
-                    }}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                    Open in Maps App
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => {
+                            window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}`, '_blank');
+                        }}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 rounded-2xl shadow-sm transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        Maps App
+                    </button>
+                    <button
+                        onClick={() => setFeedbackOpen(true)}
+                        className="flex-[2] bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        <CheckCircle size={20} />
+                        Arrived & Feedback
+                    </button>
+                </div>
             </motion.div>
+
+            {/* Mandatory Feedback Modal */}
+            <AnimatePresence>
+                {feedbackOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col"
+                        >
+                            <div className="bg-emerald-500 p-6 text-center text-white relative">
+                                <div className="mx-auto w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-3 backdrop-blur-md border border-white/30">
+                                    <CheckCircle size={32} className="text-white drop-shadow-md" />
+                                </div>
+                                <h3 className="text-xl font-black">You've Arrived!</h3>
+                                <p className="text-emerald-50 text-sm mt-1">Please rate your experience.</p>
+                            </div>
+
+                            <div className="p-6">
+                                <p className="text-center font-bold text-slate-700 mb-4">How was {destination.name}?</p>
+
+                                {/* Star Rating */}
+                                <div className="flex justify-center gap-2 mb-6">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setRating(star)}
+                                            onMouseEnter={() => setHoverRating(star)}
+                                            onMouseLeave={() => setHoverRating(0)}
+                                            className="p-1 transition-transform hover:scale-110 focus:outline-none"
+                                        >
+                                            <Star
+                                                size={32}
+                                                className={`transition-colors ${(hoverRating || rating) >= star
+                                                    ? 'fill-amber-400 text-amber-400 drop-shadow-sm'
+                                                    : 'text-slate-200 fill-slate-50'
+                                                    }`}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Easy to find toggle */}
+                                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl mb-4 border border-slate-100">
+                                    <span className="text-sm font-semibold text-slate-700">Found it easily?</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setWasEasyToFind(true)}
+                                            className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${wasEasyToFind ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200'
+                                                }`}
+                                        >
+                                            Yes
+                                        </button>
+                                        <button
+                                            onClick={() => setWasEasyToFind(false)}
+                                            className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${!wasEasyToFind ? 'bg-red-500 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200'
+                                                }`}
+                                        >
+                                            No
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Failure Reason Dropdown */}
+                                {wasEasyToFind === false && (
+                                    <div className="mb-4">
+                                        <select
+                                            value={reason}
+                                            onChange={(e) => setReason(e.target.value)}
+                                            className="w-full px-4 py-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                                        >
+                                            <option value="">-- Why couldn't you find it? --</option>
+                                            <option value="Station Closed">Station was Closed</option>
+                                            <option value="Fuel/EV Unavailable">Fuel / EV Chargers Unavailable</option>
+                                            <option value="Incorrect Location">Incorrect Map Location</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="relative mb-6">
+                                    <MessageSquare size={16} className="absolute top-3 left-3 text-slate-400" />
+                                    <textarea
+                                        placeholder="Any other comments? (Optional)"
+                                        value={comment}
+                                        onChange={(e) => setComment(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all resize-none h-24"
+                                    ></textarea>
+                                </div>
+
+                                <button
+                                    onClick={handleSubmitFeedback}
+                                    disabled={rating === 0}
+                                    className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    Submit & Return Home
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

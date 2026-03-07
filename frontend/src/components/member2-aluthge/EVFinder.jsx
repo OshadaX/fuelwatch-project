@@ -107,47 +107,72 @@ const EVFinder = () => {
         }, 1500);
     };
 
-    const findNearestStation = (userLoc) => {
-        const stationsWithDist = mockStations.map(station => ({
-            ...station,
-            distance: calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng)
-        }));
+    const findNearestStation = async (userLoc) => {
+        setLoading(true);
+        setError(null);
+        try {
+            let reportedStationNames = [];
+            try {
+                const feedbackRes = await fetch('http://localhost:8081/api/feedback/downvoted');
+                if (feedbackRes.ok) {
+                    const downvotedData = await feedbackRes.json();
+                    reportedStationNames = downvotedData.map(d => ({ name: d.stationName, reason: d.reason }));
+                }
+            } catch (err) {
+                console.log("Could not fetch feedback downvotes - continuing normally.");
+            }
 
-        // Sort by distance
-        stationsWithDist.sort((a, b) => a.distance - b.distance);
+            const stations = mockStations; // Using mockStations as the source
 
-        // Recommend nearest (ignoring availability as per requirements)
-        if (stationsWithDist.length > 0) {
-            const recommendedStation = stationsWithDist[0];
-            setResult(recommendedStation);
-            setStep(3);
+            const processedStations = stations
+                // .filter(s => plugType ? s.plugTypes.includes(plugType) : true) // plugType not defined in this context
+                .map(station => {
+                    let distanceNum = calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng);
+                    let isReported = reportedStationNames.find(r => r.name === station.name);
 
-            // Save to localStorage for Admin Smart Recommendation Logging
-            saveSubmissionLogger({
-                type: 'EV Charging',
-                location: userLoc,
-                locationName: locationName,
-                preference: 'Any',
-                status: 'Resolved',
-                recommendedStation: recommendedStation.name,
-                stationAddress: recommendedStation.address,
-                distanceKm: recommendedStation.distance
-            });
-        } else {
-            setError("No stations found nearby.");
+                    let originalDistance = distanceNum; // Store original distance before penalty
+
+                    if (isReported) {
+                        distanceNum += 50; // Push far away
+                    }
+
+                    return {
+                        ...station,
+                        distance: distanceNum,
+                        originalDistance: originalDistance,
+                        wait: `${Math.floor(Math.random() * 15 + 5)} mins`,
+                        status: Math.random() > 0.3 ? 'Available' : 'In Use',
+                        reportedIssue: isReported ? isReported.reason : null
+                    };
+                })
+                .sort((a, b) => a.distance - b.distance);
+
+            if (processedStations.length > 0) {
+                const recommendedStation = processedStations[0];
+                setResult(recommendedStation);
+                setStep(3);
+            } else {
+                setError("No stations found nearby.");
+                setStep(1);
+
+                // Log failed search
+                saveSubmissionLogger({
+                    type: 'EV Charging',
+                    location: userLoc,
+                    locationName: locationName,
+                    preference: 'Any',
+                    status: 'No Stations',
+                    recommendedStation: 'N/A',
+                    stationAddress: '',
+                    distanceKm: null
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            setError("An error occurred while finding stations.");
             setStep(1);
-
-            // Log failed search
-            saveSubmissionLogger({
-                type: 'EV Charging',
-                location: userLoc,
-                locationName: locationName,
-                preference: 'Any',
-                status: 'No Stations',
-                recommendedStation: 'N/A',
-                stationAddress: '',
-                distanceKm: null
-            });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -304,9 +329,17 @@ const EVFinder = () => {
 
                             <div className="p-6">
                                 <div className="grid grid-cols-2 gap-4 mb-8">
-                                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-right">
                                         <p className="text-slate-500 text-xs font-semibold uppercase mb-1">Distance</p>
-                                        <p className="text-2xl font-bold text-blue-600">{result.distance.toFixed(1)} <span className="text-sm text-slate-500 font-medium">km</span></p>
+                                        <div className="flex items-baseline justify-end">
+                                            <span className="text-2xl font-black text-blue-600">{(result.originalDistance || result.distance).toFixed(1)}</span>
+                                            <span className="text-sm text-slate-500 font-medium ml-1">km</span>
+                                        </div>
+                                        {result.reportedIssue && (
+                                            <div className="text-[10px] mt-1 bg-red-100 text-red-600 px-2 py-0.5 rounded uppercase tracking-wider font-bold">
+                                                Reported: {result.reportedIssue}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className={`p-4 rounded-2xl border ${result.status === 'Open' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                                         <p className="text-slate-500 text-xs font-semibold uppercase mb-1">Status</p>
@@ -318,12 +351,40 @@ const EVFinder = () => {
 
                                 <div className="space-y-3">
                                     <button
-                                        onClick={() => navigate('/navigate', {
-                                            state: {
-                                                destination: { ...result, type: 'ev' },
-                                                origin: location
+                                        onClick={() => {
+                                            const isConfirmed = window.confirm("Are you sure you want to confirm this station recommendation and start navigating?");
+                                            if (isConfirmed) {
+                                                const now = new Date();
+                                                const newLogId = `REC-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                                                const recPayload = {
+                                                    logId: newLogId,
+                                                    type: 'EV Charging',
+                                                    currentLocation: locationName || location,
+                                                    preference: 'Any',
+                                                    status: 'Resolved',
+                                                    recommendedStation: result.name,
+                                                    stationAddress: result.address,
+                                                    distanceKm: result.distance,
+                                                    submissionDate: now.toISOString().split('T')[0],
+                                                    submissionTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                                                };
+
+                                                // Send recommendation record instantly
+                                                fetch('http://localhost:8081/api/recommendations', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(recPayload)
+                                                }).catch(console.error);
+
+                                                navigate('/navigate', {
+                                                    state: {
+                                                        destination: { ...result, type: 'ev' },
+                                                        origin: location,
+                                                        logId: newLogId
+                                                    }
+                                                });
                                             }
-                                        })}
+                                        }}
                                         className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                     >
                                         <Navigation size={20} />

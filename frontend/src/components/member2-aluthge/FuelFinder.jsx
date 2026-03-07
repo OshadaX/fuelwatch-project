@@ -227,65 +227,87 @@ const FuelFinder = () => {
         }, 1500);
     };
 
-    const findBestStation = (userLoc) => {
-        // 1. Calculate distance & Filter by Brand (if selected)
-        let candidates = dbStations.map(station => ({
-            ...station,
-            distance: calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng)
-        }));
-
-        if (brand && brand !== 'Any') {
-            candidates = candidates.filter(s => s.brand === brand);
-        }
-
-        // 2. Sort by distance
-        candidates.sort((a, b) => a.distance - b.distance);
-
-        // 3. Evaluate one by one
-        let recommended = null;
-
-        for (const station of candidates) {
-            // Is Open?
-            if (station.status !== 'Open') continue;
-
-            // Has Fuel?
-            const availability = station.inventory[fuelType];
-            if (availability === 'Available') {
-                recommended = station;
-                break;
+    const findBestStation = async (userLoc) => {
+        setLoading(true);
+        setError(null);
+        try {
+            let reportedStationNames = [];
+            try {
+                const feedbackRes = await fetch('http://localhost:8081/api/feedback/downvoted');
+                if (feedbackRes.ok) {
+                    const downvotedData = await feedbackRes.json();
+                    reportedStationNames = downvotedData.map(d => ({ name: d.stationName, reason: d.reason }));
+                }
+            } catch (err) {
+                console.log("Could not fetch feedback downvotes - continuing normally.");
             }
-        }
 
-        if (recommended) {
-            setResult(recommended);
-            setStep(3);
+            // 1. Calculate distance & Filter by Brand (if selected)
+            let candidates = dbStations.map(station => {
+                let distanceNum = calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng);
+                let isReported = reportedStationNames.find(r => r.name === station.name);
 
-            saveSubmissionLogger({
-                type: 'Fuel',
-                location: userLoc,
-                locationName: locationName,
-                preference: `${fuelType} (${brand || 'Any'})`,
-                status: 'Resolved',
-                recommendedStation: recommended.name,
-                stationAddress: recommended.address,
-                distanceKm: recommended.distance,
-                brand: recommended.brand
+                let originalDistance = distanceNum;
+
+                if (isReported) {
+                    distanceNum += 50; // Add 50km penalty
+                }
+
+                return {
+                    ...station,
+                    distance: distanceNum,
+                    originalDistance,
+                    reportedIssue: isReported ? isReported.reason : null
+                };
             });
-        } else {
-            setError(`No open stations found with ${fuelType} available nearby.`);
+
+            if (brand && brand !== 'Any') {
+                candidates = candidates.filter(s => s.brand === brand);
+            }
+
+            // 2. Sort by penalised distance
+            candidates.sort((a, b) => a.distance - b.distance);
+
+            // 3. Evaluate one by one
+            let recommended = null;
+
+            for (const station of candidates) {
+                // Is Open?
+                if (station.status !== 'Open') continue;
+
+                // Has Fuel?
+                const availability = station.inventory[fuelType];
+                if (availability === 'Available') {
+                    recommended = station;
+                    break;
+                }
+            }
+
+            if (recommended) {
+                setResult(recommended);
+                setStep(3);
+            } else {
+                setError(`No open stations found with ${fuelType} available nearby.`);
+                setStep(1);
+
+                saveSubmissionLogger({
+                    type: 'Fuel',
+                    location: userLoc,
+                    locationName: locationName,
+                    preference: `${fuelType} (${brand || 'Any'})`,
+                    status: 'No Stations',
+                    recommendedStation: 'N/A',
+                    stationAddress: '',
+                    distanceKm: null,
+                    brand: brand || 'Any'
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            setError("An error occurred generating your recommendation.");
             setStep(1);
-
-            saveSubmissionLogger({
-                type: 'Fuel',
-                location: userLoc,
-                locationName: locationName,
-                preference: `${fuelType} (${brand || 'Any'})`,
-                status: 'No Stations',
-                recommendedStation: 'N/A',
-                stationAddress: '',
-                distanceKm: null,
-                brand: brand || 'Any'
-            });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -551,7 +573,12 @@ const FuelFinder = () => {
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-slate-500 uppercase font-bold mb-1">Distance</p>
-                                        <span className="text-2xl font-bold text-slate-800">{result.distance.toFixed(1)}</span>
+                                        <span className="text-2xl font-bold text-slate-800">{(result.originalDistance || result.distance).toFixed(1)}</span>
+                                        {result.reportedIssue && (
+                                            <div className="text-[10px] mt-1 bg-red-100 text-red-600 px-2 py-0.5 rounded uppercase tracking-wider font-bold">
+                                                Reported: {result.reportedIssue}
+                                            </div>
+                                        )}
                                         <span className="text-sm text-slate-400 font-medium ml-1">km</span>
                                     </div>
                                 </div>
@@ -611,12 +638,40 @@ const FuelFinder = () => {
 
                                 <div className="space-y-3">
                                     <button
-                                        onClick={() => navigate('/navigate', {
-                                            state: {
-                                                destination: { ...result, type: 'fuel' },
-                                                origin: location
+                                        onClick={() => {
+                                            const isConfirmed = window.confirm("Are you sure you want to confirm this station recommendation and start navigating?");
+                                            if (isConfirmed) {
+                                                const now = new Date();
+                                                const newLogId = `REC-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                                                const recPayload = {
+                                                    logId: newLogId,
+                                                    type: 'Fuel',
+                                                    currentLocation: locationName || location,
+                                                    preference: `${fuelType} (${brand || 'Any'})`,
+                                                    status: 'Resolved',
+                                                    recommendedStation: result.name,
+                                                    stationAddress: result.address,
+                                                    distanceKm: result.distance,
+                                                    brand: result.brand,
+                                                    submissionDate: now.toISOString().split('T')[0],
+                                                    submissionTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                                                };
+
+                                                fetch('http://localhost:8081/api/recommendations', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(recPayload)
+                                                }).catch(console.error);
+
+                                                navigate('/navigate', {
+                                                    state: {
+                                                        destination: { ...result, type: 'fuel' },
+                                                        origin: location,
+                                                        logId: newLogId
+                                                    }
+                                                });
                                             }
-                                        })}
+                                        }}
                                         className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                     >
                                         <Navigation size={20} />

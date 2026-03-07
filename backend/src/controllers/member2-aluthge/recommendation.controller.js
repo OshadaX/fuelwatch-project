@@ -9,7 +9,25 @@ exports.getAll = async (req, res) => {
         if (status) filter.status = status;
         if (date) filter.submissionDate = date;
 
-        const logs = await RecommendationLog.find(filter).sort({ createdAt: -1 });
+        let logs = await RecommendationLog.aggregate([
+            { $match: filter },
+            { $sort: { createdAt: -1 } },
+            {
+                $lookup: {
+                    from: 'feedback', // Name of the feedback collection as defined in model
+                    localField: 'logId',
+                    foreignField: 'recommendationId',
+                    as: 'feedbackData'
+                }
+            }
+        ]);
+
+        // Format to map back to the expected object shape for the frontend
+        logs = logs.map(log => ({
+            ...log,
+            feedback: log.feedbackData && log.feedbackData.length > 0 ? log.feedbackData[0] : undefined
+        }));
+
         res.json(logs);
     } catch (err) {
         res.status(500).json({ message: 'Failed to fetch recommendations', error: err.message });
