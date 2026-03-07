@@ -1,12 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, ArrowRight, Fuel, ChevronLeft, Search, CheckCircle, XCircle, Droplet } from 'lucide-react';
+import { MapPin, Navigation, ArrowRight, Fuel, ChevronLeft, Search, CheckCircle, XCircle, Droplet, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+
+// ─── CPC / Ceypetco official fuel prices (LKR per litre) ────────────────────
+// Source: Ceylon Petroleum Corporation announcements (updated 1st of each month)
+const FUEL_PRICES_BY_MONTH = {
+    '2025-11': { 'Lanka Petrol 92 Octane': 294, 'Lanka Petrol 95 Octane': 335, 'Lanka Auto Diesel': 277, 'Lanka Super Diesel': 318, 'Auto Kerosene': 180 },
+    '2025-12': { 'Lanka Petrol 92 Octane': 294, 'Lanka Petrol 95 Octane': 335, 'Lanka Auto Diesel': 277, 'Lanka Super Diesel': 318, 'Auto Kerosene': 185 },
+    '2026-01': { 'Lanka Petrol 92 Octane': 292, 'Lanka Petrol 95 Octane': 340, 'Lanka Auto Diesel': 277, 'Lanka Super Diesel': 323, 'Auto Kerosene': 182 },
+    '2026-02': { 'Lanka Petrol 92 Octane': 292, 'Lanka Petrol 95 Octane': 340, 'Lanka Auto Diesel': 277, 'Lanka Super Diesel': 323, 'Auto Kerosene': 182 },
+    '2026-03': { 'Lanka Petrol 92 Octane': 293, 'Lanka Petrol 95 Octane': 340, 'Lanka Auto Diesel': 281, 'Lanka Super Diesel': 329, 'Auto Kerosene': 182 },
+};
+
+const FUEL_LABELS = {
+    'Lanka Petrol 92 Octane': 'Petrol 92',
+    'Lanka Petrol 95 Octane': 'Petrol 95',
+    'Lanka Auto Diesel': 'Auto Diesel',
+    'Lanka Super Diesel': 'Super Diesel',
+    'Auto Kerosene': 'Kerosene',
+};
+
+const getMonthKey = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+};
+
+const getFuelPrices = () => {
+    const key = getMonthKey();
+    const cacheRaw = localStorage.getItem('fuelPricesCache');
+    if (cacheRaw) {
+        try {
+            const cache = JSON.parse(cacheRaw);
+            if (cache.month === key && cache.prices) return cache.prices;
+        } catch { /* ignore */ }
+    }
+    // Use this month's table or the latest known month as fallback
+    const prices = FUEL_PRICES_BY_MONTH[key]
+        || FUEL_PRICES_BY_MONTH[Object.keys(FUEL_PRICES_BY_MONTH).sort().at(-1)];
+    localStorage.setItem('fuelPricesCache', JSON.stringify({ month: key, prices }));
+    return prices;
+};
 
 const FuelFinder = () => {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [location, setLocation] = useState(null);
+    const [locationName, setLocationName] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
@@ -15,6 +57,8 @@ const FuelFinder = () => {
     // Form states
     const [fuelType, setFuelType] = useState('Lanka Petrol 92 Octane');
     const [brand, setBrand] = useState('');
+    const [fuelPrices, setFuelPrices] = useState(() => getFuelPrices());
+    const [budget, setBudget] = useState('');
 
     // API Base URL
     const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
@@ -109,25 +153,52 @@ const FuelFinder = () => {
 
     const handleGetLocation = () => {
         setLoading(true);
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setLocation({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                    setLoading(false);
-                },
-                (err) => {
-                    setError("Using default location (GPS denied needed for demo).");
-                    setLocation({ lat: 6.9270, lng: 79.8610 });
-                    setLoading(false);
-                }
-            );
-        } else {
+        setError(null);
+        setLocation(null);
+        if (!navigator.geolocation) {
             setError("Geolocation is not supported by your browser.");
             setLoading(false);
+            return;
         }
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude: lat, longitude: lng } = position.coords;
+                setLocation({ lat, lng });
+
+                // Reverse geocode to get a human-readable name
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+                    );
+                    const data = await res.json();
+                    const addr = data.address || {};
+                    const name =
+                        addr.suburb ||
+                        addr.neighbourhood ||
+                        addr.village ||
+                        addr.town ||
+                        addr.city ||
+                        addr.county ||
+                        data.display_name ||
+                        `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                    setLocationName(name);
+                } catch {
+                    setLocationName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+                }
+
+                setLoading(false);
+            },
+            (err) => {
+                let msg = "Unable to retrieve your location.";
+                if (err.code === 1) msg = "Location access denied. Please allow location permission in your browser.";
+                else if (err.code === 2) msg = "Location unavailable. Please check your GPS or network.";
+                else if (err.code === 3) msg = "Location request timed out. Please try again.";
+                setError(msg);
+                setLoading(false);
+                // No fallback — real location is required
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     };
 
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -144,11 +215,15 @@ const FuelFinder = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        if (!location) {
+            setError("Real location is required. Please allow GPS access and try again.");
+            return;
+        }
         setStep(2);
 
+        // Find best station using real GPS location
         setTimeout(() => {
-            const userLoc = location || { lat: 6.9270, lng: 79.8610 };
-            findBestStation(userLoc);
+            findBestStation(location);
         }, 1500);
     };
 
@@ -188,9 +263,13 @@ const FuelFinder = () => {
             saveSubmissionLogger({
                 type: 'Fuel',
                 location: userLoc,
+                locationName: locationName,
                 preference: `${fuelType} (${brand || 'Any'})`,
                 status: 'Resolved',
-                recommendedStation: recommended.name
+                recommendedStation: recommended.name,
+                stationAddress: recommended.address,
+                distanceKm: recommended.distance,
+                brand: recommended.brand
             });
         } else {
             setError(`No open stations found with ${fuelType} available nearby.`);
@@ -199,9 +278,13 @@ const FuelFinder = () => {
             saveSubmissionLogger({
                 type: 'Fuel',
                 location: userLoc,
+                locationName: locationName,
                 preference: `${fuelType} (${brand || 'Any'})`,
                 status: 'No Stations',
-                recommendedStation: 'N/A'
+                recommendedStation: 'N/A',
+                stationAddress: '',
+                distanceKm: null,
+                brand: brand || 'Any'
             });
         }
     };
@@ -215,11 +298,14 @@ const FuelFinder = () => {
 
         const newLog = {
             id: `REC-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-            currentLocation: `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}`,
+            currentLocation: data.locationName || `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}`,
             type: data.type,
             preference: data.preference,
             status: data.status,
             recommendedStation: data.recommendedStation,
+            stationAddress: data.stationAddress || '',
+            distanceKm: data.distanceKm != null ? parseFloat(data.distanceKm.toFixed(2)) : null,
+            brand: data.brand || '',
             submissionDate: dateStr,
             submissionTime: timeStr
         };
@@ -231,6 +317,7 @@ const FuelFinder = () => {
         setStep(1);
         setResult(null);
         setError(null);
+        setBudget('');
     };
 
     useEffect(() => {
@@ -280,7 +367,7 @@ const FuelFinder = () => {
                                         <input
                                             type="text"
                                             readOnly
-                                            value={location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Detecting location..."}
+                                            value={location ? (locationName || 'Fetching place name...') : 'Detecting location...'}
                                             className="block w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-2xl text-slate-800 text-sm font-medium focus:ring-2 focus:ring-amber-500/20"
                                         />
                                         {loading && (
@@ -302,15 +389,26 @@ const FuelFinder = () => {
                                                 onChange={(e) => setFuelType(e.target.value)}
                                                 className="block w-full pl-4 pr-8 py-3.5 bg-slate-50 border-0 rounded-2xl text-slate-800 text-sm font-medium focus:ring-2 focus:ring-amber-500/20 appearance-none cursor-pointer"
                                             >
-                                                <option value="Lanka Petrol 92 Octane">Petrol 92 Octane</option>
-                                                <option value="Lanka Petrol 95 Octane">Petrol 95 Octane</option>
-                                                <option value="Lanka Auto Diesel">Auto Diesel</option>
-                                                <option value="Lanka Super Diesel">Super Diesel</option>
-                                                <option value="Auto Kerosene">Auto Kerosene</option>
+                                                {Object.entries(FUEL_LABELS).map(([key, label]) => (
+                                                    <option key={key} value={key}>
+                                                        {label} — Rs.{fuelPrices[key]}/L
+                                                    </option>
+                                                ))}
                                             </select>
                                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500">
                                                 <Droplet size={16} />
                                             </div>
+                                        </div>
+                                        {/* Live price badge */}
+                                        <div className="mt-2 flex items-center justify-between">
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold rounded-full">
+                                                <Droplet size={11} />
+                                                Rs. {fuelPrices[fuelType]} / litre
+                                            </span>
+                                            <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                                                <RefreshCw size={9} />
+                                                Updated 1st of month
+                                            </span>
                                         </div>
                                     </div>
                                     <div>
@@ -330,14 +428,63 @@ const FuelFinder = () => {
                                     </div>
                                 </div>
 
-                                {error && <div className="p-3 bg-red-50 text-red-500 text-xs rounded-xl flex items-center gap-2">
-                                    <XCircle size={14} /> {error}
-                                </div>}
+                                {/* Optional Budget Field */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        Your Budget
+                                        <span className="text-xs text-slate-400 font-normal ml-1">(Optional)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <span className="text-sm font-bold text-slate-400">Rs.</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            placeholder="e.g. 2000"
+                                            value={budget}
+                                            onChange={(e) => setBudget(e.target.value)}
+                                            className="block w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-2xl text-slate-800 text-sm font-medium focus:ring-2 focus:ring-amber-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
+                                    </div>
+                                    {budget && Number(budget) > 0 && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -6 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="mt-2 flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-xl"
+                                        >
+                                            <Droplet size={14} className="text-green-500 shrink-0" />
+                                            <span className="text-sm text-green-700">
+                                                You can get{' '}
+                                                <span className="font-bold text-green-800">
+                                                    {(Number(budget) / fuelPrices[fuelType]).toFixed(2)} L
+                                                </span>{' '}
+                                                of {FUEL_LABELS[fuelType]}
+                                            </span>
+                                        </motion.div>
+                                    )}
+                                </div>
+
+                                {error && (
+                                    <div className="p-3 bg-red-50 text-red-500 text-xs rounded-xl flex items-start gap-2">
+                                        <XCircle size={14} className="mt-0.5 shrink-0" />
+                                        <div>
+                                            <span>{error}</span>
+                                            <button
+                                                type="button"
+                                                onClick={handleGetLocation}
+                                                className="block mt-1 text-blue-600 hover:text-blue-800 font-semibold underline"
+                                            >
+                                                ↺ Retry Location
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <button
                                     type="submit"
-                                    disabled={!location && !loading} // Allow if location is set (even default) 
-                                    className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-semibold shadow-lg shadow-slate-900/10 transition-all transform active:scale-[0.98] mt-2"
+                                    disabled={loading || !location}
+                                    className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-semibold shadow-lg shadow-slate-900/10 transition-all transform active:scale-[0.98] mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Search size={18} />
                                     Find Fuel Station
@@ -409,6 +556,34 @@ const FuelFinder = () => {
                                     </div>
                                 </div>
 
+                                {/* Budget breakdown card — only shown if user entered a budget */}
+                                {budget && Number(budget) > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="mb-5 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200"
+                                    >
+                                        <p className="text-xs text-amber-600 uppercase font-bold mb-2 flex items-center gap-1.5">
+                                            <Droplet size={12} /> Budget Breakdown
+                                        </p>
+                                        <div className="flex items-end justify-between">
+                                            <div>
+                                                <p className="text-3xl font-black text-amber-700">
+                                                    {(Number(budget) / fuelPrices[fuelType]).toFixed(2)}
+                                                    <span className="text-base font-semibold text-amber-500 ml-1">L</span>
+                                                </p>
+                                                <p className="text-xs text-amber-600 mt-0.5">
+                                                    of {FUEL_LABELS[fuelType]} for Rs. {Number(budget).toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-slate-400">Rate</p>
+                                                <p className="text-sm font-bold text-slate-600">Rs. {fuelPrices[fuelType]}/L</p>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
                                 <div className="mb-8">
                                     <h4 className="text-sm font-bold text-slate-800 mb-3 px-1">Real-time Availability</h4>
                                     <div className="space-y-2">
@@ -439,7 +614,7 @@ const FuelFinder = () => {
                                         onClick={() => navigate('/navigate', {
                                             state: {
                                                 destination: { ...result, type: 'fuel' },
-                                                origin: location || { lat: 6.9270, lng: 79.8610 }
+                                                origin: location
                                             }
                                         })}
                                         className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
@@ -469,7 +644,7 @@ const FuelFinder = () => {
                     )}
                 </AnimatePresence>
             </div>
-        </div>
+        </div >
     );
 };
 

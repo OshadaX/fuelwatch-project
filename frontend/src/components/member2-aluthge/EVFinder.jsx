@@ -7,6 +7,7 @@ const EVFinder = () => {
     const navigate = useNavigate();
     const [step, setStep] = useState(1); // 1: Form, 2: Loading, 3: Result
     const [location, setLocation] = useState(null);
+    const [locationName, setLocationName] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
@@ -27,26 +28,52 @@ const EVFinder = () => {
 
     const handleGetLocation = () => {
         setLoading(true);
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setLocation({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                    setLoading(false);
-                },
-                (err) => {
-                    setError("Unable to retrieve your location. Please enable GPS.");
-                    setLoading(false);
-                    // Fallback for demo if GPS fails/denied
-                    setLocation({ lat: 6.9270, lng: 79.8610 });
-                }
-            );
-        } else {
+        setError(null);
+        setLocation(null);
+        if (!navigator.geolocation) {
             setError("Geolocation is not supported by your browser.");
             setLoading(false);
+            return;
         }
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude: lat, longitude: lng } = position.coords;
+                setLocation({ lat, lng });
+
+                // Reverse geocode to get a human-readable name
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+                    );
+                    const data = await res.json();
+                    const addr = data.address || {};
+                    const name =
+                        addr.suburb ||
+                        addr.neighbourhood ||
+                        addr.village ||
+                        addr.town ||
+                        addr.city ||
+                        addr.county ||
+                        data.display_name ||
+                        `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                    setLocationName(name);
+                } catch {
+                    setLocationName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+                }
+
+                setLoading(false);
+            },
+            (err) => {
+                let msg = "Unable to retrieve your location.";
+                if (err.code === 1) msg = "Location access denied. Please allow location permission in your browser.";
+                else if (err.code === 2) msg = "Location unavailable. Please check your GPS or network.";
+                else if (err.code === 3) msg = "Location request timed out. Please try again.";
+                setError(msg);
+                setLoading(false);
+                // No fallback — real location is required
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     };
 
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -68,17 +95,15 @@ const EVFinder = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        if (!location) {
+            setError("Real location is required. Please allow GPS access and try again.");
+            return;
+        }
         setStep(2);
 
-        // Simulate API call and calculation
+        // Find nearest station using real GPS location
         setTimeout(() => {
-            if (!location) {
-                // If location wasn't set (e.g. manual entry not implemented yet), use default
-                const defaultLoc = { lat: 6.9270, lng: 79.8610 };
-                findNearestStation(defaultLoc);
-            } else {
-                findNearestStation(location);
-            }
+            findNearestStation(location);
         }, 1500);
     };
 
@@ -101,9 +126,12 @@ const EVFinder = () => {
             saveSubmissionLogger({
                 type: 'EV Charging',
                 location: userLoc,
+                locationName: locationName,
                 preference: 'Any',
                 status: 'Resolved',
-                recommendedStation: recommendedStation.name
+                recommendedStation: recommendedStation.name,
+                stationAddress: recommendedStation.address,
+                distanceKm: recommendedStation.distance
             });
         } else {
             setError("No stations found nearby.");
@@ -113,9 +141,12 @@ const EVFinder = () => {
             saveSubmissionLogger({
                 type: 'EV Charging',
                 location: userLoc,
+                locationName: locationName,
                 preference: 'Any',
                 status: 'No Stations',
-                recommendedStation: 'N/A'
+                recommendedStation: 'N/A',
+                stationAddress: '',
+                distanceKm: null
             });
         }
     };
@@ -129,11 +160,13 @@ const EVFinder = () => {
 
         const newLog = {
             id: `REC-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-            currentLocation: `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}`,
+            currentLocation: data.locationName || `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}`,
             type: data.type,
             preference: data.preference,
             status: data.status,
             recommendedStation: data.recommendedStation,
+            stationAddress: data.stationAddress || '',
+            distanceKm: data.distanceKm != null ? parseFloat(data.distanceKm.toFixed(2)) : null,
             submissionDate: dateStr,
             submissionTime: timeStr
         };
@@ -193,14 +226,25 @@ const EVFinder = () => {
                                         <input
                                             type="text"
                                             readOnly
-                                            value={location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Detecting location..."}
+                                            value={location ? (locationName || 'Fetching place name...') : 'Detecting location...'}
                                             className="block w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl text-slate-800 font-medium focus:ring-2 focus:ring-blue-500/20 transition-all cursor-not-allowed"
                                         />
                                         <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                                             {loading && <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>}
                                         </div>
                                     </div>
-                                    {error && <p className="text-red-500 text-xs mt-2 ml-1">{error}</p>}
+                                    {error && (
+                                        <div className="mt-2 ml-1">
+                                            <p className="text-red-500 text-xs">{error}</p>
+                                            <button
+                                                type="button"
+                                                onClick={handleGetLocation}
+                                                className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-semibold underline"
+                                            >
+                                                ↺ Retry Location
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button
@@ -277,7 +321,7 @@ const EVFinder = () => {
                                         onClick={() => navigate('/navigate', {
                                             state: {
                                                 destination: { ...result, type: 'ev' },
-                                                origin: location || { lat: 6.9270, lng: 79.8610 }
+                                                origin: location
                                             }
                                         })}
                                         className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
