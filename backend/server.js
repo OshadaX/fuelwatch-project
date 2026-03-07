@@ -23,6 +23,11 @@ const reportRoutes = require("./src/routes/member1-kumara/reportRoutes");   // a
 const notificationsRoutes = require("./src/routes/member1-kumara/notifications.routes");
 const sensorRoutes = require("./src/routes/member1-kumara/sensor.routes");
 
+// Member 2 Routes
+const evStationRoutes = require("./src/routes/member2-aluthge/evStation.routes");
+const recommendationRoutes = require("./src/routes/member2-aluthge/recommendation.routes");
+const feedbackRoutes = require("./src/routes/member2-aluthge/feedback.routes");
+
 // (Optional) Models: only needed if you rely on auto-index creation or model side-effects.
 // Safe to keep.
 require("./src/models/member1-kumara/RegistrationModel");
@@ -64,6 +69,11 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/seed", seedRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/sensor", sensorRoutes);
+
+// Member 2 Endpoints
+app.use("/api/ev-stations", evStationRoutes);
+app.use("/api/recommendations", recommendationRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 /* ===========================
    Health + Root

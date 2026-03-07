@@ -12,7 +12,14 @@ import Hero from './components/shared/Hero';
 import AdminQRView from './components/member3-oshada/AdminQRView';
 import EmployeePortal from './components/member3-oshada/EmployeePortal';
 import LoginPage from './components/member3-oshada/LoginPage';
+import CustomerGuestPage from './components/member2-aluthge/CustomerGuestPage';
+import EVFinder from './components/member2-aluthge/EVFinder';
+import FuelFinder from './components/member2-aluthge/FuelFinder';
 import StaffPrediction from './components/member3-oshada/StaffPrediction';
+import SmartRecommendationAdmin from './components/member2-aluthge/admin/SmartRecommendationAdmin';
+import StationMap from './components/member2-aluthge/admin/StationMap';
+import NavigationMap from './components/member2-aluthge/NavigationMap';
+import EVStationPortal from './components/member2-aluthge/admin/EVStationPortal';
 
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
@@ -54,7 +61,14 @@ function App() {
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
               <Route path="/admin-qr" element={<AdminQRView />} />
               <Route path="/employee-portal" element={<EmployeePortal />} />
+              <Route path="/customer" element={<CustomerGuestPage />} />
+              <Route path="/ev-station" element={<EVFinder />} />
+              <Route path="/fuel-station" element={<FuelFinder />} />
+              <Route path="/navigate" element={<NavigationMap />} />
               <Route path="/staff-prediction" element={<StaffPrediction />} />
+              <Route path="/recommendation" element={<SmartRecommendationAdmin />} />
+              <Route path="/ev-portal" element={<EVStationPortal />} />
+              <Route path="/station-map" element={<StationMap />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />
             </Routes>
