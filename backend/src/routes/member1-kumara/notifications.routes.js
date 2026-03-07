@@ -98,10 +98,12 @@ router.post("/send-manual", async (req, res) => {
       return res.status(404).json({ error: "Station not found for this station_id" });
     }
 
-    // 2) get manager email from station
-    const toEmail = (station.manager_email || "").trim().toLowerCase();
+    // 2) get email from station contacts
+    const toEmail = (station?.person?.PersonEmail || "").trim().toLowerCase();
     if (!toEmail) {
-      return res.status(400).json({ error: "manager_email not found for this station" });
+      return res.status(400).json({
+      error: "Contact person email (person.PersonEmail) not found for this station",
+      });
     }
 
     // 3) send email
