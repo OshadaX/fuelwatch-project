@@ -1,0 +1,86 @@
+// src/controllers/member1-kumara/sensor.controller.js
+const SensorTest = require("../../models/member1-kumara/SensorTestModel");
+const { computeHealthFeatures } = require("../../utils/healthFeatures");
+
+// Simple distance->fuel (replace with your calibration module if you already have it)
+function distanceToFuel(distanceCm, tankCapacityL) {
+  const tankHeightCm = 30;
+  const filledRatio = Math.max(
+    0,
+    Math.min(1, (tankHeightCm - distanceCm) / tankHeightCm)
+  );
+  return Number((filledRatio * tankCapacityL).toFixed(1));
+}
+
+exports.runSensorTest = async (req, res) => {
+  try {
+    const { stationId, tankCapacity, samples, reading } = req.body;
+
+    if (!stationId || !tankCapacity) {
+      return res
+        .status(400)
+        .json({ message: "stationId and tankCapacity required" });
+    }
+
+    // ✅ Accept burst samples from ESP32 OR single reading (compat)
+    let burst = [];
+    if (Array.isArray(samples) && samples.length > 0) {
+      burst = samples.map(Number);
+    } else if (Number.isFinite(reading)) {
+      burst = [Number(reading)];
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Provide samples[] or reading" });
+    }
+
+    // ✅ Health Features (Research grade)
+    const health = computeHealthFeatures(burst);
+
+    const status = health.validCount < 5 ? "FAILED" : "OK";
+    const message =
+      status === "OK"
+        ? "✅ Test completed (health features computed)"
+        : "❌ Test failed (too few valid samples)";
+
+    const distance = health.medianDistance ?? 0;
+    const fuelLevel = status === "OK" ? distanceToFuel(distance, tankCapacity) : 0;
+
+    // ✅ Save to Mongo (USE SensorTest MODEL)
+    const doc = await SensorTest.create({
+      stationId,
+      tankCapacity,
+      raw: { sampleCount: burst.length, samples: burst },
+      health,
+      reading: distance,
+      fuelLevel,
+      status,
+      message,
+      timestamp: new Date()
+    });
+
+    return res.json({
+      message: doc.message,
+      status: doc.status,
+      stationId: doc.stationId,
+      tankCapacity: doc.tankCapacity,
+      reading: doc.reading,
+      fuelLevel: doc.fuelLevel,
+      health: doc.health,
+      timestamp: doc.timestamp
+    });
+  } catch (err) {
+    console.error("runSensorTest error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getSensorLogs = async (req, res) => {
+  try {
+    const logs = await SensorTest.find().sort({ timestamp: -1 }).limit(500);
+    return res.json(logs);
+  } catch (err) {
+    console.error("getSensorLogs error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

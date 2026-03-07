@@ -1,136 +1,173 @@
 const Station = require("../../models/member1-kumara/StationModel");
 
-const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "");
-
-async function createStation(req, res, next) {
+// ================================
+// CREATE
+// POST /api/station
+// ================================
+const createStation = async (req, res) => {
   try {
-    const { Id, Name, Location, person, tanks } = req.body;
+    const payload = req.body || {};
 
-    if (!Id || !Name || !Location) {
+    // ✅ Get manager email from frontend (logged-in user)
+    if (!payload.manager_email) {
       return res.status(400).json({
-        message: "Station Id, Name and Location are required",
+        ok: false,
+        message: "manager_email is required",
       });
     }
 
-    const stationId = Id.trim().toUpperCase();
+    payload.manager_email = String(payload.manager_email).toLowerCase().trim();
 
-    // ❗ Pre-check for better UX
-    const exists = await Station.findOne({ Id: stationId });
-    if (exists) {
-      return res.status(409).json({
-        message: `Station with ID ${stationId} already exists`,
-      });
-    }
+    // Basic validations
+    if (!payload.Id) return res.status(400).json({ ok: false, message: "Id is required" });
+    if (!payload.Name) return res.status(400).json({ ok: false, message: "Name is required" });
+    if (payload.Address) payload.Address = String(payload.Address).trim();
+    if (!payload.Location) return res.status(400).json({ ok: false, message: "Location is required" });
+    if (!payload.person) return res.status(400).json({ ok: false, message: "person is required" });
 
-    const station = await Station.create({
-      Id: stationId,
-      Name,
-      Location,
-      person,
-      tanks: Array.isArray(tanks) ? tanks : [],
+    const created = await Station.create(payload);
+
+    return res.status(201).json({
+      ok: true,
+      station: created,
+      message: "Station created",
     });
 
-    return res.status(201).json(station);
   } catch (err) {
-    // 🔥 Handles race-condition duplicates
-    if (err.code === 11000) {
+    if (err?.code === 11000) {
       return res.status(409).json({
-        message: "Station ID must be unique",
+        ok: false,
+        message: "Duplicate key error",
+        details: err.keyValue,
       });
     }
-    next(err);
+
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "Server error",
+    });
   }
-}
+};
 
-async function listStations(req, res, next) {
+// ================================
+// LIST
+// GET /api/station
+// ================================
+const listStations = async (_req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || "10", 10), 1), 50);
-    const q = (req.query.q || "").trim();
-
-    const filter = q
-      ? {
-          $or: [
-            { Id: { $regex: q, $options: "i" } },
-            { Name: { $regex: q, $options: "i" } },
-            { Location: { $regex: q, $options: "i" } },
-            { "person.PersonName": { $regex: q, $options: "i" } },
-            { "person.PersonEmail": { $regex: q, $options: "i" } },
-          ],
-        }
-      : {};
-
-    const [items, total] = await Promise.all([
-      Station.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-      Station.countDocuments(filter),
-    ]);
-
-    return res.json({ items, total, page, limit, pages: Math.ceil(total / limit) });
+    const stations = await Station.find().sort({ createdAt: -1 }).lean();
+    return res.json({ ok: true, stations });
   } catch (err) {
-    next(err);
+    return res.status(500).json({ ok: false, message: err.message || "Server error" });
   }
-}
+};
 
-async function getStation(req, res, next) {
+// ================================
+// GET ONE
+// GET /api/station/:id
+// Here :id refers to Station "Id" (not Mongo _id)
+// ================================
+const getStation = async (req, res) => {
   try {
-    const station = await Station.findById(req.params.id);
-    if (!station) return res.status(404).json({ message: "Station not found." });
-    return res.json(station);
-  } catch (err) {
-    next(err);
-  }
-}
+    const id = String(req.params.id || "").trim().toUpperCase();
 
-async function updateStation(req, res, next) {
-  try {
-    const station = await Station.findById(req.params.id);
+    const station = await Station.findOne({ Id: id }).lean();
     if (!station) {
-      return res.status(404).json({ message: "Station not found" });
+      return res.status(404).json({ ok: false, message: "Station not found" });
     }
 
-    const { Id, Name, Location, person, tanks } = req.body;
-
-    if (Id && Id.trim().toUpperCase() !== station.Id) {
-      const newId = Id.trim().toUpperCase();
-      const exists = await Station.findOne({ Id: newId });
-      if (exists) {
-        return res.status(409).json({
-          message: `Station ID ${newId} already exists`,
-        });
-      }
-      station.Id = newId;
-    }
-
-    if (Name !== undefined) station.Name = Name;
-    if (Location !== undefined) station.Location = Location;
-    if (person !== undefined) station.person = person;
-    if (tanks !== undefined) station.tanks = tanks;
-
-    await station.save();
-    return res.json(station);
+    return res.json({ ok: true, station });
   } catch (err) {
-    if (err.code === 11000) {
+    return res.status(500).json({ ok: false, message: err.message || "Server error" });
+  }
+};
+
+// ================================
+// UPDATE
+// PUT /api/station/:id
+// ================================
+const updateStation = async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim().toUpperCase();
+    const updates = req.body || {};
+
+    // Never allow changing primary station Id accidentally
+    delete updates.Id;
+
+    if (updates.manager_email) {
+      updates.manager_email = String(updates.manager_email).toLowerCase().trim();
+    }
+
+    const updated = await Station.findOneAndUpdate(
+      { Id: id },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, message: "Station not found" });
+    }
+
+    return res.json({ ok: true, station: updated, message: "Station updated" });
+  } catch (err) {
+    if (err?.code === 11000) {
       return res.status(409).json({
-        message: "Station ID must be unique",
+        ok: false,
+        message: "Duplicate key error",
+        details: err.keyValue,
       });
     }
-    next(err);
-  }
-}
 
-async function deleteStation(req, res, next) {
-  try {
-    const station = await Station.findById(req.params.id);
-    if (!station) return res.status(404).json({ message: "Station not found." });
-    await station.deleteOne();
-    return res.json({ message: "Deleted successfully." });
-  } catch (err) {
-    next(err);
+    return res.status(500).json({ ok: false, message: err.message || "Server error" });
   }
-}
+};
+
+// ================================
+// DELETE
+// DELETE /api/station/:id
+// ================================
+const deleteStation = async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim().toUpperCase();
+
+    const deleted = await Station.findOneAndDelete({ Id: id });
+    if (!deleted) {
+      return res.status(404).json({ ok: false, message: "Station not found" });
+    }
+
+    return res.json({ ok: true, message: "Station deleted" });
+  } catch (err) {
+    return res.status(500).json({ ok: false, message: err.message || "Server error" });
+  }
+};
+
+// ================================
+// ✅ GET STATION BY MANAGER EMAIL
+// GET /api/station/by-manager/:email
+// ================================
+const getStationByManagerEmail = async (req, res) => {
+  try {
+    const email = String(req.params.email || "").toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ ok: false, message: "email param is required" });
+    }
+
+    const station = await Station.findOne({ manager_email: email }).lean();
+    if (!station) {
+      return res.status(404).json({
+        ok: false,
+        message: "No station registered under this manager email",
+      });
+    }
+
+    return res.json({
+      ok: true,
+      station,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, message: err.message || "Server error" });
+  }
+};
 
 module.exports = {
   createStation,
@@ -138,4 +175,6 @@ module.exports = {
   getStation,
   updateStation,
   deleteStation,
+  getStationByManagerEmail,
 };
+
