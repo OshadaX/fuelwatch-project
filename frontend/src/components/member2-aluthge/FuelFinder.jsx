@@ -114,7 +114,7 @@ const FuelFinder = () => {
             const response = await fetch(`${API_BASE}/station?limit=100`);
             const data = await response.json();
 
-            const stationsList = Array.isArray(data) ? data : (data.items || []);
+            const stationsList = Array.isArray(data) ? data : (data.stations || data.items || []);
 
             // Map the DB Stations into a usable format, assigning mock coordinates built from their location string roughly
             // since actual lat/lng fields don't seem explicitly present on the registration form Schema.

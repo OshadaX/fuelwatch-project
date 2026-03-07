@@ -27,6 +27,7 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
             features: [
                 { name: "Smart Recommendations", path: "/recommendation" },
                 { name: "EV Station Portal", path: "/ev-portal" },
+                { name: "Fuel Station Portal", path: "/fuel-portal" },
                 { name: "Station Map", path: "/station-map" }
             ]
         },

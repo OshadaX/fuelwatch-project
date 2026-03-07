@@ -122,10 +122,30 @@ const EVFinder = () => {
                 console.log("Could not fetch feedback downvotes - continuing normally.");
             }
 
-            const stations = mockStations; // Using mockStations as the source
+            let evPortalData = [];
+            try {
+                const stored = localStorage.getItem('evStations');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    evPortalData = parsed.map(s => ({
+                        id: s.id,
+                        name: s.name,
+                        lat: parseFloat(s.lat) || 0,
+                        lng: parseFloat(s.lng) || 0,
+                        address: s.location || '',
+                        status: s.status === 'Active' ? 'Open' : (s.status === 'Maintenance' ? 'Maintenance' : 'Closed'),
+                        power: s.power,
+                        operator: s.operator,
+                        phone: s.phone
+                    }));
+                }
+            } catch (e) {
+                console.error('Error parsing evStations from localStorage', e);
+            }
+
+            const stations = evPortalData.length > 0 ? evPortalData : mockStations;
 
             const processedStations = stations
-                // .filter(s => plugType ? s.plugTypes.includes(plugType) : true) // plugType not defined in this context
                 .map(station => {
                     let distanceNum = calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng);
                     let isReported = reportedStationNames.find(r => r.name === station.name);
@@ -141,7 +161,6 @@ const EVFinder = () => {
                         distance: distanceNum,
                         originalDistance: originalDistance,
                         wait: `${Math.floor(Math.random() * 15 + 5)} mins`,
-                        status: Math.random() > 0.3 ? 'Available' : 'In Use',
                         reportedIssue: isReported ? isReported.reason : null
                     };
                 })

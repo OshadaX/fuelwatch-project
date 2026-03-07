@@ -20,6 +20,8 @@ import SmartRecommendationAdmin from './components/member2-aluthge/admin/SmartRe
 import StationMap from './components/member2-aluthge/admin/StationMap';
 import NavigationMap from './components/member2-aluthge/NavigationMap';
 import EVStationPortal from './components/member2-aluthge/admin/EVStationPortal';
+import FuelStationPortal from './components/member2-aluthge/admin/FuelStationPortal';
+
 
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
@@ -68,6 +70,7 @@ function App() {
               <Route path="/staff-prediction" element={<StaffPrediction />} />
               <Route path="/recommendation" element={<SmartRecommendationAdmin />} />
               <Route path="/ev-portal" element={<EVStationPortal />} />
+              <Route path="/fuel-portal" element={<FuelStationPortal />} />
               <Route path="/station-map" element={<StationMap />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />
