@@ -5,7 +5,9 @@ const jwt = require('jsonwebtoken');
 // Get all employees
 const getEmployees = async (req, res) => {
     try {
-        const employees = await Employee.find().sort({ createdAt: -1 });
+        const { stationId } = req.query;
+        const query = stationId ? { stationId } : {};
+        const employees = await Employee.find(query).sort({ createdAt: -1 });
         res.status(200).json(employees);
     } catch (error) {
         res.status(500).json({ message: error.message });

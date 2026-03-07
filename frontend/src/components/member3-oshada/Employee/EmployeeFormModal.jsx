@@ -15,7 +15,8 @@ const EmployeeFormModal = ({
     handleCloseModal,
     submitting,
     fetchingPerformance,
-    attendanceHistory
+    attendanceHistory,
+    isStationAdmin
 }) => {
     if (!isModalOpen) return null;
 
@@ -58,24 +59,26 @@ const EmployeeFormModal = ({
 
                     {activeTab === 'general' ? (
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1 ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                                    <MapPin size={12} /> Assigned Station
-                                </label>
-                                <select
-                                    required
-                                    className={`w-full px-4 py-3 rounded-2xl text-sm ${isDark ? 'bg-slate-900/60 border-slate-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500'} border outline-none transition-all ring-2 ring-blue-500/20`}
-                                    value={formData.stationId}
-                                    onChange={(e) => setFormData({ ...formData, stationId: e.target.value })}
-                                >
-                                    <option value="">Select a Station...</option>
-                                    {stations.map((st) => (
-                                        <option key={st._id} value={st.Id || st._id}>
-                                            {st.Name || st.Id || st._id}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            {!isStationAdmin && (
+                                <div className="space-y-2">
+                                    <label className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1 ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                                        <MapPin size={12} /> Assigned Station
+                                    </label>
+                                    <select
+                                        required
+                                        className={`w-full px-4 py-3 rounded-2xl text-sm ${isDark ? 'bg-slate-900/60 border-slate-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500'} border outline-none transition-all ring-2 ring-blue-500/20`}
+                                        value={formData.stationId}
+                                        onChange={(e) => setFormData({ ...formData, stationId: e.target.value })}
+                                    >
+                                        <option value="">Select a Station...</option>
+                                        {stations.map((st) => (
+                                            <option key={st._id} value={st.Id || st._id}>
+                                                {st.Name || st.Id || st._id}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -133,7 +136,7 @@ const EmployeeFormModal = ({
                                         value={formData.role}
                                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                     >
-                                        <option value="admin">Admin</option>
+                                        {!isStationAdmin && <option value="admin">Admin</option>}
                                         <option value="manager">Manager</option>
                                         <option value="employee">Employee</option>
                                     </select>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { RefreshCw, Download, Monitor, Share2, Info, MapPin, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import { useAuth } from '../../../context/AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 
@@ -9,11 +10,18 @@ const AdminQRView = () => {
     const [stationId, setStationId] = useState('');
     const [stations, setStations] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [stationName, setStationName] = useState('');
     const [lastRefreshed, setLastRefreshed] = useState(new Date());
+
+    const { user } = useAuth();
+    const isStationAdmin = user?.role === 'admin';
 
     useEffect(() => {
         fetchStations();
-    }, []);
+        if (isStationAdmin && user.stationId) {
+            setStationId(user.stationId);
+        }
+    }, [user, isStationAdmin]);
 
     const fetchStations = async () => {
         try {
@@ -22,11 +30,12 @@ const AdminQRView = () => {
             const data = response.data?.stations || response.data?.items || response.data?.data || [];
 
             // Ensure data is always an array
-            if (Array.isArray(data)) {
-                setStations(data);
-            } else {
-                console.error("API did not return an array of stations:", response.data);
-                setStations([]);
+            const stationList = Array.isArray(data) ? data : [];
+            setStations(stationList);
+
+            if (isStationAdmin && user.stationId) {
+                const myStation = stationList.find(s => s.Id === user.stationId || s._id === user.stationId);
+                if (myStation) setStationName(myStation.Name);
             }
         } catch (error) {
             console.error('Failed to fetch stations:', error);
@@ -51,39 +60,45 @@ const AdminQRView = () => {
             <div className="max-w-4xl mx-auto">
                 <div className="mb-12">
                     <h1 className="text-4xl font-light text-slate-900 mb-2">Station Check-in QR</h1>
-                    <p className="text-slate-500">Select a station to display its QR code for employee clock-in</p>
+                    <div className="flex items-center gap-2 text-blue-600 font-bold mb-1">
+                        <MapPin size={18} />
+                        {isStationAdmin ? (stationName || "Loading Station...") : (stationId ? stations.find(s => s.Id === stationId || s._id === stationId)?.Name : "No Station Selected")}
+                    </div>
+                    <p className="text-slate-500 text-sm">Official QR code for employee clock-in at this location</p>
                 </div>
 
-                {/* Station Selection */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 mb-8">
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                        <MapPin size={16} className="text-blue-600" />
-                        Select Station Location
-                    </label>
-                    <div className="relative">
-                        <select
-                            value={stationId}
-                            onChange={(e) => {
-                                setStationId(e.target.value);
-                                setLastRefreshed(new Date());
-                            }}
-                            disabled={loading}
-                            className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 py-3 px-4 pr-8 rounded-xl outline-none focus:border-blue-500 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                            <option value="">{loading ? 'Loading stations...' : 'Choose a station...'}</option>
-                            {stations.map((st) => (
-                                <option key={st._id} value={st.Id || st._id}>
-                                    {st.Name || st.Id || st._id}
-                                </option>
-                            ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                            {loading ? <Loader2 size={16} className="animate-spin" /> : (
-                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
-                            )}
+                {/* Station Selection - Hidden for Station Admin */}
+                {!isStationAdmin && (
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 mb-8">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                            <MapPin size={16} className="text-blue-600" />
+                            Select Station Location
+                        </label>
+                        <div className="relative">
+                            <select
+                                value={stationId}
+                                onChange={(e) => {
+                                    setStationId(e.target.value);
+                                    setLastRefreshed(new Date());
+                                }}
+                                disabled={loading}
+                                className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 py-3 px-4 pr-8 rounded-xl outline-none focus:border-blue-500 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                                <option value="">{loading ? 'Loading stations...' : 'Choose a station...'}</option>
+                                {stations.map((st) => (
+                                    <option key={st._id} value={st.Id || st._id}>
+                                        {st.Name || st.Id || st._id}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                {loading ? <Loader2 size={16} className="animate-spin" /> : (
+                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {stationId ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
