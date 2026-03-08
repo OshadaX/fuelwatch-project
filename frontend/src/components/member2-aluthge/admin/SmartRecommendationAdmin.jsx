@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
     CheckCircle, XCircle, Clock, MapPin, Search,
     Filter, FileText, Download, Zap, Fuel, Trash2, AlertCircle,
-    Navigation, Calendar, Milestone, Star
+    Navigation, Calendar, Milestone, Star, BarChart2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 
 const SmartRecommendationAdmin = () => {
     const [activeTab, setActiveTab] = useState('all'); // all | ev | fuel
@@ -110,13 +111,22 @@ const SmartRecommendationAdmin = () => {
                         <h1 className="text-3xl font-bold text-slate-800">Recommendation History</h1>
                         <p className="text-slate-500 mt-1">All past EV &amp; Fuel station recommendations made by users</p>
                     </div>
-                    <button
-                        onClick={exportCSV}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
-                    >
-                        <Download size={18} />
-                        <span>Export CSV</span>
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <Link
+                            to="/crisis-insights"
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-semibold"
+                        >
+                            <BarChart2 size={18} />
+                            <span>Crisis Research Insights</span>
+                        </Link>
+                        <button
+                            onClick={exportCSV}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+                        >
+                            <Download size={18} />
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── Stats ──────────────────────────────────────────── */}

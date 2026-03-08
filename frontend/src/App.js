@@ -21,6 +21,7 @@ import StationMap from './components/member2-aluthge/admin/StationMap';
 import NavigationMap from './components/member2-aluthge/NavigationMap';
 import EVStationPortal from './components/member2-aluthge/admin/EVStationPortal';
 import FuelStationPortal from './components/member2-aluthge/admin/FuelStationPortal';
+import CrisisInsights from './components/member2-aluthge/CrisisInsights';
 
 
 import { useAuth } from './context/AuthContext';
@@ -72,6 +73,7 @@ function App() {
               <Route path="/ev-portal" element={<EVStationPortal />} />
               <Route path="/fuel-portal" element={<FuelStationPortal />} />
               <Route path="/station-map" element={<StationMap />} />
+              <Route path="/crisis-insights" element={<CrisisInsights />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />
             </Routes>
