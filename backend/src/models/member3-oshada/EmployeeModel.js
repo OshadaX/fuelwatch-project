@@ -36,6 +36,10 @@ const EmployeeSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    stationId: {
+        type: String,
+        required: true
+    },
     joinDate: {
         type: String,
         required: true

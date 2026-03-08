@@ -1,5 +1,8 @@
 const mongoose = require("mongoose");
 
+/* ===============================
+   Tank Schema
+================================ */
 const TankSchema = new mongoose.Schema(
   {
     stationId: String,
@@ -11,6 +14,9 @@ const TankSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* ===============================
+   Person Schema
+================================ */
 const PersonSchema = new mongoose.Schema(
   {
     Id: { type: String, required: true },
@@ -24,24 +30,59 @@ const PersonSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* ===============================
+   Station Schema
+================================ */
 const StationSchema = new mongoose.Schema(
   {
+    // Station ID (Unique)
     Id: {
       type: String,
       required: true,
-      unique: true,     // 🔒 DATABASE GUARANTEE
+      unique: true,
       trim: true,
       uppercase: true, // ST-001 == st-001 == St-001
     },
+
     Name: { type: String, required: true },
+
     Location: { type: String, required: true },
+    latitude: { type: Number },
+    longitude: { type: Number },
+
+    // 🔐 Manager who registered this station
+    // Used later to automatically determine station during notifications
+    manager_email: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+
+    // Station responsible person
     person: { type: PersonSchema, required: true },
+
+    // Tank configuration
     tanks: { type: [TankSchema], default: [] },
   },
   { timestamps: true }
 );
 
-// Extra safety index (recommended)
+/* ===============================
+   Indexes
+================================ */
+
+// Unique Station ID
 StationSchema.index({ Id: 1 }, { unique: true });
 
+// Unique Person NIC (VERY IMPORTANT)
+StationSchema.index({ "person.Id": 1 }, { unique: true });
+
+// Manager email index for fast lookup
+StationSchema.index({ manager_email: 1 });
+
+/* ===============================
+   Export Model
+================================ */
 module.exports = mongoose.model("Station", StationSchema);

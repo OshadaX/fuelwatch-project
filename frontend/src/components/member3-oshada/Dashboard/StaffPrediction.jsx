@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import toast, { Toaster } from 'react-hot-toast';
 import {
     Users, Calendar, CloudSun, TrendingUp, RefreshCw,
     Sun, Cloud, CloudRain, CloudLightning, Loader2,
@@ -10,8 +12,11 @@ import {
     ResponsiveContainer, AreaChart, Area, Cell, Legend,
     ComposedChart, Line
 } from 'recharts';
+import { predictStaffBatch } from '../../../services/mlService';
+import { useAuth } from '../../../context/AuthContext';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 
 const StaffPrediction = () => {
     const [predictions, setPredictions] = useState([]);
@@ -21,10 +26,73 @@ const StaffPrediction = () => {
     const [baseDemand, setBaseDemand] = useState(6000);
     const [isDark, setIsDark] = useState(false);
 
+    const { user } = useAuth();
+    const stationId = user?.stationId || '';
+
+    const location = useLocation();
+    const [externalForecast, setExternalForecast] = useState(location.state?.fuelForecast || null);
+    const [selectedFuelType, setSelectedFuelType] = useState("Lanka Petrol 92 Octane");
+    const [availableFuels, setAvailableFuels] = useState([]);
+    const hasInitialized = useRef(false);
+
     useEffect(() => {
+        if (!hasInitialized.current) {
+            hasInitialized.current = true;
+            if (externalForecast) {
+                extractAvailableFuels(externalForecast);
+                fetchExternalPredictions(externalForecast, selectedFuelType);
+            } else {
+                handleInitialLoad();
+            }
+            fetchModelInfo();
+        } else {
+            if (externalForecast) {
+                // When fuel type changes, re-fetch based on the new type
+                fetchExternalPredictions(externalForecast, selectedFuelType);
+            } else {
+                fetchPredictions();
+            }
+        }
+    }, [externalForecast, selectedFuelType]);
+
+    const extractAvailableFuels = (predictionsArray) => {
+        if (predictionsArray && predictionsArray.length > 0) {
+            const firstDay = predictionsArray[0];
+            const fuels = Object.keys(firstDay).filter(key => key !== 'Date' && key !== 'createdAt' && key !== 'updatedAt' && key !== '_id');
+            setAvailableFuels(fuels);
+        }
+    };
+
+    const processForecastForFuelType = (predictionsArray, fuelType) => {
+        return predictionsArray.map(day => ({
+            Date: day.Date,
+            [fuelType]: day[fuelType] || 0
+        }));
+    };
+
+    const handleInitialLoad = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Attempt to get Member 1's latest prediction
+            const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/latest`, {
+                params: { stationId: 'STATION_001' }
+            });
+
+            if (response.data?.ok && response.data?.data?.predictions) {
+                const latestPredictions = response.data.data.predictions;
+                extractAvailableFuels(latestPredictions);
+                setExternalForecast(latestPredictions);
+                return; // Let the useEffect trigger fetchExternalPredictions
+            }
+        } catch (e) {
+            console.log("Could not auto-sync with Member 1 on load, falling back to base forecast", e);
+        }
+
+        // Fallback to Member 3's independent forecast if Member 1 data is unavailable
         fetchPredictions();
-        fetchModelInfo();
-    }, []);
+    };
 
     const fetchPredictions = async () => {
         try {
@@ -41,6 +109,73 @@ const StaffPrediction = () => {
         } catch (err) {
             console.error('Error fetching predictions:', err);
             setError(err.message || 'Failed to connect to ML service');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchExternalPredictions = async (forecastData, fuelType) => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            if (!forecastData) return;
+
+            const filteredForecast = processForecastForFuelType(forecastData, fuelType);
+
+            // Call the batch prediction service with Member 1's daily data
+            const data = await predictStaffBatch(filteredForecast);
+
+            if (data.ok) {
+                setPredictions(data.predictions);
+                toast.success(`Analyzing impact of Member 1 Fuel Forecast (${fuelType})`);
+            } else {
+                setError('Failed to process external forecast data');
+            }
+        } catch (err) {
+            console.error('Error processing external forecast:', err);
+            setError('Staffing service unavailable for batch processing');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReset = () => {
+        setExternalForecast(null);
+        setSelectedFuelType("Lanka Petrol 92 Octane"); // Reset default
+    };
+
+    const handleSyncWithMember1 = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // 1. Fetch latest fuel prediction from backend
+            const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/latest`, {
+                params: { stationId: 'STATION_001' } // Matches Member 1's save logic
+            });
+
+            if (response.data.ok && response.data.data.predictions) {
+                const latestPredictions = response.data.data.predictions;
+                extractAvailableFuels(latestPredictions);
+                const filteredForecast = processForecastForFuelType(latestPredictions, selectedFuelType);
+
+                // 2. Pass to STAFF ML service
+                const staffData = await predictStaffBatch(filteredForecast);
+
+                if (staffData.ok) {
+                    setPredictions(staffData.predictions);
+                    setExternalForecast(latestPredictions);
+                    toast.success(`Successfully synced with Member 1 Fuel Forecast (${selectedFuelType})`);
+                } else {
+                    setError('Staffing service failed to process synced data');
+                }
+            } else {
+                setError('No fuel predictions found to sync');
+            }
+        } catch (err) {
+            console.error('Error syncing with Member 1:', err);
+            setError('Failed to sync with Member 1. Check if backend is running.');
         } finally {
             setLoading(false);
         }
@@ -112,6 +247,7 @@ const StaffPrediction = () => {
 
     return (
         <div className={`min-h-screen transition-colors duration-500 ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-slate-50 to-slate-100'} p-6 md:p-12`}>
+            <Toaster position="top-right" />
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-12">
@@ -142,6 +278,60 @@ const StaffPrediction = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Sync Button */}
+                <div className="mb-8 flex justify-end">
+                    <button
+                        onClick={handleSyncWithMember1}
+                        disabled={loading}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 ${isDark
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20'
+                            : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+                            }`}
+                    >
+                        <TrendingUp size={18} className={loading ? 'animate-spin' : ''} />
+                        Sync with Member 1 Forecast
+                    </button>
+                </div>
+
+                {/* External Forecast Source Indicator */}
+                {externalForecast && (
+                    <div className={`mb-8 p-6 rounded-[2rem] ${isDark ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'} border flex flex-col md:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-500`}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                                <TrendingUp size={24} />
+                            </div>
+                            <div>
+                                <h3 className={`font-semibold ${isDark ? 'text-blue-300' : 'text-blue-900'}`}>Live Data Source</h3>
+                                <p className={`text-sm ${isDark ? 'text-blue-400/80' : 'text-blue-700/80'}`}>
+                                    Showing staffing requirements derived from <strong>Member 1: Fuel Demand Forecast</strong>
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {availableFuels.length > 0 && (
+                                <select
+                                    value={selectedFuelType}
+                                    onChange={(e) => setSelectedFuelType(e.target.value)}
+                                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border outline-none ${isDark
+                                        ? 'bg-slate-800 text-white border-slate-700 focus:border-blue-500'
+                                        : 'bg-white text-blue-900 border-blue-200 focus:border-blue-500'
+                                        }`}
+                                >
+                                    {availableFuels.map(fuel => (
+                                        <option key={fuel} value={fuel}>{fuel}</option>
+                                    ))}
+                                </select>
+                            )}
+                            <button
+                                onClick={handleReset}
+                                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${isDark ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
+                            >
+                                Reset to Standard Forecast
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Model Info Badge */}
                 {modelInfo && (

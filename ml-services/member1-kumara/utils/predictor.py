@@ -221,6 +221,11 @@ class FuelDemandPredictor:
 
             seq = np.vstack([seq[1:], next_feat_scaled])
 
+        from datetime import date
+        today = pd.Timestamp(date.today())
+        for i, p in enumerate(preds):
+            p["Date"] = today + pd.Timedelta(days=i + 1)
+
         return pd.DataFrame(preds)
 
     def predict_mode(self, history_df: pd.DataFrame, mode: str, fuel_filter=None) -> dict:

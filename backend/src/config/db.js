@@ -1,19 +1,46 @@
+// ./src/config/db.js
 const mongoose = require("mongoose");
+mongoose.set("bufferTimeoutMS", 0);
+
 
 const connectDB = async () => {
   try {
-    if (!process.env.MONGODB_URI) {
-      throw new Error("MONGODB_URI not found in .env file");
+    const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+    if (!uri) {
+      throw new Error("Neither MONGODB_URI nor MONGO_URI found in .env file");
     }
 
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 15000,
+    // Connect to MongoDB Atlas
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 30000,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      tls: true, // Required for Atlas
     });
 
-    console.log(`✅ MongoDB connected: ${conn.connection.host}`);
+    console.log("Mongoose connected");
+    console.log(`MongoDB connected: ${conn.connection.host}`);
+    console.log("Connected DB name:", mongoose.connection.name);
+
+    // Connection event listeners
+    mongoose.connection.on("disconnected", () => {
+      console.log("Mongoose disconnected");
+    });
+
+    mongoose.connection.on("error", (err) => {
+      console.error("Mongoose connection error:", err.message);
+    });
+
+    return conn;
   } catch (err) {
-    console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
+    console.error("MongoDB connection failed:", err.message);
+
+    if (process.env.NODE_ENV === "production") {
+      process.exit(1);
+    }
+
+    throw err;
   }
 };
 
