@@ -13,6 +13,7 @@ import {
     ComposedChart, Line
 } from 'recharts';
 import { predictStaffBatch } from '../../../services/mlService';
+import { useAuth } from '../../../context/AuthContext';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
@@ -24,6 +25,9 @@ const StaffPrediction = () => {
     const [modelInfo, setModelInfo] = useState(null);
     const [baseDemand, setBaseDemand] = useState(6000);
     const [isDark, setIsDark] = useState(false);
+
+    const { user } = useAuth();
+    const stationId = user?.stationId || '';
 
     const location = useLocation();
     const [externalForecast, setExternalForecast] = useState(location.state?.fuelForecast || null);
@@ -310,8 +314,8 @@ const StaffPrediction = () => {
                                     value={selectedFuelType}
                                     onChange={(e) => setSelectedFuelType(e.target.value)}
                                     className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border outline-none ${isDark
-                                            ? 'bg-slate-800 text-white border-slate-700 focus:border-blue-500'
-                                            : 'bg-white text-blue-900 border-blue-200 focus:border-blue-500'
+                                        ? 'bg-slate-800 text-white border-slate-700 focus:border-blue-500'
+                                        : 'bg-white text-blue-900 border-blue-200 focus:border-blue-500'
                                         }`}
                                 >
                                     {availableFuels.map(fuel => (

@@ -124,23 +124,23 @@ const AdminManagement = () => {
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-[#121216] border border-white/5 p-6 rounded-3xl">
+                <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Administrators</p>
-                    <div className="text-3xl font-bold tracking-tighter">{loading ? '...' : admins.length}</div>
+                    <div className="text-3xl font-bold tracking-tighter text-slate-800">{loading ? '...' : admins.length}</div>
                 </div>
-                <div className="bg-[#121216] border border-white/5 p-6 rounded-3xl">
+                <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Managed Stations</p>
-                    <div className="text-3xl font-bold tracking-tighter">{loading ? '...' : stations.length}</div>
+                    <div className="text-3xl font-bold tracking-tighter text-slate-800">{loading ? '...' : stations.length}</div>
                 </div>
-                <div className="bg-[#121216] border border-white/5 p-6 rounded-3xl">
+                <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Active Sessions</p>
-                    <div className="text-3xl font-bold tracking-tighter">Live</div>
+                    <div className="text-3xl font-bold tracking-tighter text-slate-800">Live</div>
                 </div>
             </div>
 
             {/* Search & Table */}
-            <div className="bg-[#121216] border border-white/5 rounded-[32px] overflow-hidden">
-                <div className="p-8 border-b border-white/5 flex items-center justify-between">
+            <div className="bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-sm">
+                <div className="p-8 border-b border-slate-200 flex items-center justify-between">
                     <div className="relative group w-72">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input
@@ -148,7 +148,7 @@ const AdminManagement = () => {
                             placeholder="Filter by name, email or station..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-xs text-white focus:border-blue-500/30 transition-all outline-none"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-12 pr-4 text-xs text-slate-800 focus:border-blue-500/50 transition-all outline-none"
                         />
                     </div>
                 </div>
@@ -156,7 +156,7 @@ const AdminManagement = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                         <thead>
-                            <tr className="bg-white/5 text-slate-500 font-bold uppercase tracking-wider">
+                            <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
                                 <th className="px-8 py-4">Administrator</th>
                                 <th className="px-8 py-4">Assigned Station</th>
                                 <th className="px-8 py-4">Employee ID</th>
@@ -164,20 +164,20 @@ const AdminManagement = () => {
                                 <th className="px-8 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-slate-100">
                             {loading ? (
                                 <tr><td colSpan="5" className="px-8 py-20 text-center text-slate-500">Loading administrators...</td></tr>
                             ) : filteredAdmins.length === 0 ? (
                                 <tr><td colSpan="5" className="px-8 py-20 text-center text-slate-500">No administrators found matching criteria.</td></tr>
                             ) : filteredAdmins.map((admin) => (
-                                <tr key={admin._id} className="hover:bg-white/[0.02] transition-colors group">
+                                <tr key={admin._id} className="hover:bg-slate-50 transition-colors group">
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center font-bold text-blue-500">
+                                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center font-bold text-blue-600">
                                                 {admin.avatar || admin.name.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-white mb-0.5">{admin.name}</p>
+                                                <p className="font-bold text-slate-900 mb-0.5">{admin.name}</p>
                                                 <p className="text-[10px] text-slate-500 flex items-center gap-1">
                                                     <Mail size={10} /> {admin.email}
                                                 </p>
@@ -187,10 +187,10 @@ const AdminManagement = () => {
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2">
                                             <MapPin size={12} className="text-slate-500" />
-                                            <span className="text-slate-300 font-semibold">{getStationName(admin.stationId)}</span>
+                                            <span className="text-slate-700 font-semibold">{getStationName(admin.stationId)}</span>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5 text-slate-400 font-mono">{admin.employeeId}</td>
+                                    <td className="px-8 py-5 text-slate-600 font-mono">{admin.employeeId}</td>
                                     <td className="px-8 py-5 text-slate-500">{new Date(admin.createdAt).toLocaleDateString()}</td>
                                     <td className="px-8 py-5 text-right">
                                         <button
@@ -210,17 +210,17 @@ const AdminManagement = () => {
             {/* Create Admin Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-[#0a0a0c]/95 backdrop-blur-md" onClick={() => !submitting && setIsModalOpen(false)}></div>
-                    <div className="relative bg-[#121216] border border-white/10 w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !submitting && setIsModalOpen(false)}></div>
+                    <div className="relative bg-white border border-slate-200 w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
                         <div className="p-10">
                             <div className="flex items-center justify-between mb-10">
                                 <div>
-                                    <h3 className="text-xl font-bold text-white">Provision Station Admin</h3>
+                                    <h3 className="text-xl font-bold text-slate-900">Provision Station Admin</h3>
                                     <p className="text-slate-500 text-xs mt-1">This user will have full administrative rights over their assigned station.</p>
                                 </div>
                                 <button
                                     onClick={() => !submitting && setIsModalOpen(false)}
-                                    className="p-2 bg-white/5 rounded-xl text-slate-400 hover:text-white transition-colors"
+                                    className="p-2 bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
                                 >
                                     <X size={20} />
                                 </button>
@@ -233,7 +233,7 @@ const AdminManagement = () => {
                                         <input
                                             required
                                             type="text"
-                                            className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-blue-500/30 transition-all outline-none"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm text-slate-900 focus:border-blue-500/50 transition-all outline-none"
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="Enter full name"
@@ -244,7 +244,7 @@ const AdminManagement = () => {
                                         <input
                                             readOnly
                                             type="text"
-                                            className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-slate-500 outline-none"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm text-slate-500 outline-none cursor-not-allowed"
                                             value={formData.employeeId}
                                         />
                                     </div>
@@ -255,7 +255,7 @@ const AdminManagement = () => {
                                     <input
                                         required
                                         type="email"
-                                        className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-blue-500/30 transition-all outline-none"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm text-slate-900 focus:border-blue-500/50 transition-all outline-none"
                                         value={formData.email}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                         placeholder="admin@station.com"
@@ -267,7 +267,7 @@ const AdminManagement = () => {
                                     <input
                                         required
                                         type="password"
-                                        className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-blue-500/30 transition-all outline-none"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm text-slate-900 focus:border-blue-500/50 transition-all outline-none"
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                         placeholder="Min 6 characters"
@@ -278,7 +278,7 @@ const AdminManagement = () => {
                                     <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Assign to Station</label>
                                     <select
                                         required
-                                        className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-blue-500/30 transition-all outline-none"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm text-slate-900 focus:border-blue-500/50 transition-all outline-none"
                                         value={formData.stationId}
                                         onChange={(e) => setFormData({ ...formData, stationId: e.target.value })}
                                     >

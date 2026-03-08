@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { User, LogIn, LogOut, History, MapPin, Loader2, QrCode, X } from 'lucide-react';
+import { User, LogIn, LogOut, History, MapPin, Loader2, QrCode, X, Calendar, Clock } from 'lucide-react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -12,6 +12,7 @@ const EmployeePortal = () => {
     const { user } = useAuth();
     const [status, setStatus] = useState({ isClockedIn: false, record: null });
     const [history, setHistory] = useState([]);
+    const [mySchedule, setMySchedule] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
     const [manualStationId, setManualStationId] = useState('');
@@ -22,12 +23,23 @@ const EmployeePortal = () => {
         if (user) {
             fetchStatus();
             fetchHistory();
+            fetchMySchedule();
             if (user.stationId) {
                 fetchAssignedStation(user.stationId);
             }
             setLoading(false);
         }
     }, [user]);
+
+    const fetchMySchedule = async () => {
+        if (!user?._id && !user?.id) return;
+        try {
+            const res = await axios.get(`${API_URL}/shifts/employee/${user._id || user.id}`);
+            setMySchedule(res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch schedule:', err);
+        }
+    };
 
     const fetchAssignedStation = async (stationId) => {
         try {
@@ -312,6 +324,56 @@ const EmployeePortal = () => {
 
                         <div className="p-4 text-center">
                             <p className="text-xs text-slate-400 italic">Secure location verified check-in enforced.</p>
+                        </div>
+
+                        {/* My Schedule */}
+                        <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100">
+                            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
+                                <Calendar className="text-blue-600" size={18} />
+                                My Upcoming Shifts
+                            </h3>
+                            {mySchedule.length === 0 ? (
+                                <div className="text-center py-6">
+                                    <Calendar size={28} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs text-slate-400">No upcoming shifts assigned yet.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {mySchedule.map(s => {
+                                        const shiftColors = {
+                                            Morning: 'bg-amber-50 text-amber-700 border-amber-200',
+                                            Night: 'bg-purple-50 text-purple-700 border-purple-200'
+                                        };
+                                        const colorClass = shiftColors[s.shiftType] || shiftColors.Morning;
+                                        const dateObj = new Date(s.date);
+                                        const isToday = s.date === new Date().toISOString().split('T')[0];
+                                        return (
+                                            <div key={s._id} className={`flex items-center justify-between p-3 rounded-2xl border ${s.status === 'cancelled' ? 'opacity-50' : ''} ${isToday ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-slate-50'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] font-bold uppercase text-slate-400">
+                                                            {dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
+                                                        </p>
+                                                        <p className="text-sm font-bold text-slate-800">
+                                                            {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${colorClass}`}>
+                                                        {s.shiftType}
+                                                    </span>
+                                                    {isToday && (
+                                                        <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">TODAY</span>
+                                                    )}
+                                                </div>
+                                                <span className={`text-[10px] font-black uppercase tracking-wider 
+                                                    ${s.status === 'confirmed' ? 'text-emerald-500' : s.status === 'cancelled' ? 'text-red-400' : 'text-slate-400'}`}>
+                                                    {s.status}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
 

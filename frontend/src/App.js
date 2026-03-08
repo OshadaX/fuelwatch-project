@@ -13,6 +13,7 @@ import AdminQRView from './components/member3-oshada/Admin/AdminQRView';
 import EmployeePortal from './components/member3-oshada/Employee/EmployeePortal';
 import LoginPage from './components/member3-oshada/Auth/LoginPage';
 import StaffPrediction from './components/member3-oshada/Dashboard/StaffPrediction';
+import ShiftSchedulerPage from './components/member3-oshada/Dashboard/ShiftSchedulerPage';
 import StationsView from './components/member3-oshada/Station/StationsView';
 import SuperAdminDashboard from './components/member3-oshada/Admin/SuperAdminDashboard';
 
@@ -63,6 +64,7 @@ function App() {
               <Route path="/admin-qr" element={<AdminQRView />} />
               <Route path="/employee-portal" element={<EmployeePortal />} />
               <Route path="/staff-prediction" element={<StaffPrediction />} />
+              <Route path="/shift-scheduler" element={<ShiftSchedulerPage />} />
               <Route path="/stations" element={<StationsView />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />

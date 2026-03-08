@@ -139,42 +139,48 @@ const SuperAdminDashboard = () => {
         .slice(0, 5);
 
     return (
-        <div className="flex h-screen bg-[#0f1115] text-slate-200 overflow-hidden font-sans">
+        <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden font-sans">
             {/* --- LEFT NAVIGATION (MINIMAL) --- */}
-            <div className="w-20 border-r border-white/5 flex flex-col items-center py-8 gap-10 bg-[#0a0a0c]">
+            <div className="w-20 border-r border-slate-200 flex flex-col items-center py-8 gap-10 bg-white">
                 <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
                     <Fuel className="text-white w-6 h-6" />
                 </div>
                 <div className="flex flex-col gap-8">
                     <button
-                        onClick={() => document.getElementById('global-map')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="p-3 text-slate-500 hover:text-white transition-colors"
+                        onClick={() => {
+                            setActiveSection('dashboard');
+                            setTimeout(() => document.getElementById('global-map')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                        }}
+                        className={`p-3 transition-all ${activeSection === 'dashboard' ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'} rounded-xl`}
                         title="Global Map"
                     >
                         <Layers size={20} />
                     </button>
                     <button
-                        onClick={() => document.getElementById('inventory-table')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="p-3 text-slate-500 hover:text-white transition-colors"
+                        onClick={() => {
+                            setActiveSection('dashboard');
+                            setTimeout(() => document.getElementById('inventory-table')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                        }}
+                        className={`p-3 transition-all ${activeSection === 'dashboard' ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'} rounded-xl`}
                         title="Inventory Table"
                     >
                         <BarChart3 size={20} />
                     </button>
                     <button
                         onClick={() => setActiveSection('admins')}
-                        className={`p-3 transition-all ${activeSection === 'admins' ? 'text-blue-500 bg-blue-500/10' : 'text-slate-500 hover:text-white'} rounded-xl`}
+                        className={`p-3 transition-all ${activeSection === 'admins' ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-blue-600'} rounded-xl`}
                         title="Admin Management"
                     >
                         <Shield size={20} />
                     </button>
                     <button
                         onClick={() => setActiveSection('dashboard')}
-                        className={`p-3 transition-all ${activeSection === 'dashboard' ? 'text-blue-500 bg-blue-500/10' : 'text-slate-500 hover:text-white'} rounded-xl`}
+                        className={`p-3 transition-all ${activeSection === 'dashboard' ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-blue-600'} rounded-xl`}
                         title="Network Stats"
                     >
                         <Activity size={20} />
                     </button>
-                    <button className="p-3 text-slate-500 hover:text-white transition-colors" title="Notifications"><Bell size={20} /></button>
+                    <button className="p-3 text-slate-400 hover:text-blue-600 transition-colors" title="Notifications"><Bell size={20} /></button>
                 </div>
                 <button
                     onClick={() => { logout(); navigate('/login'); }}
@@ -187,26 +193,26 @@ const SuperAdminDashboard = () => {
             {/* --- MAIN CONTENT --- */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header */}
-                <header className="h-20 border-b border-white/5 px-8 flex items-center justify-between bg-[#0a0a0c]/50 backdrop-blur-md">
+                <header className="h-20 border-b border-slate-200 px-8 flex items-center justify-between bg-white/80 backdrop-blur-md">
                     <div>
-                        <h1 className="text-xl font-bold tracking-tight flex items-center gap-3">
-                            Super Admin <span className="text-xs px-2 py-1 bg-white/5 border border-white/10 rounded text-slate-500 font-mono">NETWORK_OVERVIEW</span>
+                        <h1 className="text-xl font-bold tracking-tight flex items-center gap-3 text-slate-900">
+                            Super Admin <span className="text-xs px-2 py-1 bg-slate-100 border border-slate-200 rounded text-slate-600 font-mono">NETWORK_OVERVIEW</span>
                         </h1>
                         <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] mt-1 font-bold">Global Fuel Logistics Command</p>
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                            <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">Live System Connected</span>
+                            <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Live System Connected</span>
                         </div>
-                        <div className="h-8 w-[1px] bg-white/5"></div>
+                        <div className="h-8 w-[1px] bg-slate-200"></div>
                         <div className="flex items-center gap-3">
                             <div className="text-right">
-                                <p className="text-xs font-bold">Network Admin</p>
+                                <p className="text-xs font-bold text-slate-800">Network Admin</p>
                                 <p className="text-[10px] text-slate-500">Master Account</p>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-slate-700 to-slate-800 border border-white/10 flex items-center justify-center font-bold text-xs">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-slate-700 shadow-sm">
                                 SA
                             </div>
                         </div>
@@ -226,34 +232,34 @@ const SuperAdminDashboard = () => {
                                     { label: 'Low Stock', value: stats.low, icon: <Activity />, color: 'amber' },
                                     { label: 'Healthy Supply', value: stats.healthy, icon: <MapPin />, color: 'emerald' }
                                 ].map((s, i) => (
-                                    <div key={i} className="bg-[#121216] border border-white/5 p-6 rounded-3xl relative overflow-hidden group">
+                                    <div key={i} className="bg-white border border-slate-200 shadow-sm p-6 rounded-3xl relative overflow-hidden group">
                                         <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity text-${s.color}-500`}>
                                             {React.cloneElement(s.icon, { size: 64 })}
                                         </div>
                                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{s.label}</p>
-                                        <div className="text-3xl font-bold tracking-tighter">{loading ? '...' : s.value}</div>
+                                        <div className="text-3xl font-bold tracking-tighter text-slate-800">{loading ? '...' : s.value}</div>
                                     </div>
                                 ))}
                             </div>
 
                             <div className="grid grid-cols-3 gap-8">
                                 {/* Map View */}
-                                <div id="global-map" className="col-span-2 h-[600px] bg-[#121216] border border-white/5 rounded-[32px] overflow-hidden relative shadow-2xl">
+                                <div id="global-map" className="col-span-2 h-[600px] bg-white border border-slate-200 rounded-[32px] overflow-hidden relative shadow-md">
                                     <div className="absolute top-6 left-6 z-[100] flex gap-2">
-                                        <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 text-xs font-bold flex items-center gap-2">
+                                        <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-200 text-xs font-bold flex items-center gap-2 text-slate-800 shadow-sm">
                                             <MapPin size={14} className="text-blue-500" />
                                             {viewMode === 'network' ? 'Global Network Visualization' : 'Regional Revenue Analytics'}
                                         </div>
-                                        <div className="flex bg-black/60 backdrop-blur-md p-1 rounded-2xl border border-white/10 ml-2">
+                                        <div className="flex bg-white/90 backdrop-blur-md p-1 rounded-2xl border border-slate-200 ml-2 shadow-sm">
                                             <button
                                                 onClick={() => setViewMode('network')}
-                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${viewMode === 'network' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-white'}`}
+                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${viewMode === 'network' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Network
                                             </button>
                                             <button
                                                 onClick={() => setViewMode('revenue')}
-                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${viewMode === 'revenue' ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20' : 'text-slate-500 hover:text-white'}`}
+                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${viewMode === 'revenue' ? 'bg-orange-600 text-white shadow-md shadow-orange-500/20' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Revenue
                                             </button>
@@ -267,7 +273,7 @@ const SuperAdminDashboard = () => {
                                         zoomControl={false}
                                     >
                                         <TileLayer
-                                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                                            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                                             attribution='&copy; CARTO'
                                         />
 
@@ -319,7 +325,7 @@ const SuperAdminDashboard = () => {
                                         )}
                                     </MapContainer>
 
-                                    <div className="absolute bottom-6 left-6 z-[100] bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex gap-4 items-center">
+                                    <div className="absolute bottom-6 left-6 z-[100] bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-slate-200 flex gap-4 items-center shadow-sm text-slate-800">
                                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
                                             <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Normal
                                         </div>
@@ -334,8 +340,8 @@ const SuperAdminDashboard = () => {
 
                                 {/* Recent Alerts & Filtering */}
                                 <div className="col-span-1 space-y-6 flex flex-col">
-                                    <div className="bg-[#121216] border border-white/5 p-8 rounded-[32px] flex flex-col gap-6">
-                                        <h3 className="text-sm font-bold flex items-center gap-2">
+                                    <div className="bg-white border border-slate-200 p-8 rounded-[32px] flex flex-col gap-6 shadow-sm">
+                                        <h3 className="text-sm font-bold flex items-center gap-2 text-slate-800">
                                             <Filter size={16} className="text-blue-500" /> Filter & Control
                                         </h3>
 
@@ -347,7 +353,7 @@ const SuperAdminDashboard = () => {
                                                     placeholder="Search network..."
                                                     value={searchTerm}
                                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                                    className="w-full bg-[#1c1c21] border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-xs text-white focus:border-blue-500/30 transition-all outline-none"
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-12 pr-4 text-xs text-slate-800 focus:border-blue-500/50 transition-all outline-none"
                                                 />
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
@@ -355,7 +361,7 @@ const SuperAdminDashboard = () => {
                                                     <button
                                                         key={f}
                                                         onClick={() => setFilterStatus(f)}
-                                                        className={`py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${filterStatus === f ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/5 border-white/5 text-slate-500 hover:border-white/10'}`}
+                                                        className={`py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${filterStatus === f ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'}`}
                                                     >
                                                         {f}
                                                     </button>
@@ -364,20 +370,20 @@ const SuperAdminDashboard = () => {
                                         </div>
                                     </div>
 
-                                    <div className="bg-red-500/5 border border-red-500/10 p-8 rounded-[32px] flex-1">
+                                    <div className="bg-red-50/50 border border-red-100 p-8 rounded-[32px] flex-1">
                                         <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-sm font-bold text-red-500 flex items-center gap-2">
+                                            <h3 className="text-sm font-bold text-red-600 flex items-center gap-2">
                                                 <AlertTriangle size={16} /> Critical Stock Alerts
                                             </h3>
-                                            <span className="text-[10px] px-2 py-1 bg-red-500 text-white rounded font-bold">{criticalAlerts.length}</span>
+                                            <span className="text-[10px] px-2 py-1 bg-red-100 text-red-600 rounded font-bold">{criticalAlerts.length}</span>
                                         </div>
                                         <div className="space-y-4">
-                                            {loading ? [1, 2, 3].map(i => <div key={i} className="h-16 bg-white/5 animate-pulse rounded-2xl"></div>) :
+                                            {loading ? [1, 2, 3].map(i => <div key={i} className="h-16 bg-slate-200 animate-pulse rounded-2xl"></div>) :
                                                 criticalAlerts.length > 0 ? criticalAlerts.map((st, i) => (
-                                                    <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all cursor-pointer">
+                                                    <div key={i} className="p-4 bg-white rounded-2xl border border-red-100 group hover:border-red-200 transition-all cursor-pointer shadow-sm">
                                                         <div className="flex justify-between items-start">
                                                             <div>
-                                                                <p className="text-xs font-bold text-slate-200">{st.Name}</p>
+                                                                <p className="text-xs font-bold text-slate-800">{st.Name}</p>
                                                                 <p className="text-[10px] text-slate-500 mt-0.5">{st.Location}</p>
                                                             </div>
                                                             <div className="text-red-500">
@@ -403,9 +409,9 @@ const SuperAdminDashboard = () => {
                             </div>
 
                             {/* Station Table */}
-                            <div id="inventory-table" className="mt-8 bg-[#121216] border border-white/5 rounded-[32px] overflow-hidden">
-                                <div className="p-8 border-b border-white/5 flex items-center justify-between">
-                                    <h3 className="text-sm font-bold flex items-center gap-2">
+                            <div id="inventory-table" className="mt-8 bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-sm">
+                                <div className="p-8 border-b border-slate-200 flex items-center justify-between">
+                                    <h3 className="text-sm font-bold flex items-center gap-2 text-slate-800">
                                         <Package size={16} className="text-blue-500" /> Network Status Inventory
                                     </h3>
                                     <button className="text-[10px] font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1">
@@ -415,7 +421,7 @@ const SuperAdminDashboard = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-xs">
                                         <thead>
-                                            <tr className="bg-white/5 text-slate-500 font-bold uppercase tracking-wider">
+                                            <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
                                                 <th className="px-8 py-4">Station ID / Name</th>
                                                 <th className="px-8 py-4">Network Node</th>
                                                 <th className="px-8 py-4">Petrol (92/95)</th>
@@ -424,18 +430,18 @@ const SuperAdminDashboard = () => {
                                                 <th className="px-8 py-4 text-right">Status</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-white/5">
+                                        <tbody className="divide-y divide-slate-100">
                                             {loading ? (
                                                 <tr><td colSpan="6" className="px-8 py-20 text-center text-slate-600 font-medium">Scanning network assets...</td></tr>
                                             ) : filteredStations.map((st, i) => {
                                                 const info = getStockInfo(st.Id);
                                                 return (
-                                                    <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
+                                                    <tr key={i} className="hover:bg-slate-50 transition-colors group">
                                                         <td className="px-8 py-5">
-                                                            <p className="font-bold text-white group-hover:text-blue-400 transition-colors">{st.Name}</p>
+                                                            <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{st.Name}</p>
                                                             <p className="text-[10px] text-slate-500 font-mono mt-0.5">{st.Id}</p>
                                                         </td>
-                                                        <td className="px-8 py-5 text-slate-400">
+                                                        <td className="px-8 py-5 text-slate-600">
                                                             <div className="flex flex-col">
                                                                 <span>{st.Location}</span>
                                                                 {(!st.latitude || !st.longitude) && (
@@ -449,9 +455,9 @@ const SuperAdminDashboard = () => {
                                                             <div className="flex flex-col gap-1.5 min-w-[120px]">
                                                                 <div className="flex justify-between font-mono text-[9px] text-slate-500 uppercase">
                                                                     <span>92 Octane</span>
-                                                                    <span className={info.petrol < 15 ? 'text-red-500' : 'text-slate-300'}>{info.petrol}%</span>
+                                                                    <span className={info.petrol < 15 ? 'text-red-500' : 'text-slate-700'}>{info.petrol}%</span>
                                                                 </div>
-                                                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                                                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                                                                     <div className={`h-full rounded-full ${info.petrol < 15 ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${info.petrol}%` }}></div>
                                                                 </div>
                                                             </div>
@@ -460,15 +466,15 @@ const SuperAdminDashboard = () => {
                                                             <div className="flex flex-col gap-1.5 min-w-[120px]">
                                                                 <div className="flex justify-between font-mono text-[9px] text-slate-500 uppercase">
                                                                     <span>Auto Diesel</span>
-                                                                    <span className={info.diesel < 15 ? 'text-red-500' : 'text-slate-300'}>{info.diesel}%</span>
+                                                                    <span className={info.diesel < 15 ? 'text-red-500' : 'text-slate-700'}>{info.diesel}%</span>
                                                                 </div>
-                                                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                                                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
                                                                     <div className={`h-full rounded-full ${info.diesel < 15 ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${info.diesel}%` }}></div>
                                                                 </div>
                                                             </div>
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <p className="text-slate-200">{st.person?.PersonName || 'No Manager'}</p>
+                                                            <p className="text-slate-800 font-medium">{st.person?.PersonName || 'No Manager'}</p>
                                                             <p className="text-[10px] text-slate-500 mt-0.5">{st.person?.ContactNumber || 'N/A'}</p>
                                                         </td>
                                                         <td className="px-8 py-5 text-right">
@@ -512,11 +518,11 @@ const SuperAdminDashboard = () => {
                     background: transparent;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: rgba(15, 23, 42, 0.1);
                     border-radius: 10px;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: rgba(15, 23, 42, 0.2);
                 }
             `}</style>
         </div>

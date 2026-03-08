@@ -149,7 +149,6 @@ const EmployeeFormModal = ({
                                         onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
                                     >
                                         <option value="Morning">Morning</option>
-                                        <option value="Evening">Evening</option>
                                         <option value="Night">Night</option>
                                         <option value="Full-time">Full-time</option>
                                         <option value="Regular">Regular</option>
