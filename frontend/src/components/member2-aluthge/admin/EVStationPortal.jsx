@@ -14,11 +14,20 @@ const defaultForm = {
     connectorTypes: ['Type 2'],
     power: '',
     status: 'Active',
-    operator: '',
     phone: ''
 };
 
 const CONNECTOR_OPTIONS = ['Type 2', 'CCS', 'CHAdeMO', 'Tesla', 'Type 1', 'GB/T'];
+
+const inputClass = (fieldName, errors) => `w-full px-4 py-3 bg-slate-50 border ${fieldName && errors?.[fieldName] ? 'border-red-400 focus:border-red-500 bg-red-50/50' : 'border-slate-200 focus:border-indigo-500'} rounded-xl outline-none transition-all text-sm font-medium text-slate-700 focus:bg-white focus:ring-4 focus:ring-indigo-500/10`;
+
+const Field = ({ label, error, children }) => (
+    <div>
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
+        {children}
+        {error && <p className="mt-1.5 text-xs text-red-500 font-medium flex items-center gap-1">⚠ {error}</p>}
+    </div>
+);
 
 const EVStationPortal = () => {
     const [stations, setStations] = useState([]);
@@ -67,15 +76,79 @@ const EVStationPortal = () => {
         }));
     };
 
+    const [isGeocoding, setIsGeocoding] = useState(false);
+
+    const geocodeAddress = async (query) => {
+        if (!query || query.length < 3) return null;
+        setIsGeocoding(true);
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ", Sri Lanka")}&format=json&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                setForm(prev => ({ ...prev, ...coords }));
+                setErrors(p => {
+                    const next = { ...p };
+                    delete next.location;
+                    return next;
+                });
+                return coords;
+            } else {
+                setForm(prev => ({ ...prev, lat: '', lng: '' }));
+            }
+        } catch (err) {
+            console.warn('Geocoding failed:', err);
+        } finally {
+            setIsGeocoding(false);
+        }
+        return null;
+    };
+
+    const handleLocationChange = (e) => {
+        const val = e.target.value;
+        setForm(prev => ({ ...prev, location: val }));
+        setErrors(p => ({ ...p, location: '' }));
+        setForm(prev => ({ ...prev, lat: '', lng: '' }));
+    };
+
+    const handleLocationBlur = () => {
+        if (form.location.trim()) {
+            geocodeAddress(form.location);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        let currentLat = form.lat;
+        let currentLng = form.lng;
+
+        // If coordinates are missing, try geocoding one last time (e.g. user just typed 'Horana' and clicked Register)
+        if (!currentLat || !currentLng) {
+            if (form.location.trim()) {
+                const found = await geocodeAddress(form.location);
+                if (found) {
+                    currentLat = found.lat;
+                    currentLng = found.lng;
+                }
+            }
+        }
+
+        if (isGeocoding) {
+            alert("Please wait for the system to detect the GPS coordinates...");
+            return;
+        }
 
         // Validate required fields
         const newErrors = {};
         if (!form.name.trim()) newErrors.name = 'Station name is required';
         if (!form.location.trim()) newErrors.location = 'Location is required';
-        if (form.lat && isNaN(parseFloat(form.lat))) newErrors.lat = 'Must be a valid number (e.g. 6.9271)';
-        if (form.lng && isNaN(parseFloat(form.lng))) newErrors.lng = 'Must be a valid number (e.g. 79.8612)';
+
+        // Show specific error if geocoding failed
+        if (form.location.trim() && (!currentLat || !currentLng)) {
+            newErrors.location = 'Could not precisely locate this place. Please try a more specific name or add the town.';
+        }
+
         if (form.phone && !/^(?:\+94|0)\d{9}$/.test(form.phone.trim())) newErrors.phone = 'Use 0XXXXXXXXX or +94XXXXXXXXX format';
         if (form.connectorTypes.length === 0) newErrors.connectorTypes = 'Select at least one connector type';
 
@@ -86,11 +159,12 @@ const EVStationPortal = () => {
         setErrors({});
 
         try {
+            const payload = { ...form, lat: currentLat, lng: currentLng };
             if (editingId) {
-                await axios.put(`http://localhost:8081/api/ev-stations/${editingId}`, form);
+                await axios.put(`http://localhost:8081/api/ev-stations/${editingId}`, payload);
                 showSuccess('EV Station updated successfully!');
             } else {
-                await axios.post('http://localhost:8081/api/ev-stations', { ...form });
+                await axios.post('http://localhost:8081/api/ev-stations', payload);
                 showSuccess('EV Station registered successfully!');
             }
             fetchStations();
@@ -133,15 +207,7 @@ const EVStationPortal = () => {
         (s.id || s._id)?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    const inputClass = (fieldName) => `w-full px-4 py-3 bg-slate-50 border ${fieldName && errors[fieldName] ? 'border-red-400 focus:border-red-500 bg-red-50/50' : 'border-slate-200 focus:border-indigo-500'} rounded-xl outline-none transition-all text-sm font-medium text-slate-700 focus:bg-white focus:ring-4 focus:ring-indigo-500/10`;
 
-    const Field = ({ label, error, children }) => (
-        <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
-            {children}
-            {error && <p className="mt-1.5 text-xs text-red-500 font-medium flex items-center gap-1">⚠ {error}</p>}
-        </div>
-    );
 
     return (
         <div className="w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -193,7 +259,13 @@ const EVStationPortal = () => {
                         <div
                             key="modal-overlay"
                             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto"
-                            onClick={() => { setForm(defaultForm); setEditingId(null); setShowForm(false); }}
+                            onClick={(e) => {
+                                if (e.target === e.currentTarget) {
+                                    setForm(defaultForm);
+                                    setEditingId(null);
+                                    setShowForm(false);
+                                }
+                            }}
                         >
                             <motion.div
                                 key="modal-content"
@@ -216,10 +288,10 @@ const EVStationPortal = () => {
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <Field label="Station ID (auto)">
-                                            <input readOnly value={editingId || 'Auto-generated'} className={`${inputClass()} cursor-not-allowed text-slate-400`} />
+                                            <input readOnly value={editingId || 'Auto-generated'} className={`${inputClass(null, errors)} cursor-not-allowed text-slate-400`} />
                                         </Field>
                                         <Field label="Status">
-                                            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={inputClass('status')}>
+                                            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={inputClass('status', errors)}>
                                                 <option value="Active">Active</option>
                                                 <option value="Maintenance">Maintenance</option>
                                                 <option value="Offline">Offline</option>
@@ -232,33 +304,33 @@ const EVStationPortal = () => {
                                             placeholder="e.g. GreenCharge Colombo 07"
                                             value={form.name}
                                             onChange={e => { setForm({ ...form, name: e.target.value }); setErrors(p => ({ ...p, name: '' })); }}
-                                            className={inputClass('name')}
+                                            className={inputClass('name', errors)}
                                         />
                                     </Field>
 
                                     <Field label="Location / Address *" error={errors.location}>
-                                        <input
-                                            placeholder="e.g. 42 Alfred Place, Colombo"
-                                            value={form.location}
-                                            onChange={e => { setForm({ ...form, location: e.target.value }); setErrors(p => ({ ...p, location: '' })); }}
-                                            className={inputClass('location')}
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                placeholder="e.g. 42 Alfred Place, Colombo"
+                                                value={form.location}
+                                                onChange={handleLocationChange}
+                                                onBlur={handleLocationBlur}
+                                                className={inputClass('location', errors)}
+                                            />
+                                            {isGeocoding && (
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-white/80 px-2 py-1 rounded-lg pointer-events-none">
+                                                    <div className="animate-spin h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+                                                    <span className="text-[10px] font-bold text-indigo-600 uppercase">Detecting GPS...</span>
+                                                </div>
+                                            )}
+                                            {!isGeocoding && form.lat && form.lng && (
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 pointer-events-none">
+                                                    <CheckCircle size={12} />
+                                                    <span className="text-[10px] font-bold uppercase">GPS Locked</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </Field>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <Field label="Latitude (GPS)" error={errors.lat}>
-                                            <input type="number" step="any" placeholder="e.g. 6.9271"
-                                                value={form.lat}
-                                                onChange={e => { setForm({ ...form, lat: e.target.value }); setErrors(p => ({ ...p, lat: '' })); }}
-                                                className={inputClass('lat')} />
-                                        </Field>
-                                        <Field label="Longitude (GPS)" error={errors.lng}>
-                                            <input type="number" step="any" placeholder="e.g. 79.8612"
-                                                value={form.lng}
-                                                onChange={e => { setForm({ ...form, lng: e.target.value }); setErrors(p => ({ ...p, lng: '' })); }}
-                                                className={inputClass('lng')} />
-                                        </Field>
-                                    </div>
 
                                     <Field label="Connector Types" error={errors.connectorTypes}>
                                         <div className="flex flex-wrap gap-2 mt-1">
@@ -280,19 +352,16 @@ const EVStationPortal = () => {
                                     <div className="grid grid-cols-2 gap-4">
                                         <Field label="Charging Power (kW)">
                                             <input type="number" placeholder="e.g. 22"
-                                                value={form.power} onChange={e => setForm({ ...form, power: e.target.value })} className={inputClass('power')} />
+                                                value={form.power} onChange={e => setForm({ ...form, power: e.target.value })} className={inputClass('power', errors)} />
                                         </Field>
-                                        <Field label="Operator / Brand">
-                                            <input placeholder="e.g. ChargeNet LK"
-                                                value={form.operator} onChange={e => setForm({ ...form, operator: e.target.value })} className={inputClass('operator')} />
-                                        </Field>
+                                        <div />
                                     </div>
 
                                     <Field label="Contact Phone" error={errors.phone}>
                                         <input placeholder="e.g. 0771234567"
                                             value={form.phone}
                                             onChange={e => { setForm({ ...form, phone: e.target.value }); setErrors(p => ({ ...p, phone: '' })); }}
-                                            className={inputClass('phone')} />
+                                            className={inputClass('phone', errors)} />
                                     </Field>
 
                                     <button type="submit"
@@ -369,9 +438,6 @@ const EVStationPortal = () => {
                                                     {station.connectorTypes?.map(c => (
                                                         <span key={c} className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg font-semibold">{c}</span>
                                                     ))}
-                                                    {station.operator && (
-                                                        <span className="text-xs bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg font-semibold">{station.operator}</span>
-                                                    )}
                                                     {station.lat && station.lng && (
                                                         <span className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-lg font-semibold">
                                                             📍 {parseFloat(station.lat).toFixed(4)}, {parseFloat(station.lng).toFixed(4)}

@@ -108,48 +108,59 @@ const FuelFinder = () => {
         },
     ];
 
+    // Central coordinates for Sri Lankan districts for fallback geocoding
+    const DISTRICT_COORDS = {
+        "Ampara": [7.2889, 81.6722], "Anuradhapura": [8.3114, 80.4037], "Badulla": [6.9847, 81.0565],
+        "Batticaloa": [7.7310, 81.6747], "Colombo": [6.9271, 79.8612], "Galle": [6.0367, 80.2170],
+        "Gampaha": [7.0873, 80.0144], "Hambantota": [6.1246, 81.1244], "Jaffna": [9.6615, 80.0255],
+        "Kalutara": [6.5854, 79.9607], "Kandy": [7.2906, 80.6337], "Kegalle": [7.2513, 80.3464],
+        "Kilinochchi": [9.3803, 80.3925], "Kurunegala": [7.4863, 80.3647], "Mannar": [8.9819, 79.9044],
+        "Matale": [7.4675, 80.6234], "Matara": [5.9549, 80.5550], "Monaragala": [6.8687, 81.3508],
+        "Mullaitivu": [9.2671, 80.8143], "Nuwara Eliya": [6.9497, 80.7891], "Polonnaruwa": [7.9326, 81.0004],
+        "Puttalam": [8.0330, 79.8250], "Ratnapura": [6.6828, 80.3992], "Trincomalee": [8.5873, 81.2152],
+        "Vavuniya": [8.7542, 80.4982]
+    };
+
     const fetchDbStations = async () => {
         try {
-            // Note: In reality, use an endpoint that returns all items without pagination if possible, 
-            // or pass a high limit just for frontend radius filtering.
             const response = await fetch(`${API_BASE}/station?limit=100`);
             const data = await response.json();
-
             const stationsList = Array.isArray(data) ? data : (data.stations || data.items || []);
 
-            // Map the DB Stations into a usable format, assigning mock coordinates built from their location string roughly
-            // since actual lat/lng fields don't seem explicitly present on the registration form Schema.
-            const mappedStations = stationsList.map(st => {
-                // Creating deterministic faux-coordinates based on ID length to scatter them around Colombo
-                const baseLat = 6.9271;
-                const baseLng = 79.8612;
-                const offset = (st.Id.length * 0.01) || 0.05;
-
-                // Simplify tank inventory structure to what the UI expects for `Available`/`Unavailable`
-                const inventoryObj = {};
-                st.tanks?.forEach(tank => {
-                    // If it exists in tanks array, assume Available 
-                    inventoryObj[tank.fuel_type] = 'Available';
-                });
-
-                return {
-                    id: st._id || st.Id,
-                    name: st.Name,
-                    lat: baseLat + (Math.random() * offset * (Math.random() > 0.5 ? 1 : -1)),
-                    lng: baseLng + (Math.random() * offset * (Math.random() > 0.5 ? 1 : -1)),
-                    address: st.Location,
-                    status: "Open", // Defaulting to Open
-                    brand: st.Name.includes("IOC") ? "IOC" : st.Name.includes("Sinopec") ? "Sinopec" : "Ceypetco",
-                    inventory: inventoryObj
-                };
-            });
-
-            setDbStations(mappedStations);
+            // Just store the raw list - geocoding will happen when needed
+            setDbStations(stationsList);
         } catch (err) {
             console.error("Failed to fetch registered stations", err);
-            // Fallback to mock data if backend request fails
             setDbStations(mockStations);
         }
+    };
+
+    // Geocoding cache to avoid repeated API calls
+    const [geoCache, setGeoCache] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('fuel_geo_cache') || '{}');
+        } catch { return {}; }
+    });
+
+    const geocodeWithRetry = async (address) => {
+        if (geoCache[address]) return geoCache[address];
+
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ", Sri Lanka")}&format=json&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                setGeoCache(prev => {
+                    const next = { ...prev, [address]: coords };
+                    localStorage.setItem('fuel_geo_cache', JSON.stringify(next));
+                    return next;
+                });
+                return coords;
+            }
+        } catch (err) {
+            console.warn(`Geocoding failed for ${address}`, err);
+        }
+        return null;
     };
 
     const handleGetLocation = () => {
@@ -232,6 +243,43 @@ const FuelFinder = () => {
         setLoading(true);
         setError(null);
         try {
+            // 1. Prepare/Geocode reachable stations
+            // To be efficient, we only geocode stations in the same or neighboring districts if possible,
+            // but for this implementation we'll process all fetched stations from Member 1
+            const processedStations = [];
+
+            // Limit processing for speed
+            const stationsToProcess = dbStations.slice(0, 20);
+
+            for (const st of stationsToProcess) {
+                const fullAddress = `${st.Address}, ${st.Location}`;
+
+                // Try to get coordinates from address (member 2 logic)
+                let coords = await geocodeWithRetry(fullAddress);
+
+                // Fallback to district center if geocoding fails
+                if (!coords) {
+                    const dCoords = DISTRICT_COORDS[st.Location] || DISTRICT_COORDS["Colombo"];
+                    coords = { lat: dCoords[0], lng: dCoords[1] };
+                }
+
+                const inventoryObj = {};
+                st.tanks?.forEach(tank => {
+                    inventoryObj[tank.fuel_type] = 'Available';
+                });
+
+                processedStations.push({
+                    id: st._id || st.Id,
+                    name: st.Name,
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    address: fullAddress,
+                    status: "Open",
+                    brand: st.Name.includes("IOC") ? "IOC" : st.Name.includes("Sinopec") ? "Sinopec" : "Ceypetco",
+                    inventory: inventoryObj
+                });
+            }
+
             let reportedStationNames = [];
             try {
                 const feedbackRes = await fetch('http://localhost:8081/api/feedback/downvoted');
@@ -243,8 +291,8 @@ const FuelFinder = () => {
                 console.log("Could not fetch feedback downvotes - continuing normally.");
             }
 
-            // 1. Calculate distance & Filter by Brand (if selected)
-            let candidates = dbStations.map(station => {
+            // 2. Calculate distance & Filter
+            let candidates = processedStations.map(station => {
                 let distanceNum = calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng);
                 let isReported = reportedStationNames.find(r => r.name === station.name);
 
@@ -266,10 +314,10 @@ const FuelFinder = () => {
                 candidates = candidates.filter(s => s.brand === brand);
             }
 
-            // 2. Sort by penalised distance
+            // 3. Sort by penalized distance
             candidates.sort((a, b) => a.distance - b.distance);
 
-            // 3. Evaluate one by one
+            // 4. Evaluate one by one
             let recommended = null;
 
             for (const station of candidates) {
@@ -287,6 +335,18 @@ const FuelFinder = () => {
             if (recommended) {
                 setResult(recommended);
                 setStep(3);
+
+                saveSubmissionLogger({
+                    type: 'Fuel',
+                    location: userLoc,
+                    locationName: locationName,
+                    preference: `${fuelType} (${brand || 'Any'})`,
+                    status: 'Resolved',
+                    recommendedStation: recommended.name,
+                    stationAddress: recommended.address,
+                    distanceKm: recommended.distance,
+                    brand: recommended.brand
+                });
             } else {
                 setError(`No open stations found with ${fuelType} available nearby.`);
                 setStep(1);

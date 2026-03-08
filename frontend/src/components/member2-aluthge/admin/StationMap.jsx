@@ -49,15 +49,30 @@ const StationMap = () => {
 
     const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
 
-    const geocodeAddress = async (query) => {
+    // Geocoding cache to avoid repeated API calls
+    const [geoCache, setGeoCache] = useState(() => {
         try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
+            return JSON.parse(localStorage.getItem('fuel_geo_cache') || '{}');
+        } catch { return {}; }
+    });
+
+    const geocodeWithRetry = async (address) => {
+        if (geoCache[address]) return geoCache[address];
+
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ", Sri Lanka")}&format=json&limit=1`);
             const data = await res.json();
             if (data && data.length > 0) {
-                return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                setGeoCache(prev => {
+                    const next = { ...prev, [address]: coords };
+                    localStorage.setItem('fuel_geo_cache', JSON.stringify(next));
+                    return next;
+                });
+                return coords;
             }
         } catch (err) {
-            console.warn(`Geocoding failed for: ${query}`, err);
+            console.warn(`Geocoding failed for ${address}`, err);
         }
         return null;
     };
@@ -69,7 +84,7 @@ const StationMap = () => {
                 // 1. Fetch registered FUEL stations from backend
                 const fuelRes = await fetch(`${API_BASE}/station?limit=200`);
                 const fuelData = await fuelRes.json();
-                const fuelStationsList = fuelData.stations || [];
+                const fuelStationsList = Array.isArray(fuelData) ? fuelData : (fuelData.items || fuelData.stations || []);
 
                 // 2. Fetch registered EV stations from backend
                 const evRes = await fetch(`${API_BASE}/ev-stations`);
@@ -79,19 +94,31 @@ const StationMap = () => {
                 for (let i = 0; i < fuelStationsList.length; i++) {
                     const st = fuelStationsList[i];
 
-                    // Simple deterministic offset as fallback if geocoding fails or is slow
-                    let coords = await geocodeAddress(`${st.Name}, ${st.Address}, ${st.Location}, Sri Lanka`);
-                    if (!coords) coords = await geocodeAddress(`${st.Address}, ${st.Location}, Sri Lanka`);
-                    if (!coords && st.Location) coords = await geocodeAddress(`${st.Location}, Sri Lanka`);
+                    const fullAddress = `${st.Address || ''}, ${st.Location || ''}`;
+                    let coords = await geocodeWithRetry(fullAddress);
 
-                    const finalLat = coords ? coords.lat : 6.9271 + ((i % 5) * 0.01);
-                    const finalLng = coords ? coords.lng : 79.8612 + ((i % 7) * 0.01);
+                    if (!coords) {
+                        // District fallback
+                        const DISTRICT_COORDS = {
+                            "Ampara": [7.2889, 81.6722], "Anuradhapura": [8.3114, 80.4037], "Badulla": [6.9847, 81.0565],
+                            "Batticaloa": [7.7310, 81.6747], "Colombo": [6.9271, 79.8612], "Galle": [6.0367, 80.2170],
+                            "Gampaha": [7.0873, 80.0144], "Hambantota": [6.1246, 81.1244], "Jaffna": [9.6615, 80.0255],
+                            "Kalutara": [6.5854, 79.9607], "Kandy": [7.2906, 80.6337], "Kegalle": [7.2513, 80.3464],
+                            "Kilinochchi": [9.3803, 80.3925], "Kurunegala": [7.4863, 80.3647], "Mannar": [8.9819, 79.9044],
+                            "Matale": [7.4675, 80.6234], "Matara": [5.9549, 80.5550], "Monaragala": [6.8687, 81.3508],
+                            "Mullaitivu": [9.2671, 80.8143], "Nuwara Eliya": [6.9497, 80.7891], "Polonnaruwa": [7.9326, 81.0004],
+                            "Puttalam": [8.0330, 79.8250], "Ratnapura": [6.6828, 80.3992], "Trincomalee": [8.5873, 81.2152],
+                            "Vavuniya": [8.7542, 80.4982]
+                        };
+                        const dCoords = DISTRICT_COORDS[st.Location] || [6.9271, 79.8612];
+                        coords = { lat: dCoords[0], lng: dCoords[1] };
+                    }
 
                     mappedFuelStations.push({
                         id: `fuel-${st._id || st.Id || i}`,
                         name: st.Name || "Unnamed Station",
-                        lat: finalLat,
-                        lng: finalLng,
+                        lat: coords.lat,
+                        lng: coords.lng,
                         location: st.Location || st.Address || "Unknown Location",
                         type: "Fuel",
                         brand: st.Name?.toLowerCase().includes("ioc") ? "IOC" :
@@ -99,9 +126,6 @@ const StationMap = () => {
                         idTag: st.Id || "ST-UNKNOWN",
                         person: st.person?.PersonName || "Admin"
                     });
-
-                    // Pace the geocoding requests to avoid hitting search limits
-                    if (fuelStationsList.length > 3) await new Promise(r => setTimeout(r, 450));
                 }
 
                 const mappedEvStations = (evStationsList || []).map(st => ({

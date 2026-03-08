@@ -108,10 +108,82 @@ const EVFinder = () => {
         }, 1500);
     };
 
+    const [dbStations, setDbStations] = useState([]);
+    const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
+
+    const fetchDbStations = async () => {
+        try {
+            const response = await fetch(`${API_BASE}/ev-stations`);
+            const data = await response.json();
+            setDbStations(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to fetch EV stations", err);
+            setDbStations([]);
+        }
+    };
+
+    // Geocoding cache to avoid repeated API calls
+    const [geoCache, setGeoCache] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('ev_geo_cache') || '{}');
+        } catch { return {}; }
+    });
+
+    const geocodeWithRetry = async (address) => {
+        if (geoCache[address]) return geoCache[address];
+
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ", Sri Lanka")}&format=json&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                setGeoCache(prev => {
+                    const next = { ...prev, [address]: coords };
+                    localStorage.setItem('ev_geo_cache', JSON.stringify(next));
+                    return next;
+                });
+                return coords;
+            }
+        } catch (err) {
+            console.warn(`Geocoding failed for ${address}`, err);
+        }
+        return null;
+    };
+
     const findNearestStation = async (userLoc) => {
         setLoading(true);
         setError(null);
         try {
+            const stationsSource = dbStations.length > 0 ? dbStations : mockStations;
+            const processedStations = [];
+
+            // Process and geocode stations
+            for (const st of stationsSource) {
+                const stationAddr = st.location || st.address;
+
+                // User requested system convert registered address to Lat/Lng
+                let coords = await geocodeWithRetry(stationAddr);
+
+                // Fallback to stored lat/lng or default (Colombo)
+                if (!coords) {
+                    coords = {
+                        lat: parseFloat(st.lat) || 6.9271,
+                        lng: parseFloat(st.lng) || 79.8612
+                    };
+                }
+
+                processedStations.push({
+                    id: st._id || st.id,
+                    name: st.name,
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    address: stationAddr,
+                    status: st.status === 'Active' || st.status === 'Open' ? 'Open' : 'Closed',
+                    power: st.power,
+                    phone: st.phone
+                });
+            }
+
             let reportedStationNames = [];
             try {
                 const feedbackRes = await fetch('http://localhost:8081/api/feedback/downvoted');
@@ -123,69 +195,31 @@ const EVFinder = () => {
                 console.log("Could not fetch feedback downvotes - continuing normally.");
             }
 
-            let evPortalData = [];
-            try {
-                const stored = localStorage.getItem('evStations');
-                if (stored) {
-                    const parsed = JSON.parse(stored);
-                    evPortalData = parsed.map(s => ({
-                        id: s.id,
-                        name: s.name,
-                        lat: parseFloat(s.lat) || 0,
-                        lng: parseFloat(s.lng) || 0,
-                        address: s.location || '',
-                        status: s.status === 'Active' ? 'Open' : (s.status === 'Maintenance' ? 'Maintenance' : 'Closed'),
-                        power: s.power,
-                        operator: s.operator,
-                        phone: s.phone
-                    }));
+            const resultsWithDistance = processedStations.map(station => {
+                let distanceNum = calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng);
+                let isReported = reportedStationNames.find(r => r.name === station.name);
+
+                let originalDistance = distanceNum;
+
+                if (isReported) {
+                    distanceNum += 50;
                 }
-            } catch (e) {
-                console.error('Error parsing evStations from localStorage', e);
-            }
 
-            const stations = evPortalData.length > 0 ? evPortalData : mockStations;
+                return {
+                    ...station,
+                    distance: distanceNum,
+                    originalDistance: originalDistance,
+                    wait: `${Math.floor(Math.random() * 15 + 5)} mins`,
+                    reportedIssue: isReported ? isReported.reason : null
+                };
+            }).sort((a, b) => a.distance - b.distance);
 
-            const processedStations = stations
-                .map(station => {
-                    let distanceNum = calculateDistance(userLoc.lat, userLoc.lng, station.lat, station.lng);
-                    let isReported = reportedStationNames.find(r => r.name === station.name);
-
-                    let originalDistance = distanceNum; // Store original distance before penalty
-
-                    if (isReported) {
-                        distanceNum += 50; // Push far away
-                    }
-
-                    return {
-                        ...station,
-                        distance: distanceNum,
-                        originalDistance: originalDistance,
-                        wait: `${Math.floor(Math.random() * 15 + 5)} mins`,
-                        reportedIssue: isReported ? isReported.reason : null
-                    };
-                })
-                .sort((a, b) => a.distance - b.distance);
-
-            if (processedStations.length > 0) {
-                const recommendedStation = processedStations[0];
-                setResult(recommendedStation);
+            if (resultsWithDistance.length > 0) {
+                setResult(resultsWithDistance[0]);
                 setStep(3);
             } else {
                 setError("No stations found nearby.");
                 setStep(1);
-
-                // Log failed search
-                saveSubmissionLogger({
-                    type: 'EV Charging',
-                    location: userLoc,
-                    locationName: locationName,
-                    preference: 'Any',
-                    status: 'No Stations',
-                    recommendedStation: 'N/A',
-                    stationAddress: '',
-                    distanceKm: null
-                });
             }
         } catch (err) {
             console.error(err);
@@ -227,6 +261,7 @@ const EVFinder = () => {
 
     useEffect(() => {
         handleGetLocation();
+        fetchDbStations();
     }, []);
 
     return (
