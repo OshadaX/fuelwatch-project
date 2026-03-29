@@ -63,6 +63,10 @@ function App() {
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
               <Route path="/admin-qr" element={<AdminQRView />} />
               <Route path="/employee-portal" element={<EmployeePortal />} />
+              <Route path="/customer" element={<CustomerGuestPage />} />
+              <Route path="/ev-station" element={<EVFinder />} />
+              <Route path="/fuel-station" element={<FuelFinder />} />
+              <Route path="/navigate" element={<NavigationMap />} />
               <Route path="/staff-prediction" element={<StaffPrediction />} />
               <Route path="/shift-scheduler" element={<ShiftSchedulerPage />} />
               <Route path="/stations" element={<StationsView />} />

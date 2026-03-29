@@ -23,8 +23,6 @@ import {
   Tab,
   InputAdornment,
   LinearProgress,
-  Switch,
-  FormControlLabel,
   Badge,
   Dialog,
   DialogTitle,
@@ -38,11 +36,9 @@ import { alpha, useTheme } from "@mui/material/styles";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
@@ -70,6 +66,7 @@ const Toast = Swal.mixin({
 
 const ML_API = "http://127.0.0.1:8090/ml/score-report";
 const BACKEND = "http://localhost:8081";
+const DEFAULT_THRESHOLD = 0.65;
 
 // ==============================
 // Small utilities
@@ -250,7 +247,7 @@ export default function Anomaly() {
   // UI State
   // -----------------------------
   const [file, setFile] = useState(null);
-  const [decisionThreshold, setDecisionThreshold] = useState(0.65);
+  const decisionThreshold = DEFAULT_THRESHOLD;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -262,26 +259,22 @@ export default function Anomaly() {
   const [events, setEvents] = useState([]);
 
   const [tab, setTab] = useState(0);
-  const [search, setSearch] = useState("");
-  const [showOnlyFlagged, setShowOnlyFlagged] = useState(false);
-  const [dense, setDense] = useState(false);
 
   const lastFileNameRef = useRef(null);
 
   // -----------------------------
   // ✅ Notification Form State
-  // (NO station selection here)
   // -----------------------------
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [notifySeverity, setNotifySeverity] = useState("Warning"); // Advisory/Warning/Critical
+  const [notifySeverity, setNotifySeverity] = useState("Warning");
   const [notifyChannel, setNotifyChannel] = useState("email");
-  const [notifyRoles, setNotifyRoles] = useState(["SUPERVISOR", "MANAGER"]);
+  const [notifyRoles, setNotifyRoles] = useState(["MANAGER"]);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [notifySending, setNotifySending] = useState(false);
 
-  // Station preview (derived from manager_email)
+  // Station preview
   const [stationPreviewLoading, setStationPreviewLoading] = useState(false);
-  const [stationPreview, setStationPreview] = useState(null); // { Id, Name, Location, ... }
+  const [stationPreview, setStationPreview] = useState(null);
   const [stationPreviewError, setStationPreviewError] = useState("");
 
   // -----------------------------
@@ -349,29 +342,7 @@ export default function Anomaly() {
     return best;
   }, [scoredDays]);
 
-  const filteredScoredDays = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return scoredDays.filter((r) => {
-      const day = String(r.day || r.date || r.timestamp || "").toLowerCase();
-      const station = String(
-        r.station_name ||
-          r.stationName ||
-          r.site_name ||
-          r.site ||
-          r.tank_name ||
-          r.tankName ||
-          r.station_id ||
-          r.stationId ||
-          ""
-      ).toLowerCase();
-      const fuel = String(r.fuel_type || r.fuelType || r.item || "").toLowerCase();
-      const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
-
-      const matchesQuery = !q || day.includes(q) || station.includes(q) || fuel.includes(q);
-      const matchesFlag = !showOnlyFlagged || pred === 1 || pred === true;
-      return matchesQuery && matchesFlag;
-    });
-  }, [scoredDays, search, showOnlyFlagged]);
+  const filteredScoredDays = useMemo(() => scoredDays, [scoredDays]);
 
   // -----------------------------
   // Row mapper
@@ -399,14 +370,14 @@ export default function Anomaly() {
   // Helper: current manager email
   // -----------------------------
   const getManagerEmail = () => {
-  try {
-    const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
-    const email = u?.email || "";
-    return String(email).trim().toLowerCase();
-  } catch {
-    return "";
-  }
-};
+    try {
+      const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+      const email = u?.email || "";
+      return String(email).trim().toLowerCase();
+    } catch {
+      return "";
+    }
+  };
 
   // -----------------------------
   // ✅ RUN ML SCAN
@@ -463,7 +434,7 @@ export default function Anomaly() {
       lastFileNameRef.current = file?.name || null;
 
       closeBlockingLoading();
-      toast("✅ ML Scan Completed Successfully", "success");
+      toast("✅ Completed Successfully", "success");
       setTab(0);
 
       await MySwal.fire({
@@ -499,22 +470,11 @@ export default function Anomaly() {
     }
   }, [file, decisionThreshold]);
 
-  // Auto-rerun when threshold changes AND the same file was already scanned
-  useEffect(() => {
-    if (!file) return;
-    if (lastFileNameRef.current === file.name) {
-      const t = setTimeout(() => handleRunScan(), 350);
-      return () => clearTimeout(t);
-    }
-  }, [decisionThreshold, file, handleRunScan]);
-
   const onPickFile = (f) => {
     setFile(f);
     setError("");
     setScoredDays([]);
     setEvents([]);
-    setSearch("");
-    setShowOnlyFlagged(false);
     lastFileNameRef.current = null;
 
     if (f) toast(`Selected: ${f.name}`, "info");
@@ -537,11 +497,6 @@ export default function Anomaly() {
     toast("Reset completed", "info");
   };
 
-  // -----------------------------
-  // ✅ Open notify form (SAFE)
-  // - station is derived from manager email via backend
-  // - no manual station selection
-  // -----------------------------
   const openNotifyForm = async () => {
     if (!scoredDays.length) {
       toast("Run a scan first to notify staff.", "warning");
@@ -553,7 +508,6 @@ export default function Anomaly() {
     setStationPreviewError("");
     setStationPreviewLoading(true);
 
-    // Default message based on max score row
     setNotifyMessage(
       maxScoreRow?.reason
         ? `Detected anomaly: ${String(maxScoreRow.reason).slice(0, 180)}`
@@ -563,7 +517,6 @@ export default function Anomaly() {
     setNotifyOpen(true);
 
     try {
-      // ✅ expects backend route: GET /api/station/by-manager/:email
       const res = await fetch(`${BACKEND}/api/station/by-manager/${encodeURIComponent(managerEmail)}`);
       const data = await res.json().catch(() => ({}));
 
@@ -587,8 +540,6 @@ export default function Anomaly() {
 
   // -----------------------------
   // ✅ Send manual notification
-  // - DOES NOT send station id from UI
-  // - backend derives station from manager_email
   // -----------------------------
   const handleSendManual = async () => {
     if (!notifyRoles.length) {
@@ -626,17 +577,15 @@ export default function Anomaly() {
 
     try {
       const payload = {
-        station_id: stationPreview?.Id, // ✅ REQUIRED
+        station_id: stationPreview?.Id,
         manager_email: getManagerEmail(),
-
         severity: notifySeverity,
         channel: notifyChannel,
         message: notifyMessage,
-
         threshold: decisionThreshold,
         file_name: file?.name || "",
         rows: scoredDays,
-        events: events
+        events: events,
       };
 
       const res = await fetch(`${BACKEND}/api/notifications/send-manual`, {
@@ -818,7 +767,7 @@ export default function Anomaly() {
       <EnterpriseCard sx={{ mb: 2 }}>
         <Box sx={{ p: { xs: 2.25, md: 3 } }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12}>
               <Button
                 variant="outlined"
                 fullWidth
@@ -849,109 +798,19 @@ export default function Anomaly() {
                 </Typography>
               </Stack>
             </Grid>
-
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                label="Decision Threshold"
-                size="medium"
-                fullWidth
-                value={decisionThreshold}
-                onChange={(e) => setDecisionThreshold(parseFloat(e.target.value))}
-                helperText={file && lastFileNameRef.current === file.name ? "Auto updates after scan" : "Run scan after change"}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <TuneRoundedIcon />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                    bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
-                    fontFamily: "Arial, Helvetica, sans-serif",
-                  },
-                  "& .MuiFormHelperText-root": { fontFamily: "Arial, Helvetica, sans-serif" },
-                  "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
-                }}
-              >
-                {[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85].map((v) => (
-                  <MenuItem key={v} value={v} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                    {v}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <Stack spacing={1}>
-                <TextField
-                  label="Search (day / station / fuel)"
-                  size="medium"
-                  fullWidth
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon />
-                      </InputAdornment>
-                    ),
-                    endAdornment: search ? (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setSearch("")}>
-                          <RestartAltRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    ) : null,
-                  }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 2,
-                      bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
-                      fontFamily: "Arial, Helvetica, sans-serif",
-                    },
-                    "& .MuiInputLabel-root": { fontFamily: "Arial, Helvetica, sans-serif" },
-                  }}
-                />
-
-                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                  <FormControlLabel
-                    control={<Switch checked={showOnlyFlagged} onChange={(e) => setShowOnlyFlagged(e.target.checked)} />}
-                    label="Only flagged"
-                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13, fontFamily: "Arial, Helvetica, sans-serif" } }}
-                  />
-                  <FormControlLabel
-                    control={<Switch checked={dense} onChange={(e) => setDense(e.target.checked)} />}
-                    label="Dense"
-                    sx={{ ".MuiFormControlLabel-label": { fontWeight: 800, fontSize: 13, fontFamily: "Arial, Helvetica, sans-serif" } }}
-                  />
-                </Stack>
-              </Stack>
-            </Grid>
           </Grid>
         </Box>
       </EnterpriseCard>
 
       {/* KPI Cards */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard label="Scored Days" value={scoredDays.length} sub="Processed count" tone="primary" icon={<TableChartRoundedIcon />} />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard label="Flagged Days" value={flaggedDays.length} sub="Predicted irregularities" tone="danger" icon={<WarningAmberRoundedIcon />} />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            label="Threshold"
-            value={decisionThreshold}
-            sub={file && lastFileNameRef.current === file.name ? "Auto rerun enabled" : "Set threshold"}
-            tone="success"
-            icon={<TuneRoundedIcon />}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
             label="Avg Score"
             value={safeFixed(avgScore)}
@@ -1031,17 +890,6 @@ export default function Anomaly() {
 
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
                     <Chip
-                      icon={<TuneRoundedIcon />}
-                      label={`Threshold: ${decisionThreshold}`}
-                      variant="outlined"
-                      sx={{
-                        fontWeight: 900,
-                        borderColor: alpha(theme.palette.primary.main, 0.25),
-                        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.12 : 0.06),
-                        fontFamily: "Arial, Helvetica, sans-serif",
-                      }}
-                    />
-                    <Chip
                       icon={<WarningAmberRoundedIcon />}
                       label={`Flagged: ${flaggedDays.length}`}
                       color="error"
@@ -1065,12 +913,12 @@ export default function Anomaly() {
                       startIcon={<DownloadRoundedIcon />}
                       disabled={!filteredScoredDays.length}
                       onClick={() => {
-                        downloadCSV("scored_days_filtered.csv", filteredScoredDays.map(mapRow));
-                        toast("Exported filtered scored days.", "success");
+                        downloadCSV("scored_days.csv", filteredScoredDays.map(mapRow));
+                        toast("Exported scored days.", "success");
                       }}
                       sx={{ borderRadius: 2, fontWeight: 900, textTransform: "none", fontFamily: "Arial, Helvetica, sans-serif" }}
                     >
-                      Export filtered scored days
+                      Export scored days
                     </Button>
 
                     <Button
@@ -1202,7 +1050,7 @@ export default function Anomaly() {
                   bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                 }}
               >
-                <Table size={dense ? "small" : "medium"}>
+                <Table size="medium">
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Event</TableCell>
@@ -1281,7 +1129,7 @@ export default function Anomaly() {
                   bgcolor: (t) => (t.palette.mode === "dark" ? alpha("#0b1220", 0.35) : "#ffffff"),
                 }}
               >
-                <Table stickyHeader size={dense ? "small" : "medium"}>
+                <Table stickyHeader size="medium">
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>Day</TableCell>
@@ -1341,7 +1189,7 @@ export default function Anomaly() {
         ) : null}
       </EnterpriseCard>
 
-      {/* ✅ Notification Dialog (SAFE: station derived from manager email) */}
+      {/* ✅ Notification Dialog */}
       <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
           Send Notification to Responsible Staff
@@ -1350,8 +1198,12 @@ export default function Anomaly() {
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
-              label="Manager Email (Logged in)"
-              value={getManagerEmail()}
+              label="Recipient Email"
+              value={
+                stationPreviewLoading
+                  ? "Loading recipient..."
+                  : stationPreview?.person?.PersonEmail || "Not available"
+              }
               fullWidth
               InputProps={{ readOnly: true }}
             />

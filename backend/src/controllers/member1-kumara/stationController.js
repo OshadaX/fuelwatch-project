@@ -21,6 +21,7 @@ const createStation = async (req, res) => {
     // Basic validations
     if (!payload.Id) return res.status(400).json({ ok: false, message: "Id is required" });
     if (!payload.Name) return res.status(400).json({ ok: false, message: "Name is required" });
+    if (payload.Address) payload.Address = String(payload.Address).trim();
     if (!payload.Location) return res.status(400).json({ ok: false, message: "Location is required" });
     if (!payload.person) return res.status(400).json({ ok: false, message: "person is required" });
 
