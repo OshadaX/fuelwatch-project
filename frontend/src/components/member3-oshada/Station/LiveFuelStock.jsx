@@ -59,23 +59,59 @@ const LiveFuelStock = () => {
 
     const fetchSensorData = async () => {
         try {
+            // First, try to fetch station data to get correct capacities if possible
+            let stationTanks = [];
+            try {
+                const stationsRes = await axios.get(`${API_URL}/station`);
+                if (stationsRes.data && (stationsRes.data.stations || stationsRes.data.items)) {
+                    // Assuming we are monitoring the first station for now
+                    const stationDataArr = stationsRes.data.stations || stationsRes.data.items;
+                    stationTanks = stationDataArr.length > 0 ? stationDataArr[0].tanks || [] : [];
+                }
+            } catch (err) {
+                console.warn('Could not fetch station capacities, using defaults:', err);
+            }
+
             const response = await axios.get(`${API_URL}/sensor`);
             const readings = response.data;
 
             if (readings && readings.length > 0) {
                 setFuelData(prevData => prevData.map(fuel => {
-                    // Find the latest reading for this specific tank/sensor
-                    const latestReading = readings.find(r => r.location === fuel.sensorId);
+                    // Filter readings for this specific tank/sensor
+                    const sensorReadings = readings
+                        .filter(r => r.location === fuel.sensorId)
+                        .sort((a, b) => new Date(b.reading_time) - new Date(a.reading_time));
 
-                    if (latestReading) {
+                    if (sensorReadings.length > 0) {
+                        const latestReading = sensorReadings[0];
+
+                        // Update capacity from station data if available
+                        const matchedTank = stationTanks.find(t => t.fuel_type === fuel.type || t.tank_index === fuel.id);
+                        const capacity = matchedTank ? matchedTank.tank_capacity : fuel.capacity;
+
                         // Calculate percentage based on volume and capacity
-                        const percentage = (latestReading.volume / fuel.capacity) * 100;
+                        const percentage = (latestReading.volume / capacity) * 100;
+
+                        // Calculate consumption if we have multiple readings
+                        let consumption = 0;
+                        if (sensorReadings.length > 1) {
+                            const oldestReading = sensorReadings[sensorReadings.length - 1];
+                            const timeDiffHours = (new Date(latestReading.reading_time) - new Date(oldestReading.reading_time)) / (1000 * 60 * 60);
+
+                            if (timeDiffHours > 0) {
+                                // Consumption = volume reduction over time
+                                // If volume increased (refill), we treat consumption as 0 for that period
+                                const volumeDiff = oldestReading.volume - latestReading.volume;
+                                consumption = volumeDiff > 0 ? parseFloat((volumeDiff / timeDiffHours).toFixed(2)) : 0;
+                            }
+                        }
+
                         return {
                             ...fuel,
+                            capacity: capacity,
                             prevLevel: fuel.level || percentage,
                             level: parseFloat(percentage.toFixed(2)),
-                            // Using a mock consumption for now if backend doesn't provide it
-                            consumption: fuel.consumption || Math.floor(Math.random() * 200) + 100
+                            consumption: consumption
                         };
                     }
                     return fuel;

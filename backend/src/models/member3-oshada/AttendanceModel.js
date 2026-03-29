@@ -17,6 +17,10 @@ const AttendanceSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    location: {
+        latitude: Number,
+        longitude: Number
+    },
     status: {
         type: String,
         enum: ['Present', 'Completed'],

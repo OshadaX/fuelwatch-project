@@ -5,7 +5,9 @@ const jwt = require('jsonwebtoken');
 // Get all employees
 const getEmployees = async (req, res) => {
     try {
-        const employees = await Employee.find().sort({ createdAt: -1 });
+        const { stationId } = req.query;
+        const query = stationId ? { stationId } : {};
+        const employees = await Employee.find(query).sort({ createdAt: -1 });
         res.status(200).json(employees);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -16,6 +18,29 @@ const getEmployees = async (req, res) => {
 const loginEmployee = async (req, res) => {
     try {
         const { email, password } = req.body;
+
+        // --- SUPER ADMIN CHECK ---
+        const SUPER_ADMIN_EMAIL = 'superadmin@fuelwatch.com';
+        const SUPER_ADMIN_PASSWORD = 'SuperAdmin@2026';
+
+        if (email === SUPER_ADMIN_EMAIL && password === SUPER_ADMIN_PASSWORD) {
+            const token = jwt.sign(
+                { id: 'SUPER_ADMIN_ID', role: 'super_admin' },
+                process.env.JWT_SECRET || 'your_jwt_secret',
+                { expiresIn: '1d' }
+            );
+            return res.status(200).json({
+                token,
+                user: {
+                    _id: 'SUPER_ADMIN_ID',
+                    email: SUPER_ADMIN_EMAIL,
+                    name: 'Network Super Admin',
+                    role: 'super_admin',
+                    avatar: 'SA'
+                }
+            });
+        }
+        // -------------------------
 
         // Find employee by email
         const employee = await Employee.findOne({ email });
@@ -79,11 +104,24 @@ const createEmployee = async (req, res) => {
 const updateEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        const updatedEmployee = await Employee.findByIdAndUpdate(id, req.body, { new: true });
+        const updateData = { ...req.body };
+
+        // If password is being updated, hash it
+        if (updateData.password) {
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(updateData.password, salt);
+        }
+
+        const updatedEmployee = await Employee.findByIdAndUpdate(id, updateData, { new: true });
         if (!updatedEmployee) {
             return res.status(404).json({ message: 'Employee not found' });
         }
-        res.status(200).json(updatedEmployee);
+
+        // Remove password from response
+        const employeeObj = updatedEmployee.toObject();
+        delete employeeObj.password;
+
+        res.status(200).json(employeeObj);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
