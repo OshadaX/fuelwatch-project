@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { User, LogIn, LogOut, History, MapPin, Loader2, QrCode, X } from 'lucide-react';
+import { User, LogIn, LogOut, History, MapPin, Loader2, QrCode, X, Calendar, Clock } from 'lucide-react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 
@@ -12,18 +12,48 @@ const EmployeePortal = () => {
     const { user } = useAuth();
     const [status, setStatus] = useState({ isClockedIn: false, record: null });
     const [history, setHistory] = useState([]);
+    const [mySchedule, setMySchedule] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
     const [manualStationId, setManualStationId] = useState('');
     const [showManualInput, setShowManualInput] = useState(false);
+    const [assignedStationName, setAssignedStationName] = useState('');
 
     useEffect(() => {
         if (user) {
             fetchStatus();
             fetchHistory();
+            fetchMySchedule();
+            if (user.stationId) {
+                fetchAssignedStation(user.stationId);
+            }
             setLoading(false);
         }
     }, [user]);
+
+    const fetchMySchedule = async () => {
+        if (!user?._id && !user?.id) return;
+        try {
+            const res = await axios.get(`${API_URL}/shifts/employee/${user._id || user.id}`);
+            setMySchedule(res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch schedule:', err);
+        }
+    };
+
+    const fetchAssignedStation = async (stationId) => {
+        try {
+            const response = await axios.get(`${API_URL}/station`);
+            // The stations are typically returned in response.data.stations
+            const stations = response.data.stations || response.data.items || response.data;
+            const station = stations.find(s => s._id === stationId || s.id === stationId);
+            if (station) {
+                setAssignedStationName(station.Name || station.name);
+            }
+        } catch (error) {
+            console.error('Failed to fetch station details:', error);
+        }
+    };
 
     const fetchStatus = async () => {
         try {
@@ -57,7 +87,7 @@ const EmployeePortal = () => {
                     if (data.type === 'STATION_CHECKIN') {
                         scanner.clear();
                         setIsScanning(false);
-                        await handleClockIn(data.stationId);
+                        await handleClockIn(data.stationId, data.timestamp);
                     }
                 } catch (e) {
                     toast.error('Invalid QR Code');
@@ -68,19 +98,83 @@ const EmployeePortal = () => {
         }, 100);
     };
 
-    const handleClockIn = async (stationId) => {
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371e3; // metres
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // in metres
+    };
+
+    const handleClockIn = async (stationId, timestamp = null) => {
+        const toastId = toast.loading('Verifying location...');
+        setLoading(true);
         try {
+            // Get Geolocation
+            let location = { latitude: null, longitude: null };
+
+            if ("geolocation" in navigator) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        });
+                    });
+                    location = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+                } catch (geoError) {
+                    console.warn('Geolocation failed, proceeding without coordinates:', geoError);
+                    toast.error('Location access denied. Verification may fail.', { id: toastId });
+                }
+            }
+
+            // distance check
+            if (location.latitude && location.longitude) {
+                const response = await axios.get(`${API_URL}/station`);
+                const stations = response.data.stations || response.data.items || response.data;
+                const station = stations.find(s => s._id === stationId || s.id === stationId);
+
+                if (station && station.latitude && station.longitude) {
+                    const distance = calculateDistance(location.latitude, location.longitude, station.latitude, station.longitude);
+                    if (distance > 500) {
+                        toast.error(`Check-in blocked. You are ${Math.round(distance)}m away from the station.`, { id: toastId });
+                        setLoading(false);
+                        return;
+                    }
+                }
+            }
+
             await axios.post(`${API_URL}/attendance/clock-in`, {
                 employeeId: user._id || user.id,
-                stationId
+                stationId,
+                timestamp,
+                ...location
             });
-            toast.success('Successfully clocked in!');
+
+            toast.success('Successfully clocked in!', { id: toastId });
             fetchStatus();
             fetchHistory();
             setShowManualInput(false);
             setManualStationId('');
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Clock-in failed');
+            console.error('Clock-in error:', error);
+            const message = error.code === 1
+                ? 'Location permission denied. Please enable GPS to clock in.'
+                : (error.response?.data?.message || 'Clock-in failed');
+            toast.error(message, { id: toastId });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -199,13 +293,10 @@ const EmployeePortal = () => {
                                             </button>
                                         ) : (
                                             <div className="space-y-3 p-4 bg-slate-50 rounded-2xl animate-in fade-in zoom-in duration-300">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Enter Station ID"
-                                                    value={manualStationId}
-                                                    onChange={(e) => setManualStationId(e.target.value)}
-                                                    className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                />
+                                                <div className="text-sm text-slate-600 mb-2">
+                                                    Check in to:<br />
+                                                    <strong className="text-slate-900 text-base">{assignedStationName || 'Your Assigned Station'}</strong>
+                                                </div>
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => setShowManualInput(false)}
@@ -214,13 +305,16 @@ const EmployeePortal = () => {
                                                         Cancel
                                                     </button>
                                                     <button
-                                                        onClick={() => handleClockIn(manualStationId)}
-                                                        disabled={!manualStationId}
+                                                        onClick={() => handleClockIn(user.stationId)}
+                                                        disabled={!user.stationId}
                                                         className="flex-[2] py-2 bg-slate-900 text-white font-bold rounded-xl disabled:opacity-50"
                                                     >
-                                                        Submit
+                                                        Confirm
                                                     </button>
                                                 </div>
+                                                {!user.stationId && (
+                                                    <p className="text-xs text-red-500 text-center mt-2">No station assigned to your profile.</p>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -230,6 +324,56 @@ const EmployeePortal = () => {
 
                         <div className="p-4 text-center">
                             <p className="text-xs text-slate-400 italic">Secure location verified check-in enforced.</p>
+                        </div>
+
+                        {/* My Schedule */}
+                        <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100">
+                            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
+                                <Calendar className="text-blue-600" size={18} />
+                                My Upcoming Shifts
+                            </h3>
+                            {mySchedule.length === 0 ? (
+                                <div className="text-center py-6">
+                                    <Calendar size={28} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs text-slate-400">No upcoming shifts assigned yet.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {mySchedule.map(s => {
+                                        const shiftColors = {
+                                            Morning: 'bg-amber-50 text-amber-700 border-amber-200',
+                                            Night: 'bg-purple-50 text-purple-700 border-purple-200'
+                                        };
+                                        const colorClass = shiftColors[s.shiftType] || shiftColors.Morning;
+                                        const dateObj = new Date(s.date);
+                                        const isToday = s.date === new Date().toISOString().split('T')[0];
+                                        return (
+                                            <div key={s._id} className={`flex items-center justify-between p-3 rounded-2xl border ${s.status === 'cancelled' ? 'opacity-50' : ''} ${isToday ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-slate-50'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] font-bold uppercase text-slate-400">
+                                                            {dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
+                                                        </p>
+                                                        <p className="text-sm font-bold text-slate-800">
+                                                            {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${colorClass}`}>
+                                                        {s.shiftType}
+                                                    </span>
+                                                    {isToday && (
+                                                        <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">TODAY</span>
+                                                    )}
+                                                </div>
+                                                <span className={`text-[10px] font-black uppercase tracking-wider 
+                                                    ${s.status === 'confirmed' ? 'text-emerald-500' : s.status === 'cancelled' ? 'text-red-400' : 'text-slate-400'}`}>
+                                                    {s.status}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
 

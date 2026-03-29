@@ -1,25 +1,21 @@
 import React from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import MainLayout from './components/shared/MainLayout';
-import LiveFuelStock from './components/member3-oshada/LiveFuelStock';
-import EmployeeDashboard from './components/member3-oshada/EmployeeDashboard';
+import LiveFuelStock from './components/member3-oshada/Station/LiveFuelStock';
+import EmployeeDashboard from './components/member3-oshada/Employee/EmployeeDashboard';
 import Portal from './components/member1-kumara/Portal';
 import ReportsGenerator from './components/member1-kumara/ReportsGenerator';
 import Anomaly from './components/member1-kumara/Anomaly';
 import FuelForecastPanel from './components/member1-kumara/FuelForecastPanel';
 import SensorTest from './components/member1-kumara/SensorTest';
 import Hero from './components/shared/Hero';
-import AdminQRView from './components/member3-oshada/AdminQRView';
-import EmployeePortal from './components/member3-oshada/EmployeePortal';
-import LoginPage from './components/member3-oshada/LoginPage';
-import CustomerGuestPage from './components/member2-aluthge/CustomerGuestPage';
-import EVFinder from './components/member2-aluthge/EVFinder';
-import FuelFinder from './components/member2-aluthge/FuelFinder';
-import StaffPrediction from './components/member3-oshada/StaffPrediction';
-import SmartRecommendationAdmin from './components/member2-aluthge/admin/SmartRecommendationAdmin';
-import StationMap from './components/member2-aluthge/admin/StationMap';
-import NavigationMap from './components/member2-aluthge/NavigationMap';
-import EVStationPortal from './components/member2-aluthge/admin/EVStationPortal';
+import AdminQRView from './components/member3-oshada/Admin/AdminQRView';
+import EmployeePortal from './components/member3-oshada/Employee/EmployeePortal';
+import LoginPage from './components/member3-oshada/Auth/LoginPage';
+import StaffPrediction from './components/member3-oshada/Dashboard/StaffPrediction';
+import ShiftSchedulerPage from './components/member3-oshada/Dashboard/ShiftSchedulerPage';
+import StationsView from './components/member3-oshada/Station/StationsView';
+import SuperAdminDashboard from './components/member3-oshada/Admin/SuperAdminDashboard';
 
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
@@ -29,6 +25,9 @@ function App() {
   const { user } = useAuth();
 
   useEffect(() => {
+    if (user?.role === 'super_admin' && (window.location.pathname === '/' || window.location.pathname === '/live-fuel')) {
+      navigate('/super-admin-dashboard');
+    }
     if (user?.role === 'employee' && (window.location.pathname === '/' || window.location.pathname === '/live-fuel')) {
       navigate('/employee-portal');
     }
@@ -37,6 +36,8 @@ function App() {
   const handleExplore = () => {
     if (!user) {
       navigate('/login');
+    } else if (user.role === 'super_admin') {
+      navigate('/super-admin-dashboard');
     } else if (user.role === 'employee') {
       navigate('/employee-portal');
     } else {
@@ -48,6 +49,7 @@ function App() {
     <div className="App">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
         <Route path="*" element={
           <MainLayout onBrandClick={() => navigate('/')}>
             <Routes>
@@ -66,9 +68,8 @@ function App() {
               <Route path="/fuel-station" element={<FuelFinder />} />
               <Route path="/navigate" element={<NavigationMap />} />
               <Route path="/staff-prediction" element={<StaffPrediction />} />
-              <Route path="/recommendation" element={<SmartRecommendationAdmin />} />
-              <Route path="/ev-portal" element={<EVStationPortal />} />
-              <Route path="/station-map" element={<StationMap />} />
+              <Route path="/shift-scheduler" element={<ShiftSchedulerPage />} />
+              <Route path="/stations" element={<StationsView />} />
               {/* Fallback */}
               <Route path="*" element={<Hero onExplore={handleExplore} />} />
             </Routes>

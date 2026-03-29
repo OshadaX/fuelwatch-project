@@ -1,5 +1,6 @@
 // src/controllers/member1-kumara/sensor.controller.js
 const SensorTest = require("../../models/member1-kumara/SensorTestModel");
+const Sensor = require("../../models/member1-kumara/SensorModel");
 const { computeHealthFeatures } = require("../../utils/healthFeatures");
 
 // Simple distance -> fuel (keep for now)
@@ -78,10 +79,11 @@ exports.runSensorTest = async (req, res) => {
 // GET /api/sensor/logs
 exports.getSensorLogs = async (req, res) => {
   try {
-    const logs = await SensorTest.find().sort({ timestamp: -1 }).limit(500);
-    return res.json(logs);
-  } catch (err) {
-    console.error("getSensorLogs error:", err);
-    return res.status(500).json({ message: "Server error" });
+    const readings = await Sensor.find()
+      .sort({ reading_time: -1 })
+      .limit(40);
+    res.json(readings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

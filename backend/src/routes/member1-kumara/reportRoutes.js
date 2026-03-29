@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const { REPORT_MAX_UPLOAD_MB } = require("../../config/env");
-const { generateReport } = require("../../controllers/member1-kumara/reportController");
+const { generateReport, saveFuelPrediction, getLatestFuelPrediction } = require("../../controllers/member1-kumara/reportController");
 
 const router = express.Router();
 
@@ -12,5 +12,9 @@ const upload = multer({
 });
 
 router.post("/generate", upload.single("file"), generateReport);
+
+// Fuel Prediction Persistence
+router.post("/fuel-prediction", saveFuelPrediction);
+router.get("/fuel-prediction/latest", getLatestFuelPrediction);
 
 module.exports = router;

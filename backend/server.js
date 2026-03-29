@@ -18,6 +18,7 @@ const anomalyRoutes = require("./src/routes/member1-kumara/anomaly.routes");
 const uploadRoutes = require("./src/routes/member1-kumara/upload.routes");
 const employeeRoutes = require("./src/routes/member3-oshada/employee.routes");
 const attendanceRoutes = require("./src/routes/member3-oshada/attendance.routes");
+const shiftRoutes = require("./src/routes/member3-oshada/shift.routes");
 const seedRoutes = require("./src/routes/member1-kumara/seedRoutes");
 const reportRoutes = require("./src/routes/member1-kumara/reportRoutes");   // add near other requires
 const notificationsRoutes = require("./src/routes/member1-kumara/notifications.routes");
@@ -65,6 +66,7 @@ app.use("/api/anomaly", anomalyRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/shifts", shiftRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/seed", seedRoutes);
 app.use("/api/reports", reportRoutes);

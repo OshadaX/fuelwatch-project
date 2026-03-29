@@ -49,6 +49,8 @@ const StationSchema = new mongoose.Schema(
     Address: { type: String, required: true },
 
     Location: { type: String, required: true },
+    latitude: { type: Number },
+    longitude: { type: Number },
 
     // 🔐 Manager who registered this station
     // Used later to automatically determine station during notifications
