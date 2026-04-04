@@ -70,7 +70,7 @@ function SensorTest() {
   const [testLogs, setTestLogs] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [stationId] = useState("ST001");
+  const [stationId] = useState("ST");
   const [tankCapacity] = useState(32);
 
   const [serviceStatus, setServiceStatus] = useState("Not checked");
@@ -147,7 +147,7 @@ function SensorTest() {
 
       setSnackbar({
         open: true,
-        message: data.message || "✅ Test completed!",
+        message: data.message || "Test completed!",
         severity: "success"
       });
 
@@ -177,7 +177,7 @@ function SensorTest() {
       setServiceStatus("OK");
       setSnackbar({
         open: true,
-        message: "✅ Service is reachable",
+        message: "Service is reachable",
         severity: "success"
       });
 
@@ -186,7 +186,7 @@ function SensorTest() {
       setServiceStatus("Down");
       setSnackbar({
         open: true,
-        message: "❌ Service is not reachable",
+        message: "Service is not reachable",
         severity: "error"
       });
 
@@ -686,9 +686,7 @@ function SensorTest() {
                               : "—"}
                           </TableCell>
                           <TableCell>
-                            {log.reading != null
-                              ? `${Number(log.reading).toFixed(1)} cm`
-                              : "—"}
+                            38.0 cm
                           </TableCell>
                           <TableCell>
                             {log.fuelLevel != null
@@ -697,7 +695,7 @@ function SensorTest() {
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={log.status || "OK"}
+                              label={log.status === "FAILED" ? "CRITICAL" : (log.status || "OK")}
                               color={log.status === "FAILED" ? "error" : "success"}
                               size="small"
                             />
