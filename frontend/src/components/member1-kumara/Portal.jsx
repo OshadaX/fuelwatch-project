@@ -1,4 +1,3 @@
-// src/pages/member1-kumara/Portal.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -21,18 +20,38 @@ import {
   Download,
   Filter,
   Eye,
+  Mail,
+  Phone,
+  MapPin,
 } from "lucide-react";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
-const http = axios.create({ baseURL: API_BASE, headers: { "Content-Type": "application/json" } });
+const http = axios.create({
+  baseURL: API_BASE,
+  headers: { "Content-Type": "application/json" },
+});
 
-/* ----------------------------
-   SweetAlert (single place)
----------------------------- */
+
+//Logged-in manager email helper
+const getManagerEmail = () => {
+  try {
+    const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
+    return String(u?.email || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+
+//SweetAlert
 const MySwal = withReactContent(Swal);
-const alertOk = (title, text = "") => MySwal.fire({ icon: "success", title, text, confirmButtonText: "OK" });
-const alertErr = (title, text = "") => MySwal.fire({ icon: "error", title, text, confirmButtonText: "OK" });
-const alertInfo = (title, text = "") => MySwal.fire({ icon: "info", title, text, confirmButtonText: "OK" });
+const alertOk = (title, text = "") =>
+  MySwal.fire({ icon: "success", title, text, confirmButtonText: "OK" });
+const alertErr = (title, text = "") =>
+  MySwal.fire({ icon: "error", title, text, confirmButtonText: "OK" });
+const alertInfo = (title, text = "") =>
+  MySwal.fire({ icon: "info", title, text, confirmButtonText: "OK" });
+
 const confirmBox = async (title, text = "Are you sure?") => {
   const r = await MySwal.fire({
     icon: "warning",
@@ -45,26 +64,47 @@ const confirmBox = async (title, text = "Are you sure?") => {
   return r.isConfirmed;
 };
 
-/* ----------------------------
-   Allowed Districts (Sri Lanka)
----------------------------- */
+
+//Allowed Districts
 const allowedDistricts = [
-  "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara",
-  "Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya",
-  "Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya",
+  "Ampara",
+  "Anuradhapura",
+  "Badulla",
+  "Batticaloa",
+  "Colombo",
+  "Galle",
+  "Gampaha",
+  "Hambantota",
+  "Jaffna",
+  "Kalutara",
+  "Kandy",
+  "Kegalle",
+  "Kilinochchi",
+  "Kurunegala",
+  "Mannar",
+  "Matale",
+  "Matara",
+  "Monaragala",
+  "Mullaitivu",
+  "Nuwara Eliya",
+  "Polonnaruwa",
+  "Puttalam",
+  "Ratnapura",
+  "Trincomalee",
+  "Vavuniya",
 ];
 
-/* ----------------------------
-   Validation Regex
----------------------------- */
+
+//Validation Regex
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/; // PUCSL/PRL/1234/2026
-const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/; // letters + spaces only
-const personIdRegex = /^(?:\d{9}[Vv]|\d{12})$/; // old NIC 9+V/v OR new NIC 12 digits
-const personNameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/; // Two names, first letters capital
-const designationRegex = /^MANAGER$/; // only MANAGER
-const gmailRegex = /^[a-z0-9._%+-]+@gmail\.com$/; // only gmail, no capitals
-const phoneRegex = /^0[1-9]\d-\d{4}-\d{3}$/; // 071-1234-567 (2nd digit not 0)
+const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/;
+const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+const addressRegex = /^[A-Za-z0-9/', ]+$/;
+const personIdRegex = /^(?:\d{9}[Vv]|\d{12})$/;
+const personNameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/;
+const designationRegex = /^MANAGER$/;
+const gmailRegex = /^[a-z0-9._%+-]+@gmail\.com$/;
+const phoneRegex = /^0[1-9]\d-\d{4}-\d{3}$/;
 
 const allowedFuelTypes = [
   "Lanka Auto Diesel",
@@ -74,25 +114,53 @@ const allowedFuelTypes = [
   "Kerosene",
 ];
 
-/* ----------------------------
-   ZOD Schema
----------------------------- */
 const schema = z
   .object({
-    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/1234/202X only"),
-    Name: z.string().trim().regex(stationNameRegex, "Only letters + spaces (no numbers/special chars)"),
+    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/XXXX/XXXX only"),
+    Name: z
+      .string()
+      .trim()
+      .regex(stationNameRegex, "Only letters & spaces allowed"),
+    
+
+  Address: z
+  .string()
+  .trim()
+  .min(1, "Address is required")
+  .regex(
+    addressRegex,
+    "Must contain only letters, (0-9)digits, slash (/), apostrophe (') and comma (,)"
+  ),
     Location: z
       .string()
       .trim()
       .min(1, "District is required")
-      .refine((v) => allowedDistricts.includes(v), "Select a valid Sri Lanka district (First letter capital)"),
+      .refine(
+        (v) => allowedDistricts.includes(v),
+        "Select a valid Sri Lanka district"
+      ),
 
     person: z.object({
-      Id: z.string().trim().regex(personIdRegex, "NIC must be 9 digits + V/v OR 12 digits"),
-      PersonName: z.string().trim().regex(personNameRegex, "Use 2 names with capitals (Ex: Alen Smith)"),
-      PersonDesignation: z.string().trim().regex(designationRegex, "Only MANAGER is allowed"),
-      PersonEmail: z.string().trim().regex(gmailRegex, "Only xxxxx@gmail.com allowed (no capitals)"),
-      ContactNumber: z.string().trim().regex(phoneRegex, "Use 071-1234-567 format (2nd digit cannot be 0)"),
+      Id: z
+        .string()
+        .trim()
+        .regex(personIdRegex, "Enter NIC number"),
+      PersonName: z
+        .string()
+        .trim()
+        .regex(personNameRegex, "Only two names with first letter capital"),
+      PersonDesignation: z
+        .string()
+        .trim()
+        .regex(designationRegex, "Designation must be 'MANAGER'"),
+      PersonEmail: z
+        .string()
+        .trim()
+        .regex(gmailRegex, "Enter correct email format"),
+      ContactNumber: z
+        .string()
+        .trim()
+        .regex(phoneRegex, "Format must be 0xx-xxxx-xxx"),
       StartTime: z.string().trim().regex(timeRegex, "Select a time"),
       EndTime: z.string().trim().regex(timeRegex, "Select a time"),
     }),
@@ -104,21 +172,27 @@ const schema = z
             .string()
             .trim()
             .min(1, "Fuel type is required")
-            .refine((v) => allowedFuelTypes.includes(v), "Select a valid fuel type from the list"),
+            .refine(
+              (v) => allowedFuelTypes.includes(v),
+              "Select a valid fuel type from the list"
+            ),
           number_of_tanks: z.coerce.number().int().min(1, "Min 1").max(50, "Max 50"),
           tank_index: z.coerce.number().int().min(1, "Min 1").max(200, "Too large"),
-          tank_capacity: z.coerce.number().min(500, "Min 500L").max(100000, "Max 100000L"),
+          tank_capacity: z.coerce
+            .number()
+            .min(500, "Min 500L")
+            .max(100000, "Max 100000L"),
         })
       )
       .min(1, "At least one tank is required")
       .max(50, "Too many tanks (max 50)"),
   })
   .superRefine((data, ctx) => {
-    // Start/End time order
     const toMins = (t) => {
       const [h, m] = t.split(":").map(Number);
       return h * 60 + m;
     };
+
     if (data?.person?.StartTime && data?.person?.EndTime) {
       if (toMins(data.person.EndTime) <= toMins(data.person.StartTime)) {
         ctx.addIssue({
@@ -129,7 +203,6 @@ const schema = z
       }
     }
 
-    // Unique tank index per fuel type
     const seen = new Set();
     (data.tanks || []).forEach((t, i) => {
       const key = `${t.fuel_type}::${t.tank_index}`;
@@ -139,13 +212,14 @@ const schema = z
           path: ["tanks", i, "tank_index"],
           message: "Tank index must be unique per fuel type",
         });
-      } else seen.add(key);
+      } else {
+        seen.add(key);
+      }
     });
   });
 
-/* ----------------------------
-   Time dropdown (every 30 min)
----------------------------- */
+
+//Time dropdown
 const timeOptions = Array.from({ length: 48 }, (_, i) => {
   const mins = i * 30;
   const h = String(Math.floor(mins / 60)).padStart(2, "0");
@@ -153,13 +227,17 @@ const timeOptions = Array.from({ length: 48 }, (_, i) => {
   return `${h}:${m}`;
 });
 
-/* ----------------------------
-   UI helpers
----------------------------- */
+
+//UI helpers
 const S = {
   app: { minHeight: "100vh", background: "#F3F6FB", color: "#0F172A" },
   wrap: { maxWidth: 1100, margin: "0 auto", padding: 16 },
-  card: { background: "#fff", border: "1px solid rgba(15,23,42,0.10)", borderRadius: 10, padding: 14 },
+  card: {
+    background: "#fff",
+    border: "1px solid rgba(15,23,42,0.10)",
+    borderRadius: 10,
+    padding: 14,
+  },
   row: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" },
   tabs: { display: "flex", gap: 8, flexWrap: "wrap" },
   tabBtn: (active) => ({
@@ -182,32 +260,73 @@ const S = {
       gap: 8,
       alignItems: "center",
     };
-    if (tone === "primary") return { ...base, background: "#2563EB", border: "1px solid #1D4ED8", color: "#fff" };
-    if (tone === "danger") return { ...base, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.22)", color: "#DC2626" };
+    if (tone === "primary") {
+      return {
+        ...base,
+        background: "#2563EB",
+        border: "1px solid #1D4ED8",
+        color: "#fff",
+      };
+    }
+    if (tone === "danger") {
+      return {
+        ...base,
+        background: "rgba(220,38,38,0.08)",
+        border: "1px solid rgba(220,38,38,0.22)",
+        color: "#DC2626",
+      };
+    }
     if (tone === "soft") return { ...base, background: "rgba(15,23,42,0.04)" };
     return base;
   },
   label: { fontSize: 12.5, fontWeight: 900, marginBottom: 6 },
   inputWrap: (invalid) => ({
     borderRadius: 10,
-    border: invalid ? "1px solid rgba(220,38,38,0.50)" : "1px solid rgba(15,23,42,0.12)",
+    border: invalid
+      ? "1px solid rgba(220,38,38,0.50)"
+      : "1px solid rgba(15,23,42,0.12)",
     background: "#fff",
     padding: "10px 10px",
   }),
-  input: { width: "100%", border: "none", outline: "none", fontSize: 14, background: "transparent" },
+  input: {
+    width: "100%",
+    border: "none",
+    outline: "none",
+    fontSize: 14,
+    background: "transparent",
+  },
   err: { fontSize: 12, color: "#DC2626", marginTop: 6, fontWeight: 850 },
   grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 },
   grid4: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 },
   divider: { height: 1, background: "rgba(15,23,42,0.10)", margin: "12px 0" },
-  modalBg: { position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 50 },
-  modal: { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", zIndex: 60, width: "min(920px, calc(100vw - 28px))" },
+  modalBg: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15,23,42,0.45)",
+    zIndex: 50,
+  },
+  modal: {
+    position: "fixed",
+    left: "50%",
+    top: "50%",
+    transform: "translate(-50%,-50%)",
+    zIndex: 60,
+    width: "min(920px, calc(100vw - 28px))",
+  },
 };
 
 function Field({ label, hint, error, children }) {
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          marginBottom: 6,
+        }}
+      >
         <div style={S.label}>{label}</div>
         {hint ? <div style={{ fontSize: 12, opacity: 0.7 }}>{hint}</div> : null}
       </div>
@@ -217,12 +336,12 @@ function Field({ label, hint, error, children }) {
   );
 }
 
-function Input({ invalid, icon: Icon, ...props }) {
+function Input({ invalid, icon: Icon, style = {}, ...props }) {
   return (
     <div style={S.inputWrap(invalid)}>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         {Icon ? <Icon size={18} style={{ opacity: 0.55, color: "#1D4ED8" }} /> : null}
-        <input style={S.input} {...props} />
+        <input style={{ ...S.input, ...style }} {...props} />
       </div>
     </div>
   );
@@ -264,7 +383,7 @@ function Modal({ open, title, onClose, children }) {
 
 const steps = [
   { key: "station", title: "Station Details", icon: Building2 },
-  { key: "person", title: "Contact Person", icon: UserRound },
+  { key: "person", title: "Contact Person Details", icon: UserRound },
   { key: "tanks", title: "Tank Details", icon: Droplets },
 ];
 
@@ -284,15 +403,23 @@ export default function Portal() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState(null);
 
-  // 🔒 Registry lock
   const [pucslId, setPucslId] = useState("");
 
   const defaultValues = useMemo(
     () => ({
       Id: "",
       Name: "",
+      Address: "",
       Location: "",
-      person: { Id: "", PersonName: "", PersonDesignation: "", PersonEmail: "", ContactNumber: "", StartTime: "", EndTime: "" },
+      person: {
+        Id: "",
+        PersonName: "",
+        PersonDesignation: "",
+        PersonEmail: "",
+        ContactNumber: "",
+        StartTime: "",
+        EndTime: "",
+      },
       tanks: [{ fuel_type: "", number_of_tanks: 1, tank_index: 1, tank_capacity: 500 }],
     }),
     []
@@ -308,11 +435,15 @@ export default function Portal() {
     formState: { errors, isSubmitting, isValid },
     watch,
     setValue,
-  } = useForm({ defaultValues, resolver: zodResolver(schema), mode: "onChange", reValidateMode: "onChange" });
+  } = useForm({
+    defaultValues,
+    resolver: zodResolver(schema),
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
 
   const { fields, append, remove } = useFieldArray({ control, name: "tanks" });
 
-  // autosave draft (only create mode)
   useEffect(() => {
     const sub = watch((val) => {
       if (!isEditing) localStorage.setItem("fuelwatch_portal_draft", JSON.stringify(val));
@@ -324,7 +455,9 @@ export default function Portal() {
     if (!isEditing) {
       const draft = localStorage.getItem("fuelwatch_portal_draft");
       if (draft) {
-        try { reset(JSON.parse(draft)); } catch {}
+        try {
+          reset(JSON.parse(draft));
+        } catch {}
       }
     }
   }, [reset, isEditing]);
@@ -332,13 +465,17 @@ export default function Portal() {
   async function fetchStations(nextPage = 1, q = "") {
     setLoadingList(true);
     try {
-      const { data } = await http.get("/station", { params: { page: nextPage, limit: 10, q } });
+      const { data } = await http.get("/station", {
+        params: { page: nextPage, limit: 10, q },
+      });
 
       const items = Array.isArray(data) ? data : data.items || [];
-      const onlyMine = q ? items.filter((s) => (s.Id || "").toUpperCase() === q.toUpperCase()) : items;
+      const onlyMine = q
+        ? items.filter((s) => (s.Id || "").toUpperCase() === q.toUpperCase())
+        : items;
 
       setStations(onlyMine);
-      setTotal(q ? onlyMine.length : (Array.isArray(data) ? data.length : (data.total ?? items.length)));
+      setTotal(q ? onlyMine.length : Array.isArray(data) ? data.length : data.total ?? items.length);
     } catch (e) {
       await alertErr("Failed", e?.response?.data?.message || "Failed to load stations");
     } finally {
@@ -350,22 +487,19 @@ export default function Portal() {
     fetchStations(1, "");
   }, []);
 
-  /* ----------------------------
-     Registry PUCSL prompt
-  ---------------------------- */
   async function askPUCSL() {
     const r = await MySwal.fire({
       icon: "info",
       title: "Enter your PUCSL Station ID",
       input: "text",
-      inputPlaceholder: "PUCSL/PRL/0005/2026",
+      inputPlaceholder: "PUCSL/PRL/xxxx/xxxx",
       showCancelButton: true,
       confirmButtonText: "Continue",
       cancelButtonText: "Cancel",
       inputValidator: (val) => {
         const v = (val || "").trim().toUpperCase();
         if (!v) return "PUCSL ID is required";
-        if (!stationIdRegex.test(v)) return "Invalid format. Use PUCSL/PRL/1234/202X";
+        if (!stationIdRegex.test(v)) return "Invalid format";
         const formId = (getValues("Id") || "").trim().toUpperCase();
         if (formId && formId !== v) return "PUCSL must match the Station ID in Station Details";
         return null;
@@ -381,7 +515,6 @@ export default function Portal() {
     const entered = (r.value || "").trim().toUpperCase();
     const formId = (getValues("Id") || "").trim().toUpperCase();
 
-    // If Station Details empty, auto-fill it so your manager flow works
     if (!formId) setValue("Id", entered, { shouldValidate: true, shouldDirty: true });
 
     setPucslId(entered);
@@ -391,9 +524,17 @@ export default function Portal() {
   async function nextStep() {
     const ok =
       activeStep === 0
-        ? await trigger(["Id", "Name", "Location"])
+        ? await trigger(["Id", "Name", "Address", "Location"])
         : activeStep === 1
-        ? await trigger(["person.Id", "person.PersonName", "person.PersonDesignation", "person.PersonEmail", "person.ContactNumber", "person.StartTime", "person.EndTime"])
+        ? await trigger([
+            "person.Id",
+            "person.PersonName",
+            "person.PersonDesignation",
+            "person.PersonEmail",
+            "person.ContactNumber",
+            "person.StartTime",
+            "person.EndTime",
+          ])
         : await trigger(["tanks"]);
 
     if (!ok) return alertErr("Validation", "Please fix the highlighted fields.");
@@ -415,16 +556,30 @@ export default function Portal() {
 
   async function onSubmit(payload) {
     try {
+      const manager_email = getManagerEmail();
+
+      if (!manager_email) {
+        return alertErr("Unauthorized", "Login required: manager email not found.");
+      }
+
       const normalized = {
         ...payload,
+        manager_email,
+
         Id: payload.Id.trim().toUpperCase(),
+        Name: payload.Name.trim(),
+        Address: payload.Address.trim(),
+        Location: payload.Location.trim(),
         person: {
           ...payload.person,
-          Id: payload.person.Id.trim(), // NIC can include v
-          PersonEmail: payload.person.PersonEmail.trim(),
+          Id: payload.person.Id.trim(),
+          PersonEmail: payload.person.PersonEmail.trim().toLowerCase(),
           ContactNumber: payload.person.ContactNumber.trim(),
         },
-        tanks: payload.tanks.map((t) => ({ ...t, fuel_type: t.fuel_type.trim() })),
+        tanks: payload.tanks.map((t) => ({
+          ...t,
+          fuel_type: t.fuel_type.trim(),
+        })),
       };
 
       if (isEditing) {
@@ -452,6 +607,7 @@ export default function Portal() {
     reset({
       Id: row.Id || "",
       Name: row.Name || "",
+      Address: row.Address || "",
       Location: row.Location || "",
       person: row.person || defaultValues.person,
       tanks: (row.tanks?.length ? row.tanks : defaultValues.tanks).map((t) => ({
@@ -478,8 +634,12 @@ export default function Portal() {
     }
   }
 
-  // step flags
-  const doneStation = !!getValues("Id") && !!getValues("Name") && !!getValues("Location");
+  const doneStation =
+    !!getValues("Id") &&
+    !!getValues("Name") &&
+    !!getValues("Address") &&
+    !!getValues("Location");
+
   const donePerson =
     !!getValues("person.Id") &&
     !!getValues("person.PersonName") &&
@@ -489,7 +649,9 @@ export default function Portal() {
     !!getValues("person.StartTime") &&
     !!getValues("person.EndTime");
 
-  const stationStepOk = !errors.Id && !errors.Name && !errors.Location && doneStation;
+  const stationStepOk =
+    !errors.Id && !errors.Name && !errors.Address && !errors.Location && doneStation;
+
   const personStepOk =
     !errors?.person?.Id &&
     !errors?.person?.PersonName &&
@@ -511,7 +673,9 @@ export default function Portal() {
 
   function exportStationsJSON() {
     const out = { exportedAt: new Date().toISOString(), total, items: stations };
-    const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(out, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -523,35 +687,49 @@ export default function Portal() {
   return (
     <div style={S.app}>
       <div style={S.wrap}>
-        {/* Header */}
         <div style={{ ...S.card, marginBottom: 12 }}>
           <div style={{ ...S.row, justifyContent: "space-between" }}>
             <div>
               <div style={{ fontWeight: 980, fontSize: 18 }}>FuelWatch Portal</div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>Fuelwatch - Filling Station Registering Dashboard</div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
+                Fuelwatch - Filling Station Registration Dashboard
+              </div>
             </div>
           </div>
 
           <div style={S.divider} />
 
           <div style={S.tabs}>
-            <button type="button" style={S.tabBtn(activeTab === "portal")} onClick={() => setActiveTab("portal")}>Form</button>
-            <button type="button" style={S.tabBtn(activeTab === "registry")} onClick={() => setActiveTab("registry")}>Registry</button>
+            <button
+              type="button"
+              style={S.tabBtn(activeTab === "portal")}
+              onClick={() => setActiveTab("portal")}
+            >
+              General Information Form
+            </button>
+            <button
+              type="button"
+              style={S.tabBtn(activeTab === "registry")}
+              onClick={() => setActiveTab("registry")}
+            >
+              Registry
+            </button>
           </div>
         </div>
 
-        {/* Top buttons */}
         <div style={{ ...S.card, marginBottom: 12 }}>
           <div style={{ ...S.row, justifyContent: "space-between" }}>
             <div />
             <div style={S.row}>
-              <button type="button" style={S.btn("soft")} onClick={clearForm}><X size={16} /> Reset</button>
+              <button type="button" style={S.btn("soft")} onClick={clearForm}>
+                <X size={16} /> Reset
+              </button>
               <button
                 type="button"
                 style={S.btn("primary")}
                 onClick={handleSubmit(onSubmit)}
                 disabled={isSubmitting || !isValid}
-                title={!isValid ? "Fix all validation errors before saving" : ""}
+                title={!isValid ? "Fix all errors before saving" : ""}
               >
                 <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update" : "Register"}
               </button>
@@ -559,7 +737,6 @@ export default function Portal() {
           </div>
         </div>
 
-        {/* FORM TAB */}
         {activeTab === "portal" && (
           <div style={S.card}>
             <div style={{ ...S.row, justifyContent: "space-between" }}>
@@ -568,7 +745,12 @@ export default function Portal() {
               </div>
 
               <div style={S.row}>
-                <button type="button" style={S.btn("soft")} onClick={prevStep} disabled={activeStep === 0}>
+                <button
+                  type="button"
+                  style={S.btn("soft")}
+                  onClick={prevStep}
+                  disabled={activeStep === 0}
+                >
                   <ChevronLeft size={16} /> Back
                 </button>
 
@@ -589,7 +771,12 @@ export default function Portal() {
                     Next <ChevronRight size={16} />
                   </button>
                 ) : (
-                  <button type="button" style={S.btn("primary")} onClick={handleSubmit(onSubmit)} disabled={isSubmitting || !isValid}>
+                  <button
+                    type="button"
+                    style={S.btn("primary")}
+                    onClick={handleSubmit(onSubmit)}
+                    disabled={isSubmitting || !isValid}
+                  >
                     <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update Station" : "Register Station"}
                   </button>
                 )}
@@ -598,7 +785,6 @@ export default function Portal() {
 
             <div style={S.divider} />
 
-            {/* Step buttons */}
             <div style={S.row}>
               {steps.map((s, idx) => {
                 const Icon = s.icon;
@@ -614,16 +800,24 @@ export default function Portal() {
                       if (locked) {
                         alertErr(
                           "Complete previous step",
-                          idx === 1 ? "Complete Station Details first." : "Complete Station + Contact Person details first."
+                          idx === 1
+                            ? "Complete Station Details first."
+                            : "Complete Station + Contact Person details first."
                         );
                         return;
                       }
                       setActiveStep(idx);
                     }}
-                    style={{ ...S.tabBtn(active), opacity: locked ? 0.5 : 1, cursor: locked ? "not-allowed" : "pointer" }}
+                    style={{
+                      ...S.tabBtn(active),
+                      opacity: locked ? 0.5 : 1,
+                      cursor: locked ? "not-allowed" : "pointer",
+                    }}
                     title={locked ? "Complete previous step first" : ""}
                   >
-                    <span style={S.row}><Icon size={16} /> {s.title}</span>
+                    <span style={S.row}>
+                      <Icon size={16} /> {s.title}
+                    </span>
                   </button>
                 );
               })}
@@ -631,99 +825,161 @@ export default function Portal() {
 
             <div style={S.divider} />
 
-            {/* STEP 0 */}
             {activeStep === 0 && (
-              <div style={S.grid3}>
-                <Field label="Station Id" hint="PUCSL/PRL/1234/202X" error={errors?.Id?.message}>
+              <div style={S.grid2}>
+                <Field label="Station Id" hint="Enter PUCSL ID" error={errors?.Id?.message}>
                   <Input
                     icon={Building2}
-                    placeholder="PUCSL/PRL/0005/2026"
+                    placeholder="Enter PUCSL ID"
                     invalid={!!errors?.Id}
-                    {...register("Id", { onChange: (e) => setValue("Id", e.target.value.toUpperCase()) })}
+                    {...register("Id", {
+                      onChange: (e) => setValue("Id", e.target.value.toUpperCase()),
+                    })}
                   />
                 </Field>
 
                 <Field label="Station Name" error={errors?.Name?.message}>
-                  <Input icon={Building2} placeholder="Sample Filling Station" invalid={!!errors?.Name} {...register("Name")} />
+                  <Input
+                    icon={Building2}
+                    placeholder="Sample Filling Station"
+                    invalid={!!errors?.Name}
+                    {...register("Name")}
+                  />
+                </Field>
+
+                <Field label="Address" error={errors?.Address?.message}>
+                  <Input
+                    icon={MapPin}
+                    placeholder="Enter station address"
+                    invalid={!!errors?.Address}
+                    {...register("Address")}
+                  />
                 </Field>
 
                 <Field label="Location (District)" error={errors?.Location?.message}>
                   <Select icon={Filter} invalid={!!errors?.Location} {...register("Location")}>
                     <option value="">Select district...</option>
-                    {allowedDistricts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {allowedDistricts.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
               </div>
             )}
 
-            {/* STEP 1 */}
             {activeStep === 1 && (
               <div style={S.grid2}>
                 <Field label="NIC Number" error={errors?.person?.Id?.message}>
                   <Input
                     icon={UserRound}
-                    placeholder="200456834V or 200456834v or 200456834567"
+                    placeholder="Enter NIC number"
                     invalid={!!errors?.person?.Id}
-                    {...register("person.Id", { onChange: (e) => setValue("person.Id", e.target.value) })}
+                    {...register("person.Id", {
+                      onChange: (e) => setValue("person.Id", e.target.value),
+                    })}
                   />
                 </Field>
 
-                <Field label="Person Name" error={errors?.person?.PersonName?.message}>
-                  <Input icon={UserRound} placeholder="Alen Smith" invalid={!!errors?.person?.PersonName} {...register("person.PersonName")} />
+                <Field label="Contact Person Name" error={errors?.person?.PersonName?.message}>
+                  <Input
+                    icon={UserRound}
+                    placeholder="First name & Last name"
+                    invalid={!!errors?.person?.PersonName}
+                    {...register("person.PersonName")}
+                  />
                 </Field>
 
-                <Field label="Designation" error={errors?.person?.PersonDesignation?.message}>
+                <Field label="Contact Person Designation" error={errors?.person?.PersonDesignation?.message}>
                   <Input
                     icon={Building2}
-                    placeholder="MANAGER"
+                    placeholder="Designation"
                     invalid={!!errors?.person?.PersonDesignation}
-                    {...register("person.PersonDesignation", { onChange: (e) => setValue("person.PersonDesignation", e.target.value.toUpperCase()) })}
+                    {...register("person.PersonDesignation", {
+                      onChange: (e) =>
+                        setValue("person.PersonDesignation", e.target.value.toUpperCase()),
+                    })}
                   />
                 </Field>
 
-                <Field label="Email" error={errors?.person?.PersonEmail?.message}>
+                <Field
+                  label="Responsible Person's Email"
+                  hint="This email will receive alerts"
+                  error={errors?.person?.PersonEmail?.message}
+                >
                   <Input
-                    icon={Filter}
-                    placeholder="alen@gmail.com"
+                    icon={Mail}
+                    placeholder="Emergency Notification Email"
                     invalid={!!errors?.person?.PersonEmail}
-                    {...register("person.PersonEmail", { onChange: (e) => setValue("person.PersonEmail", e.target.value.toLowerCase()) })}
+                    style={{ color: "#EA580C" }}
+                    {...register("person.PersonEmail", {
+                      onChange: (e) =>
+                        setValue("person.PersonEmail", e.target.value.toLowerCase()),
+                    })}
                   />
                 </Field>
 
                 <Field label="Contact Number" error={errors?.person?.ContactNumber?.message}>
-                  <Input icon={Filter} placeholder="071-1234-567" invalid={!!errors?.person?.ContactNumber} {...register("person.ContactNumber")} />
+                  <Input
+                    icon={Phone}
+                    placeholder="xxx-xxxx-xxx"
+                    invalid={!!errors?.person?.ContactNumber}
+                    {...register("person.ContactNumber")}
+                  />
                 </Field>
 
                 <div style={S.grid2}>
                   <Field label="Start Time" error={errors?.person?.StartTime?.message}>
                     <Select invalid={!!errors?.person?.StartTime} {...register("person.StartTime")}>
-                      <option value="">Select...</option>
-                      {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      <option value="">Select</option>
+                      {timeOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
                     </Select>
                   </Field>
+
                   <Field label="End Time" error={errors?.person?.EndTime?.message}>
                     <Select invalid={!!errors?.person?.EndTime} {...register("person.EndTime")}>
-                      <option value="">Select...</option>
-                      {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      <option value="">Select</option>
+                      {timeOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
                     </Select>
                   </Field>
                 </div>
               </div>
             )}
 
-            {/* STEP 2 */}
             {activeStep === 2 && (
               <div>
                 <div style={{ ...S.row, justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>Fuel type locked • unique tank index per fuel type</div>
-                  <button type="button" style={S.btn("primary")} onClick={() => append({ fuel_type: "", number_of_tanks: 1, tank_index: fields.length + 1, tank_capacity: 500 })}>
+                  <button
+                    type="button"
+                    style={S.btn("primary")}
+                    onClick={() =>
+                      append({
+                        fuel_type: "",
+                        number_of_tanks: 1,
+                        tank_index: fields.length + 1,
+                        tank_capacity: 500,
+                      })
+                    }
+                  >
                     <Plus size={16} /> Add Tank
                   </button>
                 </div>
 
                 <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                   {fields.map((f, idx) => (
-                    <div key={f.id} style={{ ...S.card, padding: 12, background: "rgba(15,23,42,0.02)" }}>
+                    <div
+                      key={f.id}
+                      style={{ ...S.card, padding: 12, background: "rgba(15,23,42,0.02)" }}
+                    >
                       <div style={{ ...S.row, justifyContent: "space-between" }}>
                         <div style={{ fontWeight: 980 }}>Tank #{idx + 1}</div>
                         <button
@@ -733,28 +989,61 @@ export default function Portal() {
                           disabled={fields.length === 1}
                           title={fields.length === 1 ? "At least one tank required" : "Remove"}
                         >
-                          <Trash2 size={16} /> Remove
+                          <Trash2 size={16} /> Remove Tanks
                         </button>
                       </div>
 
                       <div style={{ ...S.grid4, marginTop: 10 }}>
                         <Field label="Fuel Type" error={errors?.tanks?.[idx]?.fuel_type?.message}>
-                          <Select icon={Droplets} invalid={!!errors?.tanks?.[idx]?.fuel_type} {...register(`tanks.${idx}.fuel_type`)}>
-                            <option value="">Select fuel type...</option>
-                            {allowedFuelTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                          <Select
+                            icon={Droplets}
+                            invalid={!!errors?.tanks?.[idx]?.fuel_type}
+                            {...register(`tanks.${idx}.fuel_type`)}
+                          >
+                            <option value="">Select fuel type</option>
+                            {allowedFuelTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
                           </Select>
                         </Field>
 
-                        <Field label="No. of Tanks" error={errors?.tanks?.[idx]?.number_of_tanks?.message}>
-                          <Input type="number" min="1" max="50" invalid={!!errors?.tanks?.[idx]?.number_of_tanks} {...register(`tanks.${idx}.number_of_tanks`)} />
+                        <Field
+                          label="No. of Tanks"
+                          error={errors?.tanks?.[idx]?.number_of_tanks?.message}
+                        >
+                          <Input
+                            type="number"
+                            min="1"
+                            max="50"
+                            invalid={!!errors?.tanks?.[idx]?.number_of_tanks}
+                            {...register(`tanks.${idx}.number_of_tanks`)}
+                          />
                         </Field>
 
                         <Field label="Tank Index" error={errors?.tanks?.[idx]?.tank_index?.message}>
-                          <Input type="number" min="1" max="200" invalid={!!errors?.tanks?.[idx]?.tank_index} {...register(`tanks.${idx}.tank_index`)} />
+                          <Input
+                            type="number"
+                            min="1"
+                            max="200"
+                            invalid={!!errors?.tanks?.[idx]?.tank_index}
+                            {...register(`tanks.${idx}.tank_index`)}
+                          />
                         </Field>
 
-                        <Field label="Tank Capacity (L)" error={errors?.tanks?.[idx]?.tank_capacity?.message}>
-                          <Input type="number" min="500" max="100000" step="1" invalid={!!errors?.tanks?.[idx]?.tank_capacity} {...register(`tanks.${idx}.tank_capacity`)} />
+                        <Field
+                          label="Tank Capacity (L)"
+                          error={errors?.tanks?.[idx]?.tank_capacity?.message}
+                        >
+                          <Input
+                            type="number"
+                            min="500"
+                            max="100000"
+                            step="1"
+                            invalid={!!errors?.tanks?.[idx]?.tank_capacity}
+                            {...register(`tanks.${idx}.tank_capacity`)}
+                          />
                         </Field>
                       </div>
                     </div>
@@ -765,7 +1054,6 @@ export default function Portal() {
           </div>
         )}
 
-        {/* REGISTRY TAB */}
         {activeTab === "registry" && (
           <>
             {!pucslId ? (
@@ -787,8 +1075,12 @@ export default function Portal() {
                     Enter PUCSL ID
                   </button>
 
-                  <button type="button" style={{ ...S.btn("soft"), marginLeft: 8 }} onClick={() => setActiveTab("portal")}>
-                    Back to Form
+                  <button
+                    type="button"
+                    style={{ ...S.btn("soft"), marginLeft: 8 }}
+                    onClick={() => setActiveTab("portal")}
+                  >
+                    Back
                   </button>
                 </div>
               </div>
@@ -834,9 +1126,17 @@ export default function Portal() {
                   <div style={S.inputWrap(false)}>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                       <Filter size={18} style={{ opacity: 0.55, color: "#1D4ED8" }} />
-                      <select style={{ ...S.input, cursor: "pointer" }} value={quickFuel} onChange={(e) => setQuickFuel(e.target.value)}>
+                      <select
+                        style={{ ...S.input, cursor: "pointer" }}
+                        value={quickFuel}
+                        onChange={(e) => setQuickFuel(e.target.value)}
+                      >
                         <option value="all">All fuel types</option>
-                        {allowedFuelTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                        {allowedFuelTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -851,32 +1151,77 @@ export default function Portal() {
                   </button>
                 </div>
 
-                {loadingList ? <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>Loading…</div> : null}
+                {loadingList ? (
+                  <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>Loading…</div>
+                ) : null}
 
                 <div style={S.divider} />
 
                 {shownStations.length === 0 ? (
-                  <div style={{ fontSize: 13, opacity: 0.75 }}>No station found for PUCSL ID: <b>{pucslId}</b></div>
+                  <div style={{ fontSize: 13, opacity: 0.75 }}>
+                    No station found for PUCSL ID: <b>{pucslId}</b>
+                  </div>
                 ) : (
-                  <div style={{ overflowX: "auto", border: "1px solid rgba(15,23,42,0.10)", borderRadius: 10 }}>
+                  <div
+                    style={{
+                      overflowX: "auto",
+                      border: "1px solid rgba(15,23,42,0.10)",
+                      borderRadius: 10,
+                    }}
+                  >
                     <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
                       <thead>
                         <tr style={{ background: "rgba(15,23,42,0.04)" }}>
-                          <Th>Station</Th><Th>Id</Th><Th>Location</Th><Th>Contact</Th><Th>Tanks</Th><Th right>Actions</Th>
+                          <Th>Station</Th>
+                          <Th>Id</Th>
+                          <Th>Address</Th>
+                          <Th>Location</Th>
+                          <Th>Contact</Th>
+                          <Th>Tanks</Th>
+                          <Th right>Actions</Th>
                         </tr>
                       </thead>
                       <tbody>
                         {shownStations.map((s, idx) => (
-                          <tr key={s._id || idx} style={{ borderTop: "1px solid rgba(15,23,42,0.10)" }}>
-                            <Td><b>{s.Name}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.PersonDesignation || "—"}</div></Td>
+                          <tr
+                            key={s._id || idx}
+                            style={{ borderTop: "1px solid rgba(15,23,42,0.10)" }}
+                          >
+                            <Td>
+                              <b>{s.Name}</b>
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                                {s.person?.PersonDesignation || "—"}
+                              </div>
+                            </Td>
                             <Td>{s.Id}</Td>
+                            <Td>{s.Address || "—"}</Td>
                             <Td>{s.Location}</Td>
-                            <Td><b>{s.person?.PersonName || "—"}</b><div style={{ fontSize: 12, opacity: 0.7 }}>{s.person?.ContactNumber || "—"}</div></Td>
+                            <Td>
+                              <b>{s.person?.PersonName || "—"}</b>
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                                {s.person?.ContactNumber || "—"}
+                              </div>
+                            </Td>
                             <Td>{(s.tanks || []).length}</Td>
                             <Td right>
-                              <button style={S.btn("soft")} onClick={() => { setPreviewRow(s); setPreviewOpen(true); }}><Eye size={16} /></button>
-                              <button style={S.btn()} onClick={() => startEdit(s)}><Pencil size={16} /></button>
-                              <button style={S.btn("danger")} onClick={() => removeStation(s._id || s.id)}><Trash2 size={16} /></button>
+                              <button
+                                style={S.btn("soft")}
+                                onClick={() => {
+                                  setPreviewRow(s);
+                                  setPreviewOpen(true);
+                                }}
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <button style={S.btn()} onClick={() => startEdit(s)}>
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                style={S.btn("danger")}
+                                onClick={() => removeStation(s._id || s.id)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             </Td>
                           </tr>
                         ))}
@@ -888,17 +1233,27 @@ export default function Portal() {
             )}
           </>
         )}
-
       </div>
 
-      {/* Preview Modal */}
       <Modal
         open={previewOpen}
         title={`Station Preview${previewRow?.Id ? ` • ${previewRow.Id}` : ""}`}
-        onClose={() => { setPreviewOpen(false); setPreviewRow(null); }}
+        onClose={() => {
+          setPreviewOpen(false);
+          setPreviewRow(null);
+        }}
       >
         {previewRow ? (
-          <pre style={{ margin: 0, fontSize: 12, background: "rgba(15,23,42,0.04)", padding: 12, borderRadius: 10, overflow: "auto" }}>
+          <pre
+            style={{
+              margin: 0,
+              fontSize: 12,
+              background: "rgba(15,23,42,0.04)",
+              padding: 12,
+              borderRadius: 10,
+              overflow: "auto",
+            }}
+          >
             {JSON.stringify(previewRow, null, 2)}
           </pre>
         ) : null}
@@ -913,25 +1268,35 @@ export default function Portal() {
   );
 }
 
-/* table helpers */
 function Th({ children, right }) {
   return (
-    <th style={{
-      textAlign: right ? "right" : "left",
-      padding: "10px 10px",
-      fontSize: 12,
-      opacity: 0.75,
-      fontWeight: 950,
-      borderBottom: "1px solid rgba(15,23,42,0.10)",
-      whiteSpace: "nowrap",
-    }}>
+    <th
+      style={{
+        textAlign: right ? "right" : "left",
+        padding: "10px 10px",
+        fontSize: 12,
+        opacity: 0.75,
+        fontWeight: 950,
+        borderBottom: "1px solid rgba(15,23,42,0.10)",
+        whiteSpace: "nowrap",
+      }}
+    >
       {children}
     </th>
   );
 }
+
 function Td({ children, right, colSpan }) {
   return (
-    <td style={{ padding: "10px 10px", fontSize: 13, verticalAlign: "top", textAlign: right ? "right" : "left" }} colSpan={colSpan}>
+    <td
+      style={{
+        padding: "10px 10px",
+        fontSize: 13,
+        verticalAlign: "top",
+        textAlign: right ? "right" : "left",
+      }}
+      colSpan={colSpan}
+    >
       {children}
     </td>
   );

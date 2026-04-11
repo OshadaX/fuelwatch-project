@@ -6,7 +6,7 @@ import pandas as pd
 from utils.config import DATA_RAW_DIR, PROCESSED_DAILY_CSV, DATA_PROCESSED_DIR
 from utils.time_features import add_time_features
 
-RAW_FILE = DATA_RAW_DIR / "fuel_dispenses.csv"  # put your file here
+RAW_FILE = DATA_RAW_DIR / "fuel_dispenses.csv"  
 
 
 def _load_trained_fuels() -> list[str]:
@@ -14,7 +14,7 @@ def _load_trained_fuels() -> list[str]:
     Read trained fuel column names from models/model_meta.json
     If not available, return empty list (no enforcement).
     """
-    base_dir = Path(__file__).resolve().parents[1]  # member1-kumara/
+    base_dir = Path(__file__).resolve().parents[1] 
     meta_path = base_dir / "models" / "model_meta.json"
 
     if not meta_path.exists():
@@ -34,7 +34,7 @@ def main():
 
     df = pd.read_csv(RAW_FILE)
 
-    # --- Clean columns we need ---
+  
     # CSV columns: Date, Item, Qty
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df["Qty"] = pd.to_numeric(df["Qty"], errors="coerce").fillna(0.0)
@@ -42,30 +42,25 @@ def main():
     # Drop rows with missing Date or Item
     df = df.dropna(subset=["Date", "Item"])
 
-    # --- Aggregate daily totals per fuel type ---
+   
     daily = (
         df.groupby(["Date", "Item"], as_index=False)["Qty"]
         .sum()
         .sort_values("Date")
     )
 
-    # --- Pivot to wide format: one row per date, columns = fuel types ---
+
     pivot = (
         daily.pivot_table(index="Date", columns="Item", values="Qty", aggfunc="sum")
         .fillna(0.0)
         .sort_index()
     )
 
-    # --- Fill missing dates to make continuous daily series ---
     full_idx = pd.date_range(pivot.index.min(), pivot.index.max(), freq="D")
     pivot = pivot.reindex(full_idx, fill_value=0.0)
     pivot.index.name = "Date"
-
-    # ==========================================================
-    # ✅ IMPORTANT FIX:
-    # Ensure ALL trained fuel columns exist even if current data
-    # only has one fuel type (prevents zero-collapse / mismatch)
-    # ==========================================================
+    
+    # Ensure ALL trained fuel columns exist
     trained_fuels = _load_trained_fuels()
 
     if trained_fuels:
@@ -74,10 +69,10 @@ def main():
             if f not in pivot.columns:
                 pivot[f] = 0.0
 
-        # Keep column order stable: trained fuels first (prevents swapping)
+        # Keep column order stable: trained fuels first
         pivot = pivot[trained_fuels]
     else:
-        # If no meta exists yet, just keep whatever columns are present
+        
         trained_fuels = list(pivot.columns)
 
     # --- Add time features ---

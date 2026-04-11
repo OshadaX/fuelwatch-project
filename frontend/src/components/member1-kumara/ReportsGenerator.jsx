@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 
-// npm i sweetalert2 sweetalert2-react-content
 const MySwal = withReactContent(Swal);
 
 export default function ReportsGenerator() {
@@ -22,7 +21,7 @@ export default function ReportsGenerator() {
     );
   }, [file, from, to]);
 
-  // ---------- SweetAlert helpers ----------
+  //SweetAlert helpers
   const toast = Swal.mixin({
     toast: true,
     position: "top-end",
@@ -163,8 +162,8 @@ export default function ReportsGenerator() {
 
   const showGeneratingModal = () => {
     MySwal.fire({
-      title: "Generating report…",
-      html: "Please wait while we prepare your PDF.",
+      title: "Generating report",
+      html: "Please wait while !",
       allowOutsideClick: false,
       allowEscapeKey: false,
       didOpen: () => {
@@ -319,7 +318,7 @@ export default function ReportsGenerator() {
       height: 44,
       borderRadius: 12,
       background:
-        "linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #06b6d4 100%)",
+        "linear-gradient(135deg, #2563eb)",
       boxShadow: "0 8px 24px rgba(37, 99, 235, 0.25)",
     },
     titleWrap: { display: "flex", flexDirection: "column" },
@@ -436,7 +435,7 @@ export default function ReportsGenerator() {
       border: "1px solid rgba(15, 23, 42, 0.14)",
       background: loading
         ? "linear-gradient(180deg, rgba(248,250,252,0.9) 0%, rgba(241,245,249,0.9) 100%)"
-        : "linear-gradient(135deg, #2563eb 0%, #7c3aed 60%, #06b6d4 120%)",
+        : "linear-gradient(135deg, #2563eb",
       color: loading ? "#334155" : "#ffffff",
       cursor: loading || !canSubmit ? "not-allowed" : "pointer",
       fontWeight: 900,
@@ -472,9 +471,9 @@ export default function ReportsGenerator() {
           <div style={styles.brand}>
             <div style={styles.logo} />
             <div style={styles.titleWrap}>
-              <h1 style={styles.h1}>AI-based Report Generator</h1>
+              <h1 style={styles.h1}>Fuelwatch - Report Generator</h1>
               <p style={styles.sub}>
-                Fuelwatch - Report Generator for Fuel Quantity Forecasting
+                 Report Generator for Upcoming Fuel Quantity Forecasting
               </p>
             </div>
           </div>
@@ -513,7 +512,7 @@ export default function ReportsGenerator() {
                     <div style={styles.fileName}>
                       {file ? file.name : "No file selected"}
                     </div>
-                    <div style={styles.fileHint}>Accepted: .csv (text/csv)</div>
+                    <div style={styles.fileHint}>Accepted: Only .csv files</div>
                   </div>
 
                   <label
@@ -536,7 +535,7 @@ export default function ReportsGenerator() {
                     Choose file
                     <input
                       type="file"
-                      accept=".csv,text/csv"
+                      accept=".csv"
                       style={{ display: "none" }}
                       onChange={async (e) => {
                         const f = e.target.files?.[0] || null;
@@ -597,10 +596,6 @@ export default function ReportsGenerator() {
                   <div style={styles.checkboxTitle}>
                     Use AI for column mapping
                   </div>
-                  <div style={styles.checkboxDesc}>
-                    Recommended if your CSV headers differ. Only mapping uses AI;
-                    computation and PDF rendering remain deterministic.
-                  </div>
                 </div>
               </div>
 
@@ -619,11 +614,6 @@ export default function ReportsGenerator() {
                     ? "All inputs look good."
                     : "Select a CSV and enter valid dates to enable generation."}
                 </div>
-              </div>
-
-              <div style={styles.help}>
-                Tip: If your server returns structured errors (422/400), they
-                will be shown as SweetAlerts for faster triage.
               </div>
 
               {audit && (
@@ -653,7 +643,7 @@ export default function ReportsGenerator() {
             <div style={styles.cardHeader}>
               <h3 style={styles.cardTitle}>Notifications</h3>
               <div style={{ fontSize: 12, color: "#64748b" }}>
-                SweetAlerts enabled
+                Alerts enabled
               </div>
             </div>
             <div style={styles.cardBody}>
@@ -668,29 +658,21 @@ export default function ReportsGenerator() {
                 }}
               >
                 <div style={{ fontWeight: 900, marginBottom: 6, fontSize: 13 }}>
-                  How it works now
-                </div>
-                <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.45 }}>
-                  All errors, validations, row-normalization issues, progress,
-                  and audit output are shown via SweetAlert modals/toasts. Use
-                  the “View last audit” button after a run if you want to re-open
-                  it.
+                  How it works
                 </div>
               </div>
 
               <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
-                • File select → toast<br />
-                • Generate progress → loading modal<br />
-                • Success/Failure → modal<br />
-                • Validation + Row errors → modal lists<br />
-                • Audit → modal (optional)
+                • Select your .csv file<br />
+                • Generate progress<br />
+                • Success/Failure output <br />
               </div>
             </div>
           </div>
         </div>
 
         <div style={styles.footer}>
-          © {new Date().getFullYear()} • Reports Service • Enterprise UI shell
+          © {new Date().getFullYear()} • Reports Service • Fuelwatch
         </div>
       </div>
     </div>

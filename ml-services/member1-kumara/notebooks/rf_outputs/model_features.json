@@ -1,0 +1,11 @@
+[
+  "total_qty",
+  "txn_count",
+  "avg_txn",
+  "std_txn",
+  "balance_delta",
+  "qty_vs_balance_gap",
+  "roll7_qty_mean",
+  "roll7_qty_std",
+  "qty_change"
+]
