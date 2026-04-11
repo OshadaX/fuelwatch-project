@@ -4,7 +4,16 @@ const Employee = require('../../models/member3-oshada/EmployeeModel');
 // Clock-in via QR scan
 const clockIn = async (req, res) => {
     try {
-        const { employeeId, stationId } = req.body;
+        const { employeeId, stationId, timestamp, latitude, longitude } = req.body;
+
+        // Verify QR Code Freshness (e.g., must be from last 5 minutes)
+        if (timestamp) {
+            const now = Date.now();
+            const fiveMinutes = 5 * 60 * 1000;
+            if (now - timestamp > fiveMinutes) {
+                return res.status(400).json({ message: 'QR Code has expired. Please refresh the station display.' });
+            }
+        }
 
         // Check if employee exists
         const employee = await Employee.findById(employeeId);
@@ -26,6 +35,7 @@ const clockIn = async (req, res) => {
             employeeId,
             stationId,
             checkInTime: new Date(),
+            location: latitude && longitude ? { latitude, longitude } : null,
             status: 'Present'
         });
 
@@ -85,9 +95,22 @@ const getClockStatus = async (req, res) => {
     }
 };
 
+// Get all currently checked-in employees (admin view)
+const getActiveCheckIns = async (req, res) => {
+    try {
+        const records = await Attendance.find({ status: 'Present' })
+            .populate('employeeId', 'name employeeId avatar color stationId role')
+            .sort({ checkInTime: -1 });
+        res.status(200).json(records);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     clockIn,
     clockOut,
     getEmployeeAttendance,
-    getClockStatus
+    getClockStatus,
+    getActiveCheckIns
 };

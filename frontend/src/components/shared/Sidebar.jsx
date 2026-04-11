@@ -4,8 +4,10 @@ import { ChevronLeft, ChevronRight, LogIn, LogOut, UserCircle } from "lucide-rea
 import { useAuth } from "../../context/AuthContext";
 
 const Sidebar = ({ isCollapsed, onToggle }) => {
-    const navigate = useNavigate();
     const { user, login, logout } = useAuth();
+    const navigate = useNavigate();
+
+    if (user?.role === 'super_admin') return null;
 
     const menuItems = [
         {
@@ -38,7 +40,8 @@ const Sidebar = ({ isCollapsed, onToggle }) => {
                 { name: "Employee Dashboard", path: "/employee-dashboard", roles: ["admin"] },
                 { name: "Admin Station QR", path: "/admin-qr", roles: ["admin"] },
                 { name: "Employee Portal", path: "/employee-portal", roles: ["employee"] },
-                { name: "Staff Prediction", path: "/staff-prediction", roles: ["admin"] }
+                { name: "Staff Prediction", path: "/staff-prediction", roles: ["admin"] },
+                { name: "Shift Scheduler", path: "/shift-scheduler", roles: ["admin"] }
             ]
         },
         {

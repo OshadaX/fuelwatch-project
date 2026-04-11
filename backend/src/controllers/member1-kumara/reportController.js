@@ -1,6 +1,5 @@
-// backend/src/controllers/member1-kumara/reportController.js
-
 const { REPORT_STRICT_MODE } = require("../../config/env");
+const FuelPrediction = require("../../models/member1-kumara/FuelPredictionModel");
 
 const { ingestCsvBuffer } = require("../../utils/ingestCsv");
 const { inferMappingFree, inferMappingDeterministic } = require("../../utils/aiMapper");
@@ -160,4 +159,50 @@ async function generateReport(req, res) {
   }
 }
 
-module.exports = { generateReport };
+async function saveFuelPrediction(req, res) {
+  try {
+    const { stationId, mode, predictions } = req.body;
+
+    if (!stationId || !mode || !predictions) {
+      return res.status(400).json({ ok: false, message: "Missing required fields: stationId, mode, predictions" });
+    }
+
+    const newPrediction = await FuelPrediction.create({
+      stationId,
+      mode,
+      predictions,
+    });
+
+    return res.status(201).json({
+      ok: true,
+      message: "Fuel prediction saved successfully",
+      data: newPrediction,
+    });
+  } catch (err) {
+    console.error("Error saving fuel prediction:", err);
+    return res.status(500).json({ ok: false, message: "Server error while saving fuel prediction", details: err.message });
+  }
+}
+
+async function getLatestFuelPrediction(req, res) {
+  try {
+    const { stationId } = req.query;
+
+    const query = stationId ? { stationId } : {};
+
+    const latest = await FuelPrediction.findOne(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!latest) {
+      return res.status(404).json({ ok: false, message: "No fuel predictions found" });
+    }
+
+    return res.json({ ok: true, data: latest });
+  } catch (err) {
+    console.error("Error fetching fuel prediction:", err);
+    return res.status(500).json({ ok: false, message: "Server error while fetching fuel prediction", details: err.message });
+  }
+}
+
+module.exports = { generateReport, saveFuelPrediction, getLatestFuelPrediction };

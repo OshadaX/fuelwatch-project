@@ -4,11 +4,13 @@ const {
     clockIn,
     clockOut,
     getEmployeeAttendance,
-    getClockStatus
+    getClockStatus,
+    getActiveCheckIns
 } = require('../../controllers/member3-oshada/attendanceController');
 
 router.post('/clock-in', clockIn);
 router.post('/clock-out', clockOut);
+router.get('/active', getActiveCheckIns);
 router.get('/history/:employeeId', getEmployeeAttendance);
 router.get('/status/:employeeId', getClockStatus);
 

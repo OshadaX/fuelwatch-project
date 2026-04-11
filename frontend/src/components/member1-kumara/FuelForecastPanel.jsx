@@ -1,8 +1,9 @@
 // FuelForecastPanel.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
   BadgeCheck,
@@ -27,27 +28,28 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
 } from "recharts";
-
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
+// API Base URL for backend
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8081/api";
+
 const MODE_OPTIONS = [
-  { value: "weekly", label: "Weekly"},
-  { value: "monthly", label: "Monthly"},
-  { value: "annual", label: "Annual"},
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "annual", label: "Annual" },
 ];
 
 const BRAND = {
@@ -68,7 +70,6 @@ const BRAND = {
 
 const FUEL_COLORS = [BRAND.primary, BRAND.success, BRAND.warn, BRAND.danger, BRAND.violet, BRAND.cyan];
 const MAX_FILE_MB = 25;
-const API_BASE_URL = "http://localhost:8081";
 
 function cx(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -281,6 +282,60 @@ function Skeleton({ className }) {
   return <div className={cx("animate-pulse rounded-2xl bg-slate-200/70", className)} />;
 }
 
+const styles = {
+  sectionTitle: {
+    fontSize: "1.25rem",
+    fontWeight: "900",
+    color: "#0f172a",
+    marginBottom: "1rem",
+  },
+};
+
+function DataTable({ rows = [], emptyText = "No data available." }) {
+  if (!rows.length) {
+    return (
+      <div className="grid h-40 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-400">
+        {emptyText}
+      </div>
+    );
+  }
+
+  const columns = Object.keys(rows[0]);
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
+            {columns.map((c) => (
+              <th key={c} className="px-4 py-3">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr
+              key={idx}
+              className={cx(
+                "border-t border-slate-200 dark:border-white/10",
+                idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
+              )}
+            >
+              {columns.map((c) => (
+                <td key={c} className="px-4 py-3 tabular-nums">
+                  {typeof row[c] === "number" ? row[c].toLocaleString() : String(row[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Dropdown({ label, icon: Icon, items = [], disabled }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -425,8 +480,7 @@ function Banner({ tone = "neutral", icon: Icon, title, text }) {
 }
 
 export default function FuelForecastPanel() {
-  const reduceMotion = useReducedMotion();
-
+  const navigate = useNavigate();
   const [mode, setMode] = useState("weekly");
   const [file, setFile] = useState(null);
 
@@ -440,6 +494,9 @@ export default function FuelForecastPanel() {
   const [activeTab, setActiveTab] = useState("charts");
   const [fuelSearch, setFuelSearch] = useState("");
   const [selectedFuels, setSelectedFuels] = useState(() => new Set());
+  const [reduceMotion] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false
+  );
 
   const forecastObj = useMemo(() => result?.forecast || result || null, [result]);
   const totals = useMemo(() => forecastObj?.totals || null, [forecastObj]);
@@ -447,66 +504,57 @@ export default function FuelForecastPanel() {
   const monthly = useMemo(() => forecastObj?.monthly || [], [forecastObj]);
   const isAnnual = mode === "annual";
 
-  const headerFrom = forecastObj?.from || result?.from_date || result?.from || "-";
-  const headerTo = forecastObj?.to || result?.to_date || result?.to || "-";
-  const ingested = String(result?.ingest?.ingested ?? false);
+  const fuelKeys = useMemo(() => (totals ? Object.keys(totals) : []), [totals]);
 
-  const fileError = useMemo(() => {
-    if (!file) return "Please upload a PDF report to generate a forecast.";
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) return "Only PDF files are allowed.";
-    if (file.size > MAX_FILE_MB * 1024 * 1024) return `PDF is too large (max ${MAX_FILE_MB}MB).`;
-    return "";
-  }, [file]);
+  const filteredFuelKeys = useMemo(() => {
+    if (!fuelSearch) return fuelKeys;
+    const q = fuelSearch.toLowerCase();
+    return fuelKeys.filter((k) => k.toLowerCase().includes(q));
+  }, [fuelKeys, fuelSearch]);
+
+  const grandTotal = useMemo(() => {
+    if (!totals) return 0;
+    return Object.values(totals).reduce((a, b) => a + (Number(b) || 0), 0);
+  }, [totals]);
+
+  const topFuel = useMemo(() => {
+    if (!totals || fuelKeys.length === 0) return null;
+    const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    return { fuel: sorted[0][0], value: sorted[0][1] };
+  }, [totals, fuelKeys]);
 
   const totalsChartData = useMemo(() => {
     if (!totals) return [];
     return Object.entries(totals)
-      .map(([fuel, value]) => ({ fuel, value: Number(value) || 0 }))
+      .map(([fuel, value]) => ({ fuel, value }))
       .sort((a, b) => b.value - a.value);
   }, [totals]);
 
   const dailyChartData = useMemo(() => {
     if (!daily?.length) return [];
-    return daily.map((row) => {
-      const d = row.Date || row.date || row.DATE;
-      return { ...row, DateLabel: d ? String(d).split("T")[0] : "" };
-    });
+    return daily.map((row) => ({
+      ...row,
+      DateLabel: shortDate(row.Date || row.date),
+    }));
   }, [daily]);
 
   const monthlyChartData = useMemo(() => {
     if (!monthly?.length) return [];
-    return monthly.map((row) => ({ ...row }));
+    return monthly;
   }, [monthly]);
 
-  const fuelKeys = useMemo(() => {
-    if (!totals) return [];
-    return Object.keys(totals);
-  }, [totals]);
+  const headerFrom = useMemo(() => result?.from_date || result?.from || forecastObj?.from || null, [result, forecastObj]);
+  const headerTo = useMemo(() => result?.to_date || result?.to || forecastObj?.to || null, [result, forecastObj]);
+  const ingested = useMemo(() => result?.metadata?.filename || result?.filename || "Report PDF", [result]);
 
-  const filteredFuelKeys = useMemo(() => {
-    const q = fuelSearch.trim().toLowerCase();
-    if (!q) return fuelKeys;
-    return fuelKeys.filter((k) => k.toLowerCase().includes(q));
-  }, [fuelKeys, fuelSearch]);
-
-  useEffect(() => {
-    if (!fuelKeys.length) return;
-    setSelectedFuels((prev) => {
-      if (prev.size) return prev;
-      return new Set(fuelKeys);
-    });
-  }, [fuelKeys]);
-
-  const grandTotal = useMemo(() => {
-    if (!totals) return 0;
-    return Object.values(totals).reduce((acc, v) => acc + (Number(v) || 0), 0);
-  }, [totals]);
-
-  const topFuel = useMemo(() => {
-    if (!totalsChartData.length) return null;
-    return totalsChartData[0];
-  }, [totalsChartData]);
+  const fileError =
+    !file
+      ? "Please upload a PDF report to generate a forecast."
+      : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
+        ? "Only PDF files are allowed."
+        : file.size > 25 * 1024 * 1024
+          ? "PDF is too large (max 25MB)."
+          : "";
 
   async function saveForecastToDb(payload) {
     const response = await axios.post(`${API_BASE_URL}/api/forecast/save`, payload);
