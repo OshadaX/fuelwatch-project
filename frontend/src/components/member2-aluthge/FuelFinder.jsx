@@ -107,49 +107,7 @@ const FuelFinder = () => {
     // API Base URL
     const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
 
-    // Mock data
-    const mockStations = [
-        {
-            id: 1,
-            name: "City Fuels",
-            lat: 6.9271,
-            lng: 79.8612,
-            address: "123 Main St, Colombo",
-            status: "Open",
-            brand: "Ceypetco",
-            inventory: { 'Petrol': 'Available', 'Diesel': 'Unavailable', 'Other': 'Available' }
-        },
-        {
-            id: 2,
-            name: "Lanka IOC Station",
-            lat: 6.9320,
-            lng: 79.8550,
-            address: "45 Park Ave, Colombo",
-            status: "Open",
-            brand: "IOC",
-            inventory: { 'Petrol': 'Available', 'Diesel': 'Available', 'Other': 'Unavailable' }
-        },
-        {
-            id: 3,
-            name: "Highway Filling",
-            lat: 6.9100,
-            lng: 79.8700,
-            address: "88 Tech Rd, Colombo",
-            status: "Closed",
-            brand: "Ceypetco",
-            inventory: { 'Petrol': 'Available', 'Diesel': 'Available', 'Other': 'Available' }
-        },
-        {
-            id: 4,
-            name: "Suburban Fuel",
-            lat: 6.9000,
-            lng: 79.8500,
-            address: "101 Sub Rd, Colombo",
-            status: "Open",
-            brand: "Sinopec",
-            inventory: { 'Petrol': 'Unavailable', 'Diesel': 'Available', 'Other': 'Available' }
-        },
-    ];
+
 
     // Central coordinates for Sri Lankan districts for fallback geocoding
     const DISTRICT_COORDS = {
@@ -174,7 +132,7 @@ const FuelFinder = () => {
             setDbStations(stationsList);
         } catch (err) {
             console.error("Failed to fetch registered stations", err);
-            setDbStations(mockStations);
+            setDbStations([]);
         }
     };
 
