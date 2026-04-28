@@ -14,12 +14,6 @@ const EVFinder = () => {
     const [error, setError] = useState(null);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-    // Mock data for EV stations
-    const mockStations = [
-        { id: 1, name: "City Center EV Hub", lat: 6.9271, lng: 79.8612, address: "123 Main St, Colombo", status: "Open" },
-        { id: 2, name: "Green Park Charging", lat: 6.9320, lng: 79.8550, address: "45 Park Ave, Colombo", status: "Closed" },
-        { id: 3, name: "TechZone Charger", lat: 6.9100, lng: 79.8700, address: "88 Tech Rd, Colombo", status: "Open" },
-    ];
 
     const getTimeOfDay = () => {
         const hour = new Date().getHours();
@@ -187,7 +181,7 @@ const EVFinder = () => {
         setLoading(true);
         setError(null);
         try {
-            const stationsSource = dbStations.length > 0 ? dbStations : mockStations;
+            const stationsSource = dbStations;
             const processedStations = [];
 
             // Process and geocode stations
