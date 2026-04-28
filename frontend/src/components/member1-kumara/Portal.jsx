@@ -137,6 +137,8 @@ const schema = z
         (v) => allowedDistricts.includes(v),
         "Select a valid Sri Lanka district (First letter capital)"
       ),
+    latitude: z.coerce.number().min(-90, "Min -90").max(90, "Max 90"),
+    longitude: z.coerce.number().min(-180, "Min -180").max(180, "Max 180"),
 
     person: z.object({
       Id: z
@@ -411,6 +413,8 @@ export default function Portal() {
       Name: "",
       Address: "",
       Location: "",
+      latitude: "",
+      longitude: "",
       person: {
         Id: "",
         PersonName: "",
@@ -524,7 +528,7 @@ export default function Portal() {
   async function nextStep() {
     const ok =
       activeStep === 0
-        ? await trigger(["Id", "Name", "Address", "Location"])
+        ? await trigger(["Id", "Name", "Address", "Location", "latitude", "longitude"])
         : activeStep === 1
         ? await trigger([
             "person.Id",
@@ -570,6 +574,8 @@ export default function Portal() {
         Name: payload.Name.trim(),
         Address: payload.Address.trim(),
         Location: payload.Location.trim(),
+        latitude: Number(payload.latitude),
+        longitude: Number(payload.longitude),
         person: {
           ...payload.person,
           Id: payload.person.Id.trim(),
@@ -609,6 +615,8 @@ export default function Portal() {
       Name: row.Name || "",
       Address: row.Address || "",
       Location: row.Location || "",
+      latitude: row.latitude || "",
+      longitude: row.longitude || "",
       person: row.person || defaultValues.person,
       tanks: (row.tanks?.length ? row.tanks : defaultValues.tanks).map((t) => ({
         fuel_type: t.fuel_type ?? "",
@@ -638,7 +646,9 @@ export default function Portal() {
     !!getValues("Id") &&
     !!getValues("Name") &&
     !!getValues("Address") &&
-    !!getValues("Location");
+    !!getValues("Location") &&
+    !!getValues("latitude") &&
+    !!getValues("longitude");
 
   const donePerson =
     !!getValues("person.Id") &&
@@ -650,7 +660,7 @@ export default function Portal() {
     !!getValues("person.EndTime");
 
   const stationStepOk =
-    !errors.Id && !errors.Name && !errors.Address && !errors.Location && doneStation;
+    !errors.Id && !errors.Name && !errors.Address && !errors.Location && !errors.latitude && !errors.longitude && doneStation;
 
   const personStepOk =
     !errors?.person?.Id &&
@@ -865,6 +875,28 @@ export default function Portal() {
                       </option>
                     ))}
                   </Select>
+                </Field>
+
+                <Field label="Latitude" error={errors?.latitude?.message}>
+                  <Input
+                    type="number"
+                    step="any"
+                    icon={MapPin}
+                    placeholder="e.g. 6.9271"
+                    invalid={!!errors?.latitude}
+                    {...register("latitude")}
+                  />
+                </Field>
+
+                <Field label="Longitude" error={errors?.longitude?.message}>
+                  <Input
+                    type="number"
+                    step="any"
+                    icon={MapPin}
+                    placeholder="e.g. 79.8612"
+                    invalid={!!errors?.longitude}
+                    {...register("longitude")}
+                  />
                 </Field>
               </div>
             )}

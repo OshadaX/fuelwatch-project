@@ -107,21 +107,6 @@ const FuelFinder = () => {
     // API Base URL
     const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8081/api";
 
-
-
-    // Central coordinates for Sri Lankan districts for fallback geocoding
-    const DISTRICT_COORDS = {
-        "Ampara": [7.2889, 81.6722], "Anuradhapura": [8.3114, 80.4037], "Badulla": [6.9847, 81.0565],
-        "Batticaloa": [7.7310, 81.6747], "Colombo": [6.9271, 79.8612], "Galle": [6.0367, 80.2170],
-        "Gampaha": [7.0873, 80.0144], "Hambantota": [6.1246, 81.1244], "Jaffna": [9.6615, 80.0255],
-        "Kalutara": [6.5854, 79.9607], "Kandy": [7.2906, 80.6337], "Kegalle": [7.2513, 80.3464],
-        "Kilinochchi": [9.3803, 80.3925], "Kurunegala": [7.4863, 80.3647], "Mannar": [8.9819, 79.9044],
-        "Matale": [7.4675, 80.6234], "Matara": [5.9549, 80.5550], "Monaragala": [6.8687, 81.3508],
-        "Mullaitivu": [9.2671, 80.8143], "Nuwara Eliya": [6.9497, 80.7891], "Polonnaruwa": [7.9326, 81.0004],
-        "Puttalam": [8.0330, 79.8250], "Ratnapura": [6.6828, 80.3992], "Trincomalee": [8.5873, 81.2152],
-        "Vavuniya": [8.7542, 80.4982]
-    };
-
     const fetchDbStations = async () => {
         try {
             const response = await fetch(`${API_BASE}/station?limit=100`);
@@ -147,6 +132,9 @@ const FuelFinder = () => {
         if (geoCache[address]) return geoCache[address];
 
         try {
+            // Rate limit protection: OpenStreetMap requires 1 request per second max.
+            await new Promise(r => setTimeout(r, 600)); 
+
             const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ", Sri Lanka")}&format=json&limit=1`);
             const data = await res.json();
             if (data && data.length > 0) {
@@ -308,14 +296,19 @@ const FuelFinder = () => {
             for (const st of stationsToProcess) {
                 const fullAddress = `${st.Address}, ${st.Location}`;
 
-                // Try to get coordinates from address (member 2 logic)
-                let coords = await geocodeWithRetry(fullAddress);
-
-                // Fallback to district center if geocoding fails
-                if (!coords) {
-                    const dCoords = DISTRICT_COORDS[st.Location] || DISTRICT_COORDS["Colombo"];
-                    coords = { lat: dCoords[0], lng: dCoords[1] };
+                // 1st priority: Use latitude/longitude stored in the database
+                let coords = null;
+                if (st.latitude != null && st.longitude != null) {
+                    coords = { lat: st.latitude, lng: st.longitude };
                 }
+
+                // 2nd priority: Geocode from address via Nominatim API with delay
+                if (!coords) {
+                    coords = await geocodeWithRetry(fullAddress);
+                }
+
+                // Skip station if no coordinates could be resolved at all
+                if (!coords) continue;
 
                 const inventoryObj = {};
                 st.tanks?.forEach(tank => {
