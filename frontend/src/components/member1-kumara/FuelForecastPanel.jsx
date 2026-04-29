@@ -644,7 +644,7 @@ export default function FuelForecastPanel() {
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-xs text-slate-600">Upload PDF -> Generate -> Analyze -> Export</div>
+                  <div className="truncate text-xs text-slate-600">Upload PDF - Generate - Analyze - Export</div>
                 </div>
               </div>
 
