@@ -1,9 +1,8 @@
 // FuelForecastPanel.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
   BadgeCheck,
@@ -20,7 +19,6 @@ import {
   LineChart as LineChartIcon,
   Loader2,
   RefreshCw,
-  Save,
   Search,
   Sparkles,
   Trash2,
@@ -29,43 +27,36 @@ import {
   X,
 } from "lucide-react";
 import {
-  ResponsiveContainer,
-  BarChart,
   Bar,
-  LineChart,
+  BarChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
 } from "recharts";
 import { forecastFuel, healthCheck } from "../../services/mlService";
 import { downloadCsv } from "../../utils/downloadCsv";
 
-// API Base URL for backend
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8081/api";
 
 const MODE_OPTIONS = [
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "annual", label: "Annual" },
+  { value: "weekly", label: "Weekly", badge: "7D", hint: "7-day demand forecast" },
+  { value: "monthly", label: "Monthly", badge: "30D", hint: "30-day demand forecast" },
+  { value: "annual", label: "Annual", badge: "12M", hint: "12-month demand forecast" },
 ];
 
 const BRAND = {
   primary: "#2563eb",
-  primaryDark: "#1d4ed8",
-  primarySoft: "#dbeafe",
   success: "#10b981",
   warn: "#f59e0b",
   danger: "#ef4444",
   violet: "#8b5cf6",
   cyan: "#06b6d4",
-  ink: "#0f172a",
-  muted: "#475569",
   border: "#dbe2ea",
-  surface: "#ffffff",
-  surfaceAlt: "#f8fafc",
 };
 
 const FUEL_COLORS = [BRAND.primary, BRAND.success, BRAND.warn, BRAND.danger, BRAND.violet, BRAND.cyan];
@@ -75,31 +66,27 @@ function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function formatNumber(v) {
-  const n = Number(v);
+function formatNumber(value) {
+  const n = Number(value);
   if (!Number.isFinite(n)) return "0.000";
   return n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
-function shortDate(v) {
-  if (!v) return "-";
-  try {
-    return String(v).split("T")[0];
-  } catch {
-    return "-";
-  }
+function shortDate(value) {
+  if (!value) return "-";
+  return String(value).split("T")[0];
 }
 
 function niceBytes(bytes) {
   if (!Number.isFinite(bytes)) return "";
   const units = ["B", "KB", "MB", "GB"];
-  let b = bytes;
-  let i = 0;
-  while (b >= 1024 && i < units.length - 1) {
-    b /= 1024;
-    i++;
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
   }
-  return `${b.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 function showAlert({ icon = "success", title = "", text = "", timer = 1800, confirm = false }) {
@@ -130,9 +117,7 @@ function showLoading({ title = "Processing...", text = "Please wait while we gen
     text,
     allowOutsideClick: false,
     allowEscapeKey: false,
-    didOpen: () => {
-      Swal.showLoading();
-    },
+    didOpen: () => Swal.showLoading(),
     background: "#ffffff",
     color: "#0f172a",
     confirmButtonColor: BRAND.primary,
@@ -144,7 +129,7 @@ function showLoading({ title = "Processing...", text = "Please wait while we gen
   });
 }
 
-function SurfaceCard({ children, className }) {
+function Card({ children, className = "" }) {
   return (
     <div
       className={cx(
@@ -158,16 +143,9 @@ function SurfaceCard({ children, className }) {
   );
 }
 
-function SectionCard({ children, className }) {
+function SectionCard({ children, className = "" }) {
   return (
-    <div
-      className={cx(
-        "relative overflow-hidden rounded-2xl border bg-white shadow-[0_10px_24px_-18px_rgba(0,0,0,0.35)]",
-        "border-slate-200/80",
-        className
-      )}
-      style={{ borderColor: BRAND.border }}
-    >
+    <div className={cx("relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_24px_-18px_rgba(0,0,0,0.35)]", className)}>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-50/70 via-transparent to-transparent" />
       <div className="relative">{children}</div>
     </div>
@@ -178,18 +156,24 @@ function SoftDivider() {
   return <div className="my-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />;
 }
 
-function PrimaryButton({ icon: Icon, children, onClick, disabled, variant = "primary", title }) {
-  const base =
-    "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2";
+function Button({ icon: Icon, children, onClick, disabled, variant = "primary", title }) {
   const variants = {
     primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white",
-    ghost: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white",
     subtle: "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 focus:ring-slate-300 focus:ring-offset-white",
     danger: "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500 focus:ring-offset-white",
   };
 
   return (
-    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cx(base, variants[variant])}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cx(
+        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-extrabold transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2",
+        variants[variant] || variants.primary
+      )}
+    >
       {Icon ? <Icon className="h-4 w-4" /> : null}
       {children}
     </button>
@@ -205,12 +189,9 @@ function StatPill({ icon: Icon, label, value, sub, tone = "default" }) {
     warn: "bg-amber-500 text-white",
   };
 
-  const toneStyle = tones[tone] || tones.default;
-
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_24px_-20px_rgba(0,0,0,0.35)]">
-      <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-blue-600/8 blur-2xl" />
-      <div className="pointer-events-none absolute -left-16 -bottom-16 h-36 w-36 rounded-full bg-emerald-500/6 blur-2xl" />
+      <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-blue-600/10 blur-2xl" />
       <div className="relative flex items-center gap-3">
         <div className={cx("grid h-10 w-10 place-items-center rounded-xl", toneMap[tone] || toneMap.default)}>
           <Icon className="h-5 w-5" />
@@ -225,103 +206,44 @@ function StatPill({ icon: Icon, label, value, sub, tone = "default" }) {
   );
 }
 
-function ModeSegmented({ value, onChange, options, disabled }) {
+function Segmented({ value, onChange, options, disabled }) {
   return (
     <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white p-2">
-      {options.map((o) => {
-        const active = o.value === value;
+      {options.map((option) => {
+        const active = option.value === value;
         return (
           <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            disabled={disabled}
-            className={cx(
-              "group relative overflow-hidden rounded-xl px-4 py-2 text-sm font-extrabold transition",
-              "disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2",
-              active ? "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white" : "text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white"
-            )}
-            title={o.hint}
+            key={option.value}
             type="button"
+            onClick={() => onChange(option.value)}
+            disabled={disabled}
+            title={option.hint}
+            className={cx(
+              "group relative overflow-hidden rounded-xl px-4 py-2 text-sm font-extrabold transition disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2",
+              active
+                ? "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-white"
+                : "text-slate-700 hover:bg-slate-50 focus:ring-slate-300 focus:ring-offset-white"
+            )}
           >
-            <span className="relative z-10">{o.label}</span>
-            <span
-              className={cx(
-                "relative z-10 ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black",
-                active ? "bg-white/20 text-white" : "bg-slate-900/5 text-slate-600"
-              )}
-            >
-              {o.badge}
+            <span className="relative z-10">{option.label}</span>
+            <span className={cx("relative z-10 ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black", active ? "bg-white/20 text-white" : "bg-slate-900/5 text-slate-600")}>
+              {option.badge}
             </span>
-
             {active ? (
               <span className="pointer-events-none absolute inset-0 opacity-100">
                 <span className="absolute -left-6 -top-6 h-20 w-20 rounded-full bg-white/15 blur-2xl" />
                 <span className="absolute -right-6 -bottom-6 h-20 w-20 rounded-full bg-black/10 blur-2xl" />
               </span>
-            </button>
-          );
-        })}
-      </div>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function Skeleton({ className }) {
+function Skeleton({ className = "" }) {
   return <div className={cx("animate-pulse rounded-xl bg-slate-200/70", className)} />;
-}
-
-const styles = {
-  sectionTitle: {
-    fontSize: "1.25rem",
-    fontWeight: "900",
-    color: "#0f172a",
-    marginBottom: "1rem",
-  },
-};
-
-function DataTable({ rows = [], emptyText = "No data available." }) {
-  if (!rows.length) {
-    return (
-      <div className="grid h-40 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-400">
-        {emptyText}
-      </div>
-    );
-  }
-
-  const columns = Object.keys(rows[0]);
-
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-zinc-950">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-white/5 dark:text-zinc-300">
-            {columns.map((c) => (
-              <th key={c} className="px-4 py-3">
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, idx) => (
-            <tr
-              key={idx}
-              className={cx(
-                "border-t border-slate-200 dark:border-white/10",
-                idx % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-slate-50/60 dark:bg-white/5"
-              )}
-            >
-              {columns.map((c) => (
-                <td key={c} className="px-4 py-3 tabular-nums">
-                  {typeof row[c] === "number" ? row[c].toLocaleString() : String(row[c])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 function Dropdown({ label, icon: Icon, items = [], disabled }) {
@@ -329,9 +251,9 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    function onDoc(e) {
+    function onDoc(event) {
       if (!ref.current) return;
-      if (!ref.current.contains(e.target)) setOpen(false);
+      if (!ref.current.contains(event.target)) setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -342,13 +264,8 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
-        className={cx(
-          "inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-extrabold transition",
-          "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-          "disabled:cursor-not-allowed disabled:opacity-60",
-          "focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-white"
-        )}
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-white"
       >
         {Icon ? <Icon className="h-4 w-4" /> : null}
         {label}
@@ -363,20 +280,20 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_22px_60px_-30px_rgba(0,0,0,0.45)]"
           >
-            {items.map((it, idx) => (
+            {items.map((item, index) => (
               <button
-                key={idx}
+                key={`${item.label}-${index}`}
                 type="button"
                 onClick={() => {
                   setOpen(false);
-                  it.onClick?.();
+                  item.onClick?.();
                 }}
-                disabled={it.disabled}
-                className={cx("flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold transition", "hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60")}
+                disabled={item.disabled}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {it.icon ? <it.icon className="h-4 w-4" /> : null}
-                <span className="flex-1">{it.label}</span>
-                {it.hint ? <span className="text-xs text-slate-500">{it.hint}</span> : null}
+                {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                <span className="flex-1">{item.label}</span>
+                {item.hint ? <span className="text-xs text-slate-500">{item.hint}</span> : null}
               </button>
             ))}
           </motion.div>
@@ -388,7 +305,7 @@ function Dropdown({ label, icon: Icon, items = [], disabled }) {
 
 function ChartCard({ title, subtitle, actions, children, icon: Icon }) {
   return (
-    <GlassCard className="p-0">
+    <SectionCard className="p-0">
       <div className="flex flex-col gap-3 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 bg-slate-50">
@@ -409,24 +326,16 @@ function ChartCard({ title, subtitle, actions, children, icon: Icon }) {
 function FuelLegendChips({ fuelKeys, selected, onToggle, onAll, onNone }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={onAll}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50"
-      >
+      <button type="button" onClick={onAll} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50">
         All
       </button>
-      <button
-        type="button"
-        onClick={onNone}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50"
-      >
+      <button type="button" onClick={onNone} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50">
         None
       </button>
 
-      {fuelKeys.map((fuel, idx) => {
+      {fuelKeys.map((fuel, index) => {
         const active = selected.has(fuel);
-        const dot = FUEL_COLORS[idx % FUEL_COLORS.length];
+        const dot = FUEL_COLORS[index % FUEL_COLORS.length];
         return (
           <button
             key={fuel}
@@ -436,7 +345,6 @@ function FuelLegendChips({ fuelKeys, selected, onToggle, onAll, onNone }) {
               "inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-black transition",
               active ? "border-blue-600/20 bg-blue-600 text-white hover:bg-blue-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             )}
-            title={active ? "Hide series" : "Show series"}
           >
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: dot }} />
             {fuel}
@@ -447,105 +355,74 @@ function FuelLegendChips({ fuelKeys, selected, onToggle, onAll, onNone }) {
   );
 }
 
-function Banner({ tone = "neutral", icon: Icon, title, text }) {
-  const styles = {
-    neutral: "border-slate-200 bg-white text-slate-600",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    danger: "border-rose-200 bg-rose-50 text-rose-800",
-  };
-
-  return (
-    <div className={cx("rounded-3xl border px-5 py-4", styles[tone] || styles.neutral)}>
-      <div className="flex items-start gap-3">
-        {Icon ? <Icon className="mt-0.5 h-5 w-5 shrink-0" /> : null}
-        <div>
-          {title ? <div className="font-black">{title}</div> : null}
-          <div className={cx("text-sm", title ? "mt-1" : "")}>{text}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function FuelForecastPanel() {
-  const navigate = useNavigate();
   const [mode, setMode] = useState("weekly");
   const [file, setFile] = useState(null);
-
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState(null);
-
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [savingForecast, setSavingForecast] = useState(false);
-
   const [activeTab, setActiveTab] = useState("charts");
   const [fuelSearch, setFuelSearch] = useState("");
   const [selectedFuels, setSelectedFuels] = useState(() => new Set());
-  const [reduceMotion] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false
-  );
+  const [reduceMotion] = useState(() => (typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false));
 
   const forecastObj = useMemo(() => result?.forecast || result || null, [result]);
   const totals = useMemo(() => forecastObj?.totals || null, [forecastObj]);
   const daily = useMemo(() => forecastObj?.daily || [], [forecastObj]);
   const monthly = useMemo(() => forecastObj?.monthly || [], [forecastObj]);
   const isAnnual = mode === "annual";
-
   const fuelKeys = useMemo(() => (totals ? Object.keys(totals) : []), [totals]);
+
+  useEffect(() => {
+    if (fuelKeys.length) setSelectedFuels(new Set(fuelKeys));
+  }, [fuelKeys]);
 
   const filteredFuelKeys = useMemo(() => {
     if (!fuelSearch) return fuelKeys;
-    const q = fuelSearch.toLowerCase();
-    return fuelKeys.filter((k) => k.toLowerCase().includes(q));
+    const query = fuelSearch.toLowerCase();
+    return fuelKeys.filter((key) => key.toLowerCase().includes(query));
   }, [fuelKeys, fuelSearch]);
 
   const grandTotal = useMemo(() => {
     if (!totals) return 0;
-    return Object.values(totals).reduce((a, b) => a + (Number(b) || 0), 0);
+    return Object.values(totals).reduce((sum, value) => sum + (Number(value) || 0), 0);
   }, [totals]);
 
   const topFuel = useMemo(() => {
-    if (!totals || fuelKeys.length === 0) return null;
-    const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    if (!totals || !fuelKeys.length) return null;
+    const sorted = Object.entries(totals).sort((a, b) => Number(b[1]) - Number(a[1]));
     return { fuel: sorted[0][0], value: sorted[0][1] };
   }, [totals, fuelKeys]);
 
   const totalsChartData = useMemo(() => {
     if (!totals) return [];
     return Object.entries(totals)
-      .map(([fuel, value]) => ({ fuel, value }))
+      .map(([fuel, value]) => ({ fuel, value: Number(value) || 0 }))
       .sort((a, b) => b.value - a.value);
   }, [totals]);
 
   const dailyChartData = useMemo(() => {
     if (!daily?.length) return [];
-    return daily.map((row) => ({
-      ...row,
-      DateLabel: shortDate(row.Date || row.date),
-    }));
+    return daily.map((row) => ({ ...row, DateLabel: shortDate(row.Date || row.date) }));
   }, [daily]);
 
-  const monthlyChartData = useMemo(() => {
-    if (!monthly?.length) return [];
-    return monthly;
-  }, [monthly]);
+  const monthlyChartData = useMemo(() => monthly || [], [monthly]);
+  const headerFrom = result?.from_date || result?.from || forecastObj?.from || null;
+  const headerTo = result?.to_date || result?.to || forecastObj?.to || null;
+  const ingested = result?.metadata?.filename || result?.filename || file?.name || "Report PDF";
 
-  const headerFrom = useMemo(() => result?.from_date || result?.from || forecastObj?.from || null, [result, forecastObj]);
-  const headerTo = useMemo(() => result?.to_date || result?.to || forecastObj?.to || null, [result, forecastObj]);
-  const ingested = useMemo(() => result?.metadata?.filename || result?.filename || "Report PDF", [result]);
-
-  const fileError =
-    !file
-      ? "Please upload a PDF report to generate a forecast."
-      : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
-        ? "Only PDF files are allowed."
-        : file.size > 25 * 1024 * 1024
-          ? "PDF is too large (max 25MB)."
-          : "";
+  const fileError = !file
+    ? "Please upload a PDF report to generate a forecast."
+    : file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")
+      ? "Only PDF files are allowed."
+      : file.size > MAX_FILE_MB * 1024 * 1024
+        ? `PDF is too large (max ${MAX_FILE_MB}MB).`
+        : "";
 
   async function saveForecastToDb(payload) {
-    const response = await axios.post(`${API_BASE_URL}/api/forecast/save`, payload);
+    const response = await axios.post(`${API_BASE_URL}/forecast/save`, payload);
     return response.data;
   }
 
@@ -554,35 +431,19 @@ export default function FuelForecastPanel() {
       setError("");
       const data = await healthCheck();
       setHealth(data);
-
-      showAlert({
-        icon: "success",
-        title: "Service Status - Online",
-        text: "Service is reachable",
-      });
-    } catch (e) {
+      showAlert({ icon: "success", title: "Service Status - Online", text: "Service is reachable" });
+    } catch (err) {
       setHealth(null);
-      const msg = e?.response?.data?.detail || e.message || "Health check - Failed";
+      const msg = err?.response?.data?.detail || err.message || "Health check failed";
       setError(msg);
-
-      showAlert({
-        icon: "error",
-        title: "Service Error",
-        text: msg,
-        confirm: true,
-      });
+      showAlert({ icon: "error", title: "Service Error", text: msg, confirm: true });
     }
   }
 
   async function onGenerate() {
     if (fileError) {
       setError(fileError);
-      showAlert({
-        icon: "warning",
-        title: "Missing PDF",
-        text: fileError,
-        confirm: true,
-      });
+      showAlert({ icon: "warning", title: "Missing PDF", text: fileError, confirm: true });
       return;
     }
 
@@ -590,45 +451,25 @@ export default function FuelForecastPanel() {
       setError("");
       setResult(null);
       setLoading(true);
-
-      showLoading({
-        title: "Generating Forecast",
-        text: "Please Wait. Forecast generation in progress !",
-      });
+      showLoading({ title: "Generating Forecast", text: "Please wait. Forecast generation in progress!" });
 
       const data = await forecastFuel({ mode, file });
-
       Swal.close();
 
       if (!data?.ok) {
         setError(data?.message || "Forecast failed");
         setResult(data);
-
-        showAlert({
-          icon: "error",
-          title: "Forecast Failed",
-          text: data?.message || "Forecast failed",
-          confirm: true,
-        });
-      } else {
-        setResult(data);
-        showAlert({
-          icon: "success",
-          title: "Forecast Generated",
-          text: "Fuel quantity prediction completed successfully",
-        });
+        showAlert({ icon: "error", title: "Forecast Failed", text: data?.message || "Forecast failed", confirm: true });
+        return;
       }
-    } catch (e) {
-      Swal.close();
-      const msg = e?.response?.data?.detail || e.message || "Forecast request failed";
-      setError(msg);
 
-      showAlert({
-        icon: "error",
-        title: "Request Failed",
-        text: msg,
-        confirm: true,
-      });
+      setResult(data);
+      showAlert({ icon: "success", title: "Forecast Generated", text: "Fuel quantity prediction completed successfully" });
+    } catch (err) {
+      Swal.close();
+      const msg = err?.response?.data?.detail || err.message || "Forecast request failed";
+      setError(msg);
+      showAlert({ icon: "error", title: "Request Failed", text: msg, confirm: true });
     } finally {
       setLoading(false);
     }
@@ -636,22 +477,13 @@ export default function FuelForecastPanel() {
 
   async function onSaveForecast() {
     if (!forecastObj || !totals) {
-      showAlert({
-        icon: "warning",
-        title: "No Forecast",
-        text: "Generate a forecast before saving.",
-        confirm: true,
-      });
+      showAlert({ icon: "warning", title: "No Forecast", text: "Generate a forecast before saving.", confirm: true });
       return;
     }
 
     try {
       setSavingForecast(true);
-
-      showLoading({
-        title: "Saving Forecast",
-        text: "Please wait",
-      });
+      showLoading({ title: "Saving Forecast", text: "Please wait" });
 
       const payload = {
         mode,
@@ -666,44 +498,29 @@ export default function FuelForecastPanel() {
       };
 
       await saveForecastToDb(payload);
-
       Swal.close();
-      showAlert({
-        icon: "success",
-        title: "Saved",
-        text: "Forecast saved successfully.",
-      });
-    } catch (e) {
+      showAlert({ icon: "success", title: "Saved", text: "Forecast saved successfully." });
+    } catch (err) {
       Swal.close();
-      const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e.message ||
-        "Failed to save forecast";
-
-      showAlert({
-        icon: "error",
-        title: "Save Failed",
-        text: msg,
-        confirm: true,
-      });
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err.message || "Failed to save forecast";
+      showAlert({ icon: "error", title: "Save Failed", text: msg, confirm: true });
     } finally {
       setSavingForecast(false);
     }
   }
 
-  function onClearFile() {
-    setFile(null);
+  function clearRunState() {
     setResult(null);
     setHealth(null);
     setError("");
     setFuelSearch("");
     setSelectedFuels(new Set());
-    showAlert({
-      icon: "success",
-      title: "Cleared",
-      text: "PDF and results cleared successfully",
-    });
+  }
+
+  function onClearFile() {
+    setFile(null);
+    clearRunState();
+    showAlert({ icon: "success", title: "Cleared", text: "PDF and results cleared successfully" });
   }
 
   function onDownloadDaily() {
@@ -731,55 +548,48 @@ export default function FuelForecastPanel() {
     showAlert({ icon: "success", title: "Downloaded", text: "Totals CSV downloaded" });
   }
 
-  function handleDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const f = e.dataTransfer.files?.[0] || null;
+  function validateAndSetFile(selectedFile, inputElement) {
+    clearRunState();
+    if (!selectedFile) return;
 
-    setResult(null);
-    setHealth(null);
-    setError("");
-
-    if (!f) return;
-
-    const isPdfByMime = f.type === "application/pdf";
-    const isPdfByExt = f.name.toLowerCase().endsWith(".pdf");
+    const isPdfByMime = selectedFile.type === "application/pdf";
+    const isPdfByExt = selectedFile.name.toLowerCase().endsWith(".pdf");
 
     if (!isPdfByMime && !isPdfByExt) {
       setFile(null);
-      const msg = "Only PDF files are allowed. Please upload a .pdf file.";
+      if (inputElement) inputElement.value = "";
+      const msg = "Only PDF files are allowed. Please upload a .pdf report.";
       setError(msg);
       showAlert({ icon: "error", title: "Invalid File", text: msg, confirm: true });
       return;
     }
 
-    if (f.size > MAX_FILE_MB * 1024 * 1024) {
+    if (selectedFile.size > MAX_FILE_MB * 1024 * 1024) {
       setFile(null);
+      if (inputElement) inputElement.value = "";
       const msg = `PDF is too large (max ${MAX_FILE_MB}MB).`;
       setError(msg);
       showAlert({ icon: "error", title: "File Too Large", text: msg, confirm: true });
       return;
     }
 
-    setFile(f);
+    setFile(selectedFile);
     showAlert({ icon: "success", title: "PDF Selected", text: "File selected successfully" });
   }
 
+  function handleDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    validateAndSetFile(event.dataTransfer.files?.[0] || null);
+  }
+
   function toggleFuel(fuel) {
-    setSelectedFuels((prev) => {
-      const next = new Set(prev);
+    setSelectedFuels((previous) => {
+      const next = new Set(previous);
       if (next.has(fuel)) next.delete(fuel);
       else next.add(fuel);
       return next;
     });
-  }
-
-  function selectAllFuels() {
-    setSelectedFuels(new Set(fuelKeys));
-  }
-
-  function selectNoFuels() {
-    setSelectedFuels(new Set());
   }
 
   const gridDash = "2 10";
@@ -802,15 +612,13 @@ export default function FuelForecastPanel() {
           <>
             <motion.div
               aria-hidden
-              className="absolute -left-24 top-32 h-[360px] w-[360px] rounded-full blur-3xl"
-              style={{ background: "rgba(37,99,235,0.06)" }}
+              className="absolute -left-24 top-32 h-[360px] w-[360px] rounded-full bg-blue-600/10 blur-3xl"
               animate={{ y: [0, 10, 0], x: [0, 10, 0] }}
               transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
             />
             <motion.div
               aria-hidden
-              className="absolute -right-24 bottom-12 h-[360px] w-[360px] rounded-full blur-3xl"
-              style={{ background: "rgba(16,185,129,0.05)" }}
+              className="absolute -right-24 bottom-12 h-[360px] w-[360px] rounded-full bg-emerald-500/10 blur-3xl"
               animate={{ y: [0, -12, 0], x: [0, -10, 0] }}
               transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -820,33 +628,30 @@ export default function FuelForecastPanel() {
 
       <div className="relative mx-auto w-full max-w-6xl">
         <div className="sticky top-3 z-40 mb-6">
-          <GlassCard className="px-4 py-3">
+          <Card className="px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm">
                   <LayoutDashboard className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-black tracking-tight text-blue-600">FUELWATCH</span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700">
-                      Fuel Demand Forecasting
-                    </span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700">Fuel Demand Forecasting</span>
                     {result?.ok ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-700">
                         <BadgeCheck className="h-3.5 w-3.5" /> Ready
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-xs text-slate-600">Upload PDF → Generate → Analyze → Export</div>
+                  <div className="truncate text-xs text-slate-600">Upload PDF -> Generate -> Analyze -> Export</div>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <NeonButton variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading} title="Check ML service">
+                <Button variant="subtle" icon={RefreshCw} onClick={onCheckHealth} disabled={loading} title="Check ML service">
                   Check Service
-                </NeonButton>
-
+                </Button>
                 <Dropdown
                   label="Export"
                   icon={Download}
@@ -862,62 +667,39 @@ export default function FuelForecastPanel() {
                     },
                   ]}
                 />
-
-                <NeonButton icon={TrendingUp} onClick={onGenerate} disabled={loading || !!fileError} title={fileError ? fileError : "Generate forecast"}>
+                <Button icon={TrendingUp} onClick={onGenerate} disabled={loading || !!fileError} title={fileError || "Generate forecast"}>
                   {loading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Processing…
+                      <Loader2 className="h-4 w-4 animate-spin" /> Processing...
                     </>
                   ) : (
                     "Generate"
                   )}
-                </NeonButton>
+                </Button>
               </div>
             </div>
+          </Card>
+        </div>
 
         <div className="mb-6">
           <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Fuelwatch - Fuel Quantity Predictions</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600">Weekly | Monthly | Annually Fuel Demand Analyzer With The Premium Enginnering Features</p>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600">Weekly, monthly, and annual fuel demand analyzer with premium engineering features.</p>
         </div>
 
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatPill icon={Gauge} label="Forecast Mode" value={(forecastObj?.mode || mode || "").toUpperCase()} sub={MODE_OPTIONS.find((m) => m.value === mode)?.hint} tone="info" />
+          <StatPill icon={FileText} label="Document Status" value={file ? "Ready" : "Missing"} sub={file ? `${file.name} • ${niceBytes(file.size)}` : "Upload a PDF file"} tone={file ? "success" : "danger"} />
+          <StatPill icon={CheckCircle2} label="Service Health" value={health?.status || "Not checked"} sub={health ? `Model loaded: ${String(health.model_loaded)}` : "Use Check Service to verify"} tone={health ? "success" : "default"} />
           <StatPill
-            icon={Gauge}
-            label="Forecast Mode"
-            value={(forecastObj?.mode || mode || "").toUpperCase()}
-            sub={MODE_OPTIONS.find((m) => m.value === mode)?.hint}
-            tone="info"
-          />
-          <KpiCard
-            icon={FileText}
-            label="Document Status"
-            value={file ? "Ready" : "Missing"}
-            sub={file ? `${file.name} • ${niceBytes(file.size)}` : "Upload a PDF file"}
-            tone={file ? "success" : "danger"}
-          />
-          <KpiCard
-            icon={CheckCircle2}
-            label="Service Health"
-            value={health?.status || "Not checked"}
-            sub={health ? `Model loaded: ${String(health.model_loaded)}` : "Use Check Service to verify"}
-            tone={health ? "success" : "default"}
-          />
-          <KpiCard
             icon={TrendingUp}
             label="Grand Total (L)"
-            value={totals ? formatNumber(grandTotal) : "—"}
-            sub={
-              totals
-                ? topFuel
-                  ? `Top: ${topFuel.fuel} (${formatNumber(topFuel.value)} L)`
-                  : `Fuel types: ${fuelKeys.length}`
-                : "General forecast"
-            }
+            value={totals ? formatNumber(grandTotal) : "-"}
+            sub={totals ? (topFuel ? `Top: ${topFuel.fuel} (${formatNumber(topFuel.value)} L)` : `Fuel types: ${fuelKeys.length}`) : "Generate forecast"}
             tone={totals ? "default" : "warn"}
           />
         </div>
 
-        <GlassCard>
+        <Card>
           <div className="p-5 sm:p-6">
             <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
@@ -927,11 +709,10 @@ export default function FuelForecastPanel() {
                     <CalendarDays className="h-3.5 w-3.5 text-blue-600" /> Choose horizon
                   </span>
                 </div>
-
                 <Segmented
                   value={mode}
-                  onChange={(v) => {
-                    setMode(v);
+                  onChange={(nextMode) => {
+                    setMode(nextMode);
                     setResult(null);
                     setError("");
                     setActiveTab("charts");
@@ -940,29 +721,21 @@ export default function FuelForecastPanel() {
                   disabled={loading}
                 />
               </div>
-            </div>
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="text-sm font-black text-slate-900 dark:text-zinc-50">PDF Report (Required)</div>
-                  <div className="flex gap-2">
-                    {mode === "weekly" && result?.ok && result?.forecast?.daily && (
-                      <NeonButton variant="primary" icon={CloudUpload} onClick={handleSyncToDatabase} title="Push 7-Day Forecast to Staff Prediction">
-                        Sync to Member 3
-                      </NeonButton>
-                    )}
-                    {file ? (
-                      <NeonButton variant="subtle" icon={Trash2} onClick={onClearFile} title="Remove selected file">
-                        Clear
-                      </NeonButton>
-                    ) : null}
-                  </div>
+                  <div className="text-sm font-black text-slate-900">PDF Report (Required)</div>
+                  {file ? (
+                    <Button variant="subtle" icon={Trash2} onClick={onClearFile} title="Remove selected file">
+                      Clear
+                    </Button>
+                  ) : null}
                 </div>
 
                 <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                   }}
                   onDrop={handleDrop}
                   className={cx(
@@ -973,71 +746,31 @@ export default function FuelForecastPanel() {
                   role="button"
                   tabIndex={0}
                 >
+                  <input
+                    id="fuel-forecast-file"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    disabled={loading || savingForecast}
+                    onChange={(event) => validateAndSetFile(event.target.files?.[0] || null, event.target)}
+                  />
+
                   <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-emerald-500/5 to-purple-600/8" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-emerald-500/5 to-purple-600/10" />
                   </div>
+                  <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-600/10 blur-3xl" />
+                  <div className="pointer-events-none absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
 
-                  <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-600/8 blur-3xl" />
-                  <div className="pointer-events-none absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-emerald-500/7 blur-3xl" />
-
-                <input
-                  id="fuel-forecast-file"
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  className="hidden"
-                  disabled={loading || savingForecast}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] || null;
-
-                      setResult(null);
-                      setHealth(null);
-                      setError("");
-                      setFuelSearch("");
-                      setSelectedFuels(new Set());
-
-                    const isPdfByMime = f.type === "application/pdf";
-                    const isPdfByExt = f.name.toLowerCase().endsWith(".pdf");
-
-                    if (!isPdfByMime && !isPdfByExt) {
-                      setFile(null);
-                      e.target.value = "";
-                      const msg = "Only PDF files are allowed. Please upload a .pdf report.";
-                      setError(msg);
-                      showAlert({ icon: "error", title: "Invalid File", text: msg, confirm: true });
-                      return;
-                    }
-
-                    if (f.size > MAX_FILE_MB * 1024 * 1024) {
-                      setFile(null);
-                      e.target.value = "";
-                      const msg = `PDF is too large (max ${MAX_FILE_MB}MB).`;
-                      setError(msg);
-                      showAlert({ icon: "error", title: "File Too Large", text: msg, confirm: true });
-                      return;
-                    }
-
-                    setFile(f);
-                    showAlert({ icon: "success", title: "PDF Selected", text: "File selected successfully" });
-                  }}
-                />
-
-                <div className="relative flex h-full flex-col items-center justify-center text-center">
-                  <div className="grid h-20 w-20 place-items-center rounded-[24px] bg-blue-600 text-white shadow-[0_16px_40px_-18px_rgba(37,99,235,0.65)]">
-                    {file ? <FileText className="h-9 w-9" /> : <UploadCloud className="h-9 w-9" />}
-                  </div>
-
-                  <div className="relative flex items-center gap-4">
-                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm">
-                      <CloudUpload className="h-6 w-6" />
+                  <div className="relative flex items-center gap-4 text-left">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm">
+                      {file ? <FileText className="h-6 w-6" /> : <UploadCloud className="h-6 w-6" />}
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-black text-slate-900">{file ? "PDF selected" : "Drag & drop a PDF here"}</div>
                       <div className="mt-1 text-xs text-slate-600">
                         {file ? (
                           <>
-                            <span className="font-black">{file.name}</span>
-                            {" • "}
-                            {niceBytes(file.size)}
+                            <span className="font-black">{file.name}</span> • {niceBytes(file.size)}
                           </>
                         ) : (
                           <>
@@ -1046,11 +779,11 @@ export default function FuelForecastPanel() {
                         )}
                       </div>
                       <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm">
-                        <Info className="h-3.5 w-3.5 text-blue-600" />
-                        PDF
+                        <Info className="h-3.5 w-3.5 text-blue-600" /> PDF
                       </div>
                     </div>
                   </div>
+                </div>
 
                 <AnimatePresence>
                   {fileError ? (
@@ -1069,57 +802,43 @@ export default function FuelForecastPanel() {
             </div>
 
             <div className="mt-5 grid gap-3 lg:grid-cols-2">
-              <AnimatePresence>
-                {health ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="flex items-start gap-2 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-4 text-sm text-emerald-800"
-                  >
-                    <CheckCircle2 className="mt-0.5 h-5 w-5" />
-                    <div>
-                      <div className="font-black">Service OK</div>
-                      <div className="mt-1 text-xs opacity-90">
-                        Status: <span className="font-black">{health.status || "ok"}</span> • Model loaded:{" "}
-                        <span className="font-black">{String(health.model_loaded)}</span>
-                      </div>
+              {health ? (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-2 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-4 text-sm text-emerald-800">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5" />
+                  <div>
+                    <div className="font-black">Service OK</div>
+                    <div className="mt-1 text-xs opacity-90">
+                      Status: <span className="font-black">{health.status || "ok"}</span> • Model loaded: <span className="font-black">{String(health.model_loaded)}</span>
                     </div>
-                  </motion.div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                    Tip: Click <span className="font-black">Check Service</span> regularly.
                   </div>
+                </motion.div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                  Tip: Click <span className="font-black">Check Service</span> regularly.
                 </div>
-              </div>
+              )}
 
-              <AnimatePresence>
-                {error ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="flex items-start gap-2 rounded-2xl border border-rose-300/70 bg-rose-50/80 p-4 text-sm text-rose-800"
-                  >
-                    <AlertCircle className="mt-0.5 h-5 w-5" />
-                    <div>
-                      <div className="font-black">Request failed</div>
-                      <div className="mt-1 text-xs opacity-90">{error}</div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                    Upload a PDF and click <span className="font-black">Generate</span> to view charts & tables.
+              {error ? (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-2 rounded-2xl border border-rose-300/70 bg-rose-50/80 p-4 text-sm text-rose-800">
+                  <AlertCircle className="mt-0.5 h-5 w-5" />
+                  <div>
+                    <div className="font-black">Request failed</div>
+                    <div className="mt-1 text-xs opacity-90">{error}</div>
                   </div>
-                )}
-              </AnimatePresence>
+                </motion.div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                  Upload a PDF and click <span className="font-black">Generate</span> to view charts and tables.
+                </div>
+              )}
             </div>
           </div>
+        </Card>
 
         <AnimatePresence>
           {forecastObj && totals ? (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mt-6 space-y-5">
-              <GlassCard>
+              <SectionCard>
                 <div className="p-5 sm:p-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
@@ -1143,7 +862,7 @@ export default function FuelForecastPanel() {
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-white p-3">
                           <div className="text-xs font-black uppercase text-slate-500">PDF Ingested</div>
-                          <div className="mt-1 font-black">{ingested}</div>
+                          <div className="mt-1 truncate font-black">{ingested}</div>
                         </div>
                       </div>
                     </div>
@@ -1153,24 +872,16 @@ export default function FuelForecastPanel() {
                         <button
                           type="button"
                           onClick={() => setActiveTab("charts")}
-                          className={cx(
-                            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition",
-                            activeTab === "charts" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50"
-                          )}
+                          className={cx("flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition", activeTab === "charts" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50")}
                         >
-                          <BarChart3 className="h-4 w-4" />
-                          Charts
+                          <BarChart3 className="h-4 w-4" /> Charts
                         </button>
                         <button
                           type="button"
                           onClick={() => setActiveTab("tables")}
-                          className={cx(
-                            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition",
-                            activeTab === "tables" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50"
-                          )}
+                          className={cx("flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition", activeTab === "tables" ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-50")}
                         >
-                          <FileText className="h-4 w-4" />
-                          Tables
+                          <FileText className="h-4 w-4" /> Tables
                         </button>
                       </div>
 
@@ -1190,7 +901,10 @@ export default function FuelForecastPanel() {
                             },
                           ]}
                         />
-                        <PrimaryButton
+                        <Button variant="subtle" icon={CloudUpload} onClick={onSaveForecast} disabled={savingForecast}>
+                          Save
+                        </Button>
+                        <Button
                           variant="subtle"
                           icon={RefreshCw}
                           onClick={() => {
@@ -1200,19 +914,20 @@ export default function FuelForecastPanel() {
                           }}
                         >
                           Reset Filters
-                        </PrimaryButton>
+                        </Button>
                       </div>
                     </div>
                   </div>
 
                   <SoftDivider />
+
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
                       <Search className="h-4 w-4 text-slate-600" />
                       <input
                         value={fuelSearch}
-                        onChange={(e) => setFuelSearch(e.target.value)}
-                        placeholder="Search fuel type…"
+                        onChange={(event) => setFuelSearch(event.target.value)}
+                        placeholder="Search fuel type..."
                         className="w-64 bg-transparent text-sm font-bold text-slate-900 outline-none placeholder:text-slate-500"
                       />
                       {fuelSearch ? (
@@ -1222,7 +937,7 @@ export default function FuelForecastPanel() {
                       ) : null}
                     </div>
 
-                    <FuelLegendChips fuelKeys={filteredFuelKeys} selected={selectedFuels} onToggle={toggleFuel} onAll={selectAllFuels} onNone={selectNoFuels} />
+                    <FuelLegendChips fuelKeys={filteredFuelKeys} selected={selectedFuels} onToggle={toggleFuel} onAll={() => setSelectedFuels(new Set(fuelKeys))} onNone={() => setSelectedFuels(new Set())} />
                   </div>
                 </div>
               </SectionCard>
@@ -1236,13 +951,11 @@ export default function FuelForecastPanel() {
                     actions={
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
-                          <TrendingUp className="h-4 w-4 text-blue-600" />
-                          Grand total: {formatNumber(grandTotal)} L
+                          <TrendingUp className="h-4 w-4 text-blue-600" /> Grand total: {formatNumber(grandTotal)} L
                         </span>
                         {topFuel ? (
                           <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
-                            <Sparkles className="h-4 w-4 text-blue-600" />
-                            Top: {topFuel.fuel}
+                            <Sparkles className="h-4 w-4 text-blue-600" /> Top: {topFuel.fuel}
                           </span>
                         ) : null}
                       </div>
@@ -1269,8 +982,7 @@ export default function FuelForecastPanel() {
                       subtitle="Fuel-wise daily prediction trend. Toggle series using the fuel chips."
                       actions={
                         <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
-                          <Info className="h-4 w-4 text-blue-600" />
-                          Showing: {selectedFuels.size}/{fuelKeys.length}
+                          <Info className="h-4 w-4 text-blue-600" /> Showing: {selectedFuels.size}/{fuelKeys.length}
                         </span>
                       }
                     >
@@ -1283,19 +995,9 @@ export default function FuelForecastPanel() {
                               <YAxis />
                               <Tooltip />
                               <Legend />
-                              {fuelKeys.map((fuel, idx) => {
+                              {fuelKeys.map((fuel, index) => {
                                 if (!selectedFuels.has(fuel)) return null;
-                                return (
-                                  <Line
-                                    key={fuel}
-                                    type="monotone"
-                                    dataKey={fuel}
-                                    name={fuel}
-                                    stroke={FUEL_COLORS[idx % FUEL_COLORS.length]}
-                                    strokeWidth={lineWidth}
-                                    dot={false}
-                                  />
-                                );
+                                return <Line key={fuel} type="monotone" dataKey={fuel} name={fuel} stroke={FUEL_COLORS[index % FUEL_COLORS.length]} strokeWidth={lineWidth} dot={false} />;
                               })}
                             </LineChart>
                           </ResponsiveContainer>
@@ -1307,17 +1009,7 @@ export default function FuelForecastPanel() {
                   ) : null}
 
                   {isAnnual ? (
-                    <ChartCard
-                      icon={BarChart3}
-                      title="Month-wise Forecast (Jan–Dec)"
-                      subtitle="Annual planning view with monthly fuel predictions."
-                      actions={
-                        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">
-                          <Info className="h-4 w-4 text-blue-600" />
-                          Toggle fuels in chips
-                        </span>
-                      }
-                    >
+                    <ChartCard icon={BarChart3} title="Month-wise Forecast (Jan-Dec)" subtitle="Annual planning view with monthly fuel predictions.">
                       <div className="h-[400px] w-full rounded-2xl border border-slate-200 bg-white p-3">
                         {monthlyChartData.length ? (
                           <ResponsiveContainer width="100%" height="100%">
@@ -1327,17 +1019,9 @@ export default function FuelForecastPanel() {
                               <YAxis />
                               <Tooltip />
                               <Legend />
-                              {fuelKeys.map((fuel, idx) => {
+                              {fuelKeys.map((fuel, index) => {
                                 if (!selectedFuels.has(fuel)) return null;
-                                return (
-                                  <Bar
-                                    key={fuel}
-                                    dataKey={fuel}
-                                    name={fuel}
-                                    fill={FUEL_COLORS[idx % FUEL_COLORS.length]}
-                                    radius={[10, 10, 0, 0]}
-                                  />
-                                );
+                                return <Bar key={fuel} dataKey={fuel} name={fuel} fill={FUEL_COLORS[index % FUEL_COLORS.length]} radius={[10, 10, 0, 0]} />;
                               })}
                             </BarChart>
                           </ResponsiveContainer>
@@ -1352,18 +1036,12 @@ export default function FuelForecastPanel() {
 
               {activeTab === "tables" ? (
                 <div className="grid gap-5 lg:grid-cols-2">
-                  <GlassCard>
+                  <SectionCard>
                     <div className="p-5 sm:p-6">
                       <div className="mb-3 flex items-center justify-between">
                         <div className="text-lg font-black tracking-tight">Totals Table</div>
                         <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700">Sorted by total</span>
                       </div>
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-600">
-                        Totals
-                      </span>
-                    </div>
-
-                    <div className="overflow-x-auto p-6">
                       <div className="overflow-hidden rounded-[24px] border border-slate-200">
                         <table className="w-full border-collapse text-sm">
                           <thead>
@@ -1373,11 +1051,11 @@ export default function FuelForecastPanel() {
                             </tr>
                           </thead>
                           <tbody>
-                            {totalsChartData.map((row, idx) => (
-                              <tr key={row.fuel} className={cx("border-t border-slate-200", idx % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
+                            {totalsChartData.map((row, index) => (
+                              <tr key={row.fuel} className={cx("border-t border-slate-200", index % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
                                 <td className="px-4 py-3.5 font-black text-slate-900">
                                   <div className="flex items-center gap-2">
-                                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: FUEL_COLORS[idx % FUEL_COLORS.length] }} />
+                                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: FUEL_COLORS[index % FUEL_COLORS.length] }} />
                                     {row.fuel}
                                   </div>
                                 </td>
@@ -1387,80 +1065,40 @@ export default function FuelForecastPanel() {
                           </tbody>
                         </table>
                       </div>
-
-                      <div className="mt-3 text-xs text-slate-600">
-                        Tip: Use <span className="font-black">Export → Totals CSV</span> for reporting.
-                      </div>
                     </div>
-                  </GlassCard>
+                  </SectionCard>
 
-                  <GlassCard>
+                  <SectionCard>
                     <div className="p-5 sm:p-6">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className="text-lg font-black tracking-tight">{isAnnual ? "Month-wise Table (Annual)" : "Daily Breakdown"}</div>
+                      <div className="mb-3 text-lg font-black tracking-tight">{isAnnual ? "Month-wise Table (Annual)" : "Daily Breakdown"}</div>
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                        {(isAnnual ? monthly : daily)?.length ? (
+                          <table className="w-full border-collapse text-sm">
+                            <thead>
+                              <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600">
+                                {Object.keys((isAnnual ? monthly : daily)[0]).map((key) => (
+                                  <th key={key} className="px-4 py-3">
+                                    {key}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(isAnnual ? monthly : daily).map((row, rowIndex) => (
+                                <tr key={rowIndex} className={cx("border-t border-slate-200", rowIndex % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
+                                  {Object.keys((isAnnual ? monthly : daily)[0]).map((key) => (
+                                    <td key={key} className="px-4 py-3 tabular-nums">
+                                      {key === "Date" ? shortDate(row[key]) : typeof row[key] === "number" ? formatNumber(row[key]) : String(row[key])}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <div className="grid h-[260px] place-items-center text-sm text-slate-600">No breakdown data available for this run.</div>
+                        )}
                       </div>
-                    </div>
-
-                    <div className="overflow-x-auto p-6">
-                      {!isAnnual ? (
-                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                          {daily?.length ? (
-                            <table className="w-full border-collapse text-sm">
-                              <thead>
-                                <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600">
-                                  {Object.keys(daily[0]).map((k) => (
-                                    <th key={k} className="px-4 py-3">
-                                      {k}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {daily.map((row, idx) => (
-                                  <tr key={idx} className={cx("border-t border-slate-200", idx % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
-                                    {Object.keys(daily[0]).map((k) => (
-                                      <td key={k} className="px-4 py-3 tabular-nums">
-                                        {k === "Date" ? shortDate(row[k]) : typeof row[k] === "number" ? formatNumber(row[k]) : String(row[k])}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          ) : (
-                            <div className="grid h-[260px] place-items-center text-sm text-slate-600">No daily breakdown for this mode/run.</div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                          {monthly?.length ? (
-                            <table className="w-full border-collapse text-sm">
-                              <thead>
-                                <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-600">
-                                  {Object.keys(monthly[0]).map((k) => (
-                                    <th key={k} className="px-4 py-3">
-                                      {k}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {monthly.map((row, idx) => (
-                                  <tr key={idx} className={cx("border-t border-slate-200", idx % 2 === 0 ? "bg-white" : "bg-slate-50/60")}>
-                                    {Object.keys(monthly[0]).map((k) => (
-                                      <td key={k} className="px-4 py-3 tabular-nums">
-                                        {typeof row[k] === "number" ? formatNumber(row[k]) : String(row[k])}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          ) : (
-                            <div className="grid h-[260px] place-items-center text-sm text-slate-600">No month-wise breakdown for this annual run.</div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </SectionCard>
                 </div>
@@ -1472,23 +1110,20 @@ export default function FuelForecastPanel() {
         <AnimatePresence>
           {loading ? (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mt-6 grid gap-5">
-              <GlassCard>
+              <SectionCard>
                 <div className="p-5 sm:p-6">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                    <div className="text-sm font-black">Generating forecast…</div>
+                    <div className="text-sm font-black">Generating forecast...</div>
                     <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-700">
-                      <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                      Please Wait. Forecast generation in progress !
+                      <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Please wait
                     </span>
                   </div>
-
                   <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Skeleton className="h-24" />
                     <Skeleton className="h-24" />
                     <Skeleton className="h-24" />
                   </div>
-
                   <div className="mt-5">
                     <Skeleton className="h-80" />
                   </div>

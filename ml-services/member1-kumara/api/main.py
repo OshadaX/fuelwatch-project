@@ -17,16 +17,13 @@ from utils.predictor import FuelDemandPredictor
 
 app = FastAPI(title="FuelWatch ML Service")
 
-# ===============================
+
 # BASE DIRECTORY (PROJECT ROOT)
-# ===============================
 BASE_DIR = Path(__file__).resolve().parent.parent  # member1-kumara/
 UPLOAD_DIR = BASE_DIR / "data" / "raw"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# ===============================
 # CORS CONFIG
-# ===============================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,18 +32,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===============================
 # LOAD FORECAST MODEL
-# ===============================
 try:
     predictor = FuelDemandPredictor()
 except Exception as e:
     predictor = None
     print("⚠️ Forecast model not loaded:", e)
 
-# ===============================
-# LOAD RF MISBEHAVIOR MODEL (optional)
-# ===============================
+
+# LOAD RF MISBEHAVIOR MODEL
 RF_DIR = BASE_DIR / "rf_outputs"
 RF_MODEL_PATH = RF_DIR / "rf_model.pkl"
 RF_SCALER_PATH = RF_DIR / "scaler.pkl"
@@ -85,18 +79,12 @@ def load_rf_artifacts():
 
 load_rf_artifacts()
 
-# ===============================
-# RULE THRESHOLDS (STRICTER => fewer FLAGs)
-# You can tune these defaults to get ~2-3 FLAGs.
-# ===============================
-DEFAULT_GAP_TOL = 800.0              # mismatch litres threshold (was too low at 50)
-DEFAULT_RESET_TOL = 6000.0           # huge balance jump/reset litres (was too low at 3000)
+# RULE THRESHOLDS
+DEFAULT_GAP_TOL = 800.0              # mismatch litres threshold
+DEFAULT_RESET_TOL = 6000.0           # huge balance jump/reset litres
 DEFAULT_NO_SALES_DROP_TOL = 1500.0   # balance drop with 0 sales
 
-
-# ===============================
 # HEALTH
-# ===============================
 @app.get("/health")
 def health():
     return {
@@ -122,9 +110,7 @@ def ml_health():
     }
 
 
-# ===============================
-# FORECAST ENDPOINT (UNCHANGED)
-# ===============================
+# FORECAST ENDPOINT
 @app.post("/forecast")
 async def forecast(
     mode: str = Form(...),
@@ -207,10 +193,8 @@ async def forecast(
     return {"ok": True, "message": "Forecast generated successfully", "mode": mode, "ingest": ingest_result, "forecast": forecast_result}
 
 
-# ============================================================
-#  MISBEHAVIOR SCORING: upload report -> convert -> score
-# ============================================================
 
+#  MISBEHAVIOR SCORING: upload report -> convert -> score
 def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
@@ -295,7 +279,7 @@ def to_transactions(df: pd.DataFrame) -> pd.DataFrame:
     col_bal = _pick_col(d.columns, ["balance", "tank_balance", "stock_balance"])
     col_item = _pick_col(d.columns, ["item", "fuel", "fuel_type", "product"])
 
-    # Site can appear twice: choose the LAST site-ish column
+    # Site can appear twice
     site_candidates = []
     for c in d.columns:
         cl = c.strip().lower()
@@ -315,7 +299,7 @@ def to_transactions(df: pd.DataFrame) -> pd.DataFrame:
             },
         )
 
-    # IMPORTANT FIX: fillna BEFORE astype(str) to avoid 'nan' strings
+    # fillna before astype(str) to avoid 'nan' strings
     station_series = d[col_site].fillna("UNKNOWN").astype(str).str.strip()
     fuel_series = d[col_item].fillna("UNKNOWN").astype(str).str.strip()
 
@@ -334,11 +318,11 @@ def to_transactions(df: pd.DataFrame) -> pd.DataFrame:
 
     tx["qty"] = tx["qty"].fillna(0.0)
 
-    # balance must be real; only forward-fill within each (station,fuel)
+    # balance must be real
     tx = tx.sort_values(["station_id", "fuel_type", "timestamp"]).reset_index(drop=True)
     tx["balance"] = tx.groupby(["station_id", "fuel_type"])["balance"].ffill()
 
-    # if balance still missing, those rows cannot be used for real detection
+    # if balance still missing -> those rows cannot be used for real detection
     tx = tx.dropna(subset=["balance"]).copy()
 
     tx["tank_id"] = "TANK_1"
@@ -365,7 +349,7 @@ def build_daily_features(tx: pd.DataFrame) -> pd.DataFrame:
     daily["std_txn"] = daily["std_txn"].fillna(0.0)
     daily["balance_delta"] = daily["end_balance"] - daily["start_balance"]
 
-    # conservation check: total_qty ≈ -balance_delta  (if balance decreases with dispensing)
+    # total_qty ≈ -balance_delta  (if balance decreases with dispensing)
     daily["qty_vs_balance_gap"] = daily["total_qty"] + daily["balance_delta"]
 
     daily["day_dt"] = pd.to_datetime(daily["day"], errors="coerce")
@@ -411,25 +395,25 @@ def rule_anomaly_reason(row, gap_tol: float, reset_tol: float, no_sales_drop_tol
     anomaly_type = "NORMAL"
     score = 0.0
 
-    # 1) Balance drop without sales (strong)
+    # 1) Balance drop without sales
     if total_qty <= 0.0001 and bal_delta < -no_sales_drop_tol:
         reasons.append(f"Balance dropped but no sales recorded (Δbalance={bal_delta:.1f})")
         anomaly_type = "DROP_WITHOUT_SALES"
         score = max(score, 0.92)
 
-    # 2) Sales but balance did not drop (strong)
+    # 2) Sales but balance did not drop
     if total_qty > gap_tol and abs(bal_delta) < gap_tol:
         reasons.append("Sales recorded but tank balance did not decrease")
         anomaly_type = "SALES_NO_BALANCE_DROP"
         score = max(score, 0.90)
 
-    # 3) Conservation mismatch (medium -> make strict using gap_tol)
+    # 3) medium -> make strict using gap_tol
     if abs(gap) > gap_tol:
         reasons.append(f"Conservation mismatch (gap={gap:.1f})")
         anomaly_type = "CONSERVATION_GAP"
         score = max(score, 0.85)
 
-    # 4) Suspected reset/refill/maintenance (very strong)
+    # 4) refill
     if abs(bal_delta) > reset_tol:
         reasons.append(f"Large balance jump/reset (Δbalance={bal_delta:.1f})")
         anomaly_type = "BALANCE_JUMP"
@@ -487,7 +471,7 @@ def group_events(rows):
 
 @app.post("/ml/score-report")
 async def score_report(
-    threshold: float = Query(0.85, ge=0.0, le=1.0),  # ✅ default higher => fewer FLAGS
+    threshold: float = Query(0.85, ge=0.0, le=1.0), 
     gap_tol: float = Query(DEFAULT_GAP_TOL, ge=0.0),
     reset_tol: float = Query(DEFAULT_RESET_TOL, ge=0.0),
     no_sales_drop_tol: float = Query(DEFAULT_NO_SALES_DROP_TOL, ge=0.0),
@@ -509,7 +493,7 @@ async def score_report(
             "note": "No daily rows were produced. Check that Balance and Date exist and are parseable.",
         }
 
-    # ---- RF score (if available) ----
+    # RF score
     rf_prob = np.zeros(len(daily), dtype=float)
     rf_ok = bool(rf is not None and scaler is not None and MODEL_FEATURES)
 
@@ -522,7 +506,7 @@ async def score_report(
             Xs = scaler.transform(X)
             rf_prob = rf.predict_proba(Xs)[:, 1]
 
-    # ---- Rule score (always available if balance exists) ----
+    # Rule score
     rule_prob = np.zeros(len(daily), dtype=float)
     reasons = [""] * len(daily)
     anomaly_types = ["NORMAL"] * len(daily)
@@ -576,7 +560,7 @@ async def score_report(
 
         rows.append(
             {
-                "id": anomaly_id,                       # ✅ unique stable anomaly id
+                "id": anomaly_id,                       # unique fuel dispense error id
                 "day": r["day"],
                 "stationId": r["station_id"],
                 "tankId": r["tank_id"],
@@ -589,7 +573,7 @@ async def score_report(
                 "pred": int(r["pred"]),
                 "severity": r["severity"],
                 "reason": reason_text,
-                "anomalyType": r["anomaly_type"],       # ✅ machine label
+                "anomalyType": r["anomaly_type"],      
                 "rfProb": float(r["rf_prob"]),
                 "ruleProb": float(r["rule_prob"]),
             }
