@@ -17,6 +17,16 @@ import ShiftSchedulerPage from './components/member3-oshada/Dashboard/ShiftSched
 import StationsView from './components/member3-oshada/Station/StationsView';
 import SuperAdminDashboard from './components/member3-oshada/Admin/SuperAdminDashboard';
 
+import CustomerGuestPage from './components/member2-aluthge/CustomerGuestPage';
+import EVFinder from './components/member2-aluthge/EVFinder';
+import FuelFinder from './components/member2-aluthge/FuelFinder';
+import SmartRecommendationAdmin from './components/member2-aluthge/admin/SmartRecommendationAdmin';
+import StationMap from './components/member2-aluthge/admin/StationMap';
+import NavigationMap from './components/member2-aluthge/NavigationMap';
+import EVStationPortal from './components/member2-aluthge/admin/EVStationPortal';
+import FuelStationPortal from './components/member2-aluthge/admin/FuelStationPortal';
+import CrisisInsights from './components/member2-aluthge/CrisisInsights';
+
 import { useAuth } from './context/AuthContext';
 import { useEffect } from 'react';
 
@@ -63,7 +73,16 @@ function App() {
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
               <Route path="/admin-qr" element={<AdminQRView />} />
               <Route path="/employee-portal" element={<EmployeePortal />} />
+              <Route path="/customer" element={<CustomerGuestPage />} />
+              <Route path="/ev-station" element={<EVFinder />} />
+              <Route path="/fuel-station" element={<FuelFinder />} />
+              <Route path="/navigate" element={<NavigationMap />} />
               <Route path="/staff-prediction" element={<StaffPrediction />} />
+              <Route path="/recommendation" element={<SmartRecommendationAdmin />} />
+              <Route path="/ev-portal" element={<EVStationPortal />} />
+              <Route path="/fuel-portal" element={<FuelStationPortal />} />
+              <Route path="/station-map" element={<StationMap />} />
+              <Route path="/crisis-insights" element={<CrisisInsights />} />
               <Route path="/shift-scheduler" element={<ShiftSchedulerPage />} />
               <Route path="/stations" element={<StationsView />} />
               {/* Fallback */}

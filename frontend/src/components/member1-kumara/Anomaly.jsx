@@ -67,7 +67,6 @@ const ML_API = "http://127.0.0.1:8090/ml/score-report";
 const BACKEND = "http://localhost:8081";
 const DEFAULT_THRESHOLD = 0.65;
 
-
 function safeFixed(v, d = 3) {
   const n = Number(v);
   if (!Number.isFinite(n)) return (0).toFixed(d);
@@ -250,6 +249,9 @@ export default function Anomaly() {
 
   const lastFileNameRef = useRef(null);
 
+  // -----------------------------
+  // ✅ Notification Form State
+  // -----------------------------
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifySeverity, setNotifySeverity] = useState("Warning");
   const [notifyChannel, setNotifyChannel] = useState("email");
@@ -257,6 +259,7 @@ export default function Anomaly() {
   const [notifyMessage, setNotifyMessage] = useState("");
   const [notifySending, setNotifySending] = useState(false);
 
+  // Station preview
   const [stationPreviewLoading, setStationPreviewLoading] = useState(false);
   const [stationPreview, setStationPreview] = useState(null);
   const [stationPreviewError, setStationPreviewError] = useState("");
@@ -352,7 +355,9 @@ export default function Anomaly() {
     }
   };
 
-  //ML SCAN
+  // -----------------------------
+  // ✅ RUN ML SCAN
+  // -----------------------------
   const handleRunScan = useCallback(async () => {
     if (!file) {
       toast("Please select only CSV file.", "warning");
@@ -405,7 +410,7 @@ export default function Anomaly() {
       lastFileNameRef.current = file?.name || null;
 
       closeBlockingLoading();
-      toast("Completed Successfully", "success");
+      toast("✅ Completed Successfully", "success");
       setTab(0);
 
       await MySwal.fire({
@@ -509,7 +514,9 @@ export default function Anomaly() {
     }
   };
 
-  //Send manual notification
+  // -----------------------------
+  // ✅ Send manual notification
+  // -----------------------------
   const handleSendManual = async () => {
     if (!notifyRoles.length) {
       toast("Select at least one role.", "warning");
@@ -1155,7 +1162,7 @@ export default function Anomaly() {
         ) : null}
       </EnterpriseCard>
 
-      {/* Notification Dialog */}
+      {/* ✅ Notification Dialog */}
       <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
           Fuelwatch - Notification Generating Portal

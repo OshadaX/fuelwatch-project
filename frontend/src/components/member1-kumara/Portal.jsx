@@ -31,8 +31,9 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-
-//Logged-in manager email helper
+/* ----------------------------
+   Logged-in manager email helper
+---------------------------- */
 const getManagerEmail = () => {
   try {
     const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
@@ -42,8 +43,9 @@ const getManagerEmail = () => {
   }
 };
 
-
-//SweetAlert
+/* ----------------------------
+   SweetAlert
+---------------------------- */
 const MySwal = withReactContent(Swal);
 const alertOk = (title, text = "") =>
   MySwal.fire({ icon: "success", title, text, confirmButtonText: "OK" });
@@ -64,8 +66,9 @@ const confirmBox = async (title, text = "Are you sure?") => {
   return r.isConfirmed;
 };
 
-
-//Allowed Districts
+/* ----------------------------
+   Allowed Districts
+---------------------------- */
 const allowedDistricts = [
   "Ampara",
   "Anuradhapura",
@@ -99,7 +102,6 @@ const allowedDistricts = [
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/;
 const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
-const addressRegex = /^[A-Za-z0-9/', ]+$/;
 const personIdRegex = /^(?:\d{9}[Vv]|\d{12})$/;
 const personNameRegex = /^[A-Z][a-z]+ [A-Z][a-z]+$/;
 const designationRegex = /^MANAGER$/;
@@ -116,51 +118,44 @@ const allowedFuelTypes = [
 
 const schema = z
   .object({
-    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/XXXX/XXXX only"),
+    Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/1234/202X only"),
     Name: z
       .string()
       .trim()
-      .regex(stationNameRegex, "Only letters & spaces allowed"),
-    
-
-  Address: z
-  .string()
-  .trim()
-  .min(1, "Address is required")
-  .regex(
-    addressRegex,
-    "Must contain only letters, (0-9)digits, slash (/), apostrophe (') and comma (,)"
-  ),
+      .regex(stationNameRegex, "Only letters + spaces (no numbers/special chars)"),
+    Address: z.string().trim().min(1, "Address is required"),
     Location: z
       .string()
       .trim()
       .min(1, "District is required")
       .refine(
         (v) => allowedDistricts.includes(v),
-        "Select a valid Sri Lanka district"
+        "Select a valid Sri Lanka district (First letter capital)"
       ),
+    latitude: z.coerce.number().min(-90, "Min -90").max(90, "Max 90"),
+    longitude: z.coerce.number().min(-180, "Min -180").max(180, "Max 180"),
 
     person: z.object({
       Id: z
         .string()
         .trim()
-        .regex(personIdRegex, "Enter NIC number"),
+        .regex(personIdRegex, "NIC must be 9 digits + V/v OR 12 digits"),
       PersonName: z
         .string()
         .trim()
-        .regex(personNameRegex, "Only two names with first letter capital"),
+        .regex(personNameRegex, "Use 2 names with capitals (Ex: Alen Smith)"),
       PersonDesignation: z
         .string()
         .trim()
-        .regex(designationRegex, "Designation must be 'MANAGER'"),
+        .regex(designationRegex, "Only MANAGER is allowed"),
       PersonEmail: z
         .string()
         .trim()
-        .regex(gmailRegex, "Enter correct email format"),
+        .regex(gmailRegex, "Only xxxxx@gmail.com allowed (no capitals)"),
       ContactNumber: z
         .string()
         .trim()
-        .regex(phoneRegex, "Format must be 0xx-xxxx-xxx"),
+        .regex(phoneRegex, "Use 071-1234-567 format (2nd digit cannot be 0)"),
       StartTime: z.string().trim().regex(timeRegex, "Select a time"),
       EndTime: z.string().trim().regex(timeRegex, "Select a time"),
     }),
@@ -218,8 +213,9 @@ const schema = z
     });
   });
 
-
-//Time dropdown
+/* ----------------------------
+   Time dropdown
+---------------------------- */
 const timeOptions = Array.from({ length: 48 }, (_, i) => {
   const mins = i * 30;
   const h = String(Math.floor(mins / 60)).padStart(2, "0");
@@ -411,6 +407,8 @@ export default function Portal() {
       Name: "",
       Address: "",
       Location: "",
+      latitude: "",
+      longitude: "",
       person: {
         Id: "",
         PersonName: "",
@@ -524,7 +522,7 @@ export default function Portal() {
   async function nextStep() {
     const ok =
       activeStep === 0
-        ? await trigger(["Id", "Name", "Address", "Location"])
+        ? await trigger(["Id", "Name", "Address", "Location", "latitude", "longitude"])
         : activeStep === 1
         ? await trigger([
             "person.Id",
@@ -559,7 +557,7 @@ export default function Portal() {
       const manager_email = getManagerEmail();
 
       if (!manager_email) {
-        return alertErr("Unauthorized", "Login required: manager email not found.");
+        return alertErr("Unauthorized", "Login required: manager email not found in localStorage.");
       }
 
       const normalized = {
@@ -570,6 +568,8 @@ export default function Portal() {
         Name: payload.Name.trim(),
         Address: payload.Address.trim(),
         Location: payload.Location.trim(),
+        latitude: Number(payload.latitude),
+        longitude: Number(payload.longitude),
         person: {
           ...payload.person,
           Id: payload.person.Id.trim(),
@@ -609,6 +609,8 @@ export default function Portal() {
       Name: row.Name || "",
       Address: row.Address || "",
       Location: row.Location || "",
+      latitude: row.latitude || "",
+      longitude: row.longitude || "",
       person: row.person || defaultValues.person,
       tanks: (row.tanks?.length ? row.tanks : defaultValues.tanks).map((t) => ({
         fuel_type: t.fuel_type ?? "",
@@ -638,7 +640,9 @@ export default function Portal() {
     !!getValues("Id") &&
     !!getValues("Name") &&
     !!getValues("Address") &&
-    !!getValues("Location");
+    !!getValues("Location") &&
+    !!getValues("latitude") &&
+    !!getValues("longitude");
 
   const donePerson =
     !!getValues("person.Id") &&
@@ -650,7 +654,7 @@ export default function Portal() {
     !!getValues("person.EndTime");
 
   const stationStepOk =
-    !errors.Id && !errors.Name && !errors.Address && !errors.Location && doneStation;
+    !errors.Id && !errors.Name && !errors.Address && !errors.Location && !errors.latitude && !errors.longitude && doneStation;
 
   const personStepOk =
     !errors?.person?.Id &&
@@ -692,7 +696,7 @@ export default function Portal() {
             <div>
               <div style={{ fontWeight: 980, fontSize: 18 }}>FuelWatch Portal</div>
               <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
-                Fuelwatch - Filling Station Registration Dashboard
+                Fuelwatch - Filling Station Registering Dashboard
               </div>
             </div>
           </div>
@@ -705,7 +709,7 @@ export default function Portal() {
               style={S.tabBtn(activeTab === "portal")}
               onClick={() => setActiveTab("portal")}
             >
-              General Information Form
+              Form
             </button>
             <button
               type="button"
@@ -866,6 +870,28 @@ export default function Portal() {
                     ))}
                   </Select>
                 </Field>
+
+                <Field label="Latitude" error={errors?.latitude?.message}>
+                  <Input
+                    type="number"
+                    step="any"
+                    icon={MapPin}
+                    placeholder="e.g. 6.9271"
+                    invalid={!!errors?.latitude}
+                    {...register("latitude")}
+                  />
+                </Field>
+
+                <Field label="Longitude" error={errors?.longitude?.message}>
+                  <Input
+                    type="number"
+                    step="any"
+                    icon={MapPin}
+                    placeholder="e.g. 79.8612"
+                    invalid={!!errors?.longitude}
+                    {...register("longitude")}
+                  />
+                </Field>
               </div>
             )}
 
@@ -905,7 +931,7 @@ export default function Portal() {
 
                 <Field
                   label="Responsible Person's Email"
-                  hint="This email will receive alerts"
+                  hint="This address will receive email alerts"
                   error={errors?.person?.PersonEmail?.message}
                 >
                   <Input
@@ -923,7 +949,7 @@ export default function Portal() {
                 <Field label="Contact Number" error={errors?.person?.ContactNumber?.message}>
                   <Input
                     icon={Phone}
-                    placeholder="xxx-xxxx-xxx"
+                    placeholder="071-1234-567"
                     invalid={!!errors?.person?.ContactNumber}
                     {...register("person.ContactNumber")}
                   />
@@ -932,7 +958,7 @@ export default function Portal() {
                 <div style={S.grid2}>
                   <Field label="Start Time" error={errors?.person?.StartTime?.message}>
                     <Select invalid={!!errors?.person?.StartTime} {...register("person.StartTime")}>
-                      <option value="">Select</option>
+                      <option value="">Select...</option>
                       {timeOptions.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -943,7 +969,7 @@ export default function Portal() {
 
                   <Field label="End Time" error={errors?.person?.EndTime?.message}>
                     <Select invalid={!!errors?.person?.EndTime} {...register("person.EndTime")}>
-                      <option value="">Select</option>
+                      <option value="">Select...</option>
                       {timeOptions.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -958,6 +984,9 @@ export default function Portal() {
             {activeStep === 2 && (
               <div>
                 <div style={{ ...S.row, justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                    Fuel type locked • unique tank index per fuel type
+                  </div>
                   <button
                     type="button"
                     style={S.btn("primary")}
@@ -1000,7 +1029,7 @@ export default function Portal() {
                             invalid={!!errors?.tanks?.[idx]?.fuel_type}
                             {...register(`tanks.${idx}.fuel_type`)}
                           >
-                            <option value="">Select fuel type</option>
+                            <option value="">Select fuel type...</option>
                             {allowedFuelTypes.map((t) => (
                               <option key={t} value={t}>
                                 {t}
@@ -1080,7 +1109,7 @@ export default function Portal() {
                     style={{ ...S.btn("soft"), marginLeft: 8 }}
                     onClick={() => setActiveTab("portal")}
                   >
-                    Back
+                    Back to Form
                   </button>
                 </div>
               </div>
