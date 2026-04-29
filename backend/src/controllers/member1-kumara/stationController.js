@@ -1,14 +1,13 @@
 const Station = require("../../models/member1-kumara/StationModel");
 
-// ================================
+
 // CREATE
 // POST /api/station
-// ================================
 const createStation = async (req, res) => {
   try {
     const payload = req.body || {};
 
-    // ✅ Get manager email from frontend (logged-in user)
+    // Get manager email from frontend
     if (!payload.manager_email) {
       return res.status(400).json({
         ok: false,
@@ -49,10 +48,8 @@ const createStation = async (req, res) => {
   }
 };
 
-// ================================
-// LIST
 // GET /api/station
-// ================================
+
 const listStations = async (_req, res) => {
   try {
     const stations = await Station.find().sort({ createdAt: -1 }).lean();
@@ -62,11 +59,9 @@ const listStations = async (_req, res) => {
   }
 };
 
-// ================================
-// GET ONE
 // GET /api/station/:id
-// Here :id refers to Station "Id" (not Mongo _id)
-// ================================
+// id refers to Station "Id"
+
 const getStation = async (req, res) => {
   try {
     const id = String(req.params.id || "").trim().toUpperCase();
@@ -82,10 +77,9 @@ const getStation = async (req, res) => {
   }
 };
 
-// ================================
+
 // UPDATE
 // PUT /api/station/:id
-// ================================
 const updateStation = async (req, res) => {
   try {
     const id = String(req.params.id || "").trim().toUpperCase();
@@ -122,10 +116,9 @@ const updateStation = async (req, res) => {
   }
 };
 
-// ================================
+
 // DELETE
 // DELETE /api/station/:id
-// ================================
 const deleteStation = async (req, res) => {
   try {
     const id = String(req.params.id || "").trim().toUpperCase();
@@ -141,10 +134,9 @@ const deleteStation = async (req, res) => {
   }
 };
 
-// ================================
-// ✅ GET STATION BY MANAGER EMAIL
+
+// GET STATION BY MANAGER EMAIL
 // GET /api/station/by-manager/:email
-// ================================
 const getStationByManagerEmail = async (req, res) => {
   try {
     const email = String(req.params.email || "").toLowerCase().trim();

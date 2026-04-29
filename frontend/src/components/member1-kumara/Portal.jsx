@@ -1,4 +1,3 @@
-// src/pages/member1-kumara/Portal.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -98,9 +97,8 @@ const allowedDistricts = [
   "Vavuniya",
 ];
 
-/* ----------------------------
-   Validation Regex
----------------------------- */
+
+//Validation Regex
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const stationIdRegex = /^PUCSL\/PRL\/\d{4}\/202\d$/;
 const stationNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
@@ -118,9 +116,6 @@ const allowedFuelTypes = [
   "Kerosene",
 ];
 
-/* ----------------------------
-   ZOD Schema
----------------------------- */
 const schema = z
   .object({
     Id: z.string().trim().regex(stationIdRegex, "Use PUCSL/PRL/1234/202X only"),
@@ -228,9 +223,8 @@ const timeOptions = Array.from({ length: 48 }, (_, i) => {
   return `${h}:${m}`;
 });
 
-/* ----------------------------
-   UI helpers
----------------------------- */
+
+//UI helpers
 const S = {
   app: { minHeight: "100vh", background: "#F3F6FB", color: "#0F172A" },
   wrap: { maxWidth: 1100, margin: "0 auto", padding: 16 },
@@ -385,7 +379,7 @@ function Modal({ open, title, onClose, children }) {
 
 const steps = [
   { key: "station", title: "Station Details", icon: Building2 },
-  { key: "person", title: "Contact Person", icon: UserRound },
+  { key: "person", title: "Contact Person Details", icon: UserRound },
   { key: "tanks", title: "Tank Details", icon: Droplets },
 ];
 
@@ -496,14 +490,14 @@ export default function Portal() {
       icon: "info",
       title: "Enter your PUCSL Station ID",
       input: "text",
-      inputPlaceholder: "PUCSL/PRL/0005/2026",
+      inputPlaceholder: "PUCSL/PRL/xxxx/xxxx",
       showCancelButton: true,
       confirmButtonText: "Continue",
       cancelButtonText: "Cancel",
       inputValidator: (val) => {
         const v = (val || "").trim().toUpperCase();
         if (!v) return "PUCSL ID is required";
-        if (!stationIdRegex.test(v)) return "Invalid format. Use PUCSL/PRL/1234/202X";
+        if (!stationIdRegex.test(v)) return "Invalid format";
         const formId = (getValues("Id") || "").trim().toUpperCase();
         if (formId && formId !== v) return "PUCSL must match the Station ID in Station Details";
         return null;
@@ -739,7 +733,7 @@ export default function Portal() {
                 style={S.btn("primary")}
                 onClick={handleSubmit(onSubmit)}
                 disabled={isSubmitting || !isValid}
-                title={!isValid ? "Fix all validation errors before saving" : ""}
+                title={!isValid ? "Fix all errors before saving" : ""}
               >
                 <Save size={16} /> {isSubmitting ? "Saving..." : isEditing ? "Update" : "Register"}
               </button>
@@ -1024,7 +1018,7 @@ export default function Portal() {
                           disabled={fields.length === 1}
                           title={fields.length === 1 ? "At least one tank required" : "Remove"}
                         >
-                          <Trash2 size={16} /> Remove
+                          <Trash2 size={16} /> Remove Tanks
                         </button>
                       </div>
 

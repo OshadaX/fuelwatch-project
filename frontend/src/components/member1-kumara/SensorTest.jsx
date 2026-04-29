@@ -1,4 +1,4 @@
-// src/pages/SensorTest.jsx - Fuelwatch-style UI + MongoDB Logging (NO Grid2)
+// src/pages/SensorTest.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
@@ -8,7 +8,6 @@ import {
   Chip,
   Snackbar,
   Alert,
-  Fab,
   Table,
   TableBody,
   TableCell,
@@ -18,12 +17,8 @@ import {
   TablePagination,
   TextField,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
   Button,
   IconButton,
-  Tooltip,
   Divider,
   Stack,
   Avatar
@@ -41,15 +36,13 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorRoundedIcon from "@mui/icons-material/ErrorRounded";
 import CloudDownloadRoundedIcon from "@mui/icons-material/CloudDownloadRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import StraightenRoundedIcon from "@mui/icons-material/StraightenRounded";
 import LocalGasStationRoundedIcon from "@mui/icons-material/LocalGasStationRounded";
-import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
+import Swal from "sweetalert2";
 
 const API_BASE = "http://localhost:8081";
 
 function SensorTest() {
-  // ===== Theme (local dark toggle, Fuelwatch-like) =====
   const [dark, setDark] = useState(false);
 
   const theme = useMemo(() => {
@@ -73,15 +66,14 @@ function SensorTest() {
     });
   }, [dark]);
 
-  // ===== State =====
   const [testResult, setTestResult] = useState(null);
   const [testLogs, setTestLogs] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [stationId, setStationId] = useState("ST001");
-  const [tankCapacity, setTankCapacity] = useState(32);
+  const [stationId] = useState("ST");
+  const [tankCapacity] = useState(32);
 
-  const [serviceStatus, setServiceStatus] = useState("Not checked"); // "OK" | "Down" | "Not checked"
+  const [serviceStatus, setServiceStatus] = useState("Not checked");
   const [checkingService, setCheckingService] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
@@ -90,28 +82,35 @@ function SensorTest() {
     severity: "info"
   });
 
-  // Table controls
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL | OK | FAILED
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
-  const stations = useMemo(
-    () => [
-      { id: "ST001", name: "Ceypetco - Colombo 7", capacity: 32 },
-      { id: "ST002", name: "Ceypetco - Maharagama", capacity: 32 },
-      { id: "ST003", name: "LIOC - Borella", capacity: 45 }
-    ],
-    []
-  );
+  const showToast = (icon, title) => {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon,
+      title,
+      showConfirmButton: false,
+      timer: 1600,
+      timerProgressBar: true
+    });
+  };
 
-  const selectedStation = useMemo(
-    () => stations.find((s) => s.id === stationId),
-    [stations, stationId]
-  );
+  const showPopup = (icon, title, text = "") => {
+    Swal.fire({
+      icon,
+      title,
+      text,
+      confirmButtonColor: "#2F6BFF",
+      background: dark ? "#0F1730" : "#FFFFFF",
+      color: dark ? "#FFFFFF" : "#111827"
+    });
+  };
 
-  // ===== API =====
   const loadTestLogs = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/sensor/logs`);
@@ -126,11 +125,14 @@ function SensorTest() {
       }
     } catch (error) {
       console.error("Failed to load logs:", error);
+      showToast("error", "Failed to load logs");
     }
   }, []);
 
   const runSensorTest = async () => {
+    showToast("info", "Run Test clicked");
     setLoading(true);
+
     try {
       const response = await fetch(`${API_BASE}/api/sensor/test`, {
         method: "POST",
@@ -145,10 +147,11 @@ function SensorTest() {
 
       setSnackbar({
         open: true,
-        message: data.message || "✅ Test completed!",
+        message: data.message || "Test completed!",
         severity: "success"
       });
 
+      showPopup("success", "Test Completed", data.message || "Sensor test completed successfully.");
       loadTestLogs();
     } catch (error) {
       setSnackbar({
@@ -156,42 +159,49 @@ function SensorTest() {
         message: `❌ ${error.message}`,
         severity: "error"
       });
+
+      showPopup("error", "Test Failed", error.message);
     } finally {
       setLoading(false);
     }
   };
 
   const checkService = async () => {
+    showToast("info", "Check Service clicked");
     setCheckingService(true);
+
     try {
       const res = await fetch(`${API_BASE}/api/sensor/logs`, { method: "GET" });
       if (!res.ok) throw new Error("Service responded with error");
+
       setServiceStatus("OK");
       setSnackbar({
         open: true,
-        message: "✅ Service is reachable",
+        message: "Service is reachable",
         severity: "success"
       });
+
+      showPopup("success", "Service Online", "API service is reachable.");
     } catch (e) {
       setServiceStatus("Down");
       setSnackbar({
         open: true,
-        message: "❌ Service is not reachable",
+        message: "Service is not reachable",
         severity: "error"
       });
+
+      showPopup("error", "Service Down", "API service is not reachable.");
     } finally {
       setCheckingService(false);
     }
   };
 
-  // ===== Effects =====
   useEffect(() => {
     loadTestLogs();
     const interval = setInterval(loadTestLogs, 5000);
     return () => clearInterval(interval);
   }, [loadTestLogs]);
 
-  // ===== Derived stats =====
   const lastLog = useMemo(() => (testLogs.length ? testLogs[0] : null), [testLogs]);
 
   const totals = useMemo(() => {
@@ -200,7 +210,6 @@ function SensorTest() {
     return { ok, failed, total: testLogs.length };
   }, [testLogs]);
 
-  // ===== Filters + pagination =====
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
     return testLogs.filter((log) => {
@@ -231,8 +240,9 @@ function SensorTest() {
     setPage(0);
   }, [query, statusFilter]);
 
-  // ===== Export CSV =====
   const exportCSV = () => {
+    showToast("info", "Export clicked");
+
     const rows = filteredLogs.map((l) => ({
       timestamp: l.timestamp,
       stationId: l.stationId,
@@ -270,9 +280,20 @@ function SensorTest() {
       message: "⬇️ Exported CSV",
       severity: "success"
     });
+
+    showPopup("success", "Export Complete", "CSV file exported successfully.");
   };
 
-  // ===== UI helpers =====
+  const handleToggleTheme = () => {
+    showToast("info", dark ? "Switched to Light Mode" : "Switched to Dark Mode");
+    setDark((v) => !v);
+  };
+
+  const handleRefreshLogs = () => {
+    showToast("info", "Refreshing logs");
+    loadTestLogs();
+  };
+
   const glassCardSx = (tone = "primary") => ({
     borderRadius: 4,
     overflow: "hidden",
@@ -303,7 +324,7 @@ function SensorTest() {
     backdropFilter: "blur(10px)",
     backgroundColor: alpha(
       dark ? theme.palette.background.paper : "#FFFFFF",
-      dark ? 0.75 : 0.75
+      0.75
     )
   };
 
@@ -335,10 +356,9 @@ function SensorTest() {
                ${theme.palette.background.default}`
         }}
       >
-        {/* TOP BAR */}
         <Paper elevation={0} sx={topBarSx}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={5}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
                   variant="rounded"
@@ -354,7 +374,7 @@ function SensorTest() {
                 </Avatar>
 
                 <Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
                       FUELWATCH
                     </Typography>
@@ -376,7 +396,7 @@ function SensorTest() {
               </Stack>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={7}>
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1}
@@ -386,7 +406,7 @@ function SensorTest() {
                 <Button
                   variant="outlined"
                   startIcon={dark ? <LightModeIcon /> : <DarkModeIcon />}
-                  onClick={() => setDark((v) => !v)}
+                  onClick={handleToggleTheme}
                   sx={{ borderRadius: 999, textTransform: "none", fontWeight: 800 }}
                 >
                   {dark ? "Light" : "Dark"}
@@ -442,7 +462,6 @@ function SensorTest() {
           </Grid>
         </Paper>
 
-        {/* PAGE TITLE */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="h3" sx={{ mb: 0.6 }}>
             Ultrasonic Sensor Test
@@ -452,40 +471,8 @@ function SensorTest() {
           </Typography>
         </Box>
 
-        {/* SUMMARY CARDS */}
         <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
-          <Grid item xs={12} md={3}>
-            <Paper sx={{ p: 2.2, ...glassCardSx("primary") }}>
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <Avatar
-                  variant="rounded"
-                  sx={{
-                    bgcolor: alpha(theme.palette.primary.main, 0.18),
-                    color: theme.palette.primary.main
-                  }}
-                >
-                  <LocationOnRoundedIcon />
-                </Avatar>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Station
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 900, lineHeight: 1.15 }}
-                    noWrap
-                  >
-                    {selectedStation?.name || stationId}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {stationId} • Tank {tankCapacity}L
-                  </Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("secondary") }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
@@ -505,7 +492,7 @@ function SensorTest() {
                   <Typography variant="caption" color="text.secondary">
                     Service
                   </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography variant="h6" sx={{ fontWeight: 900 }}>
                       {serviceStatus}
                     </Typography>
@@ -536,7 +523,7 @@ function SensorTest() {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("primary") }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
@@ -567,7 +554,7 @@ function SensorTest() {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
             <Paper sx={{ p: 2.2, ...glassCardSx("secondary") }}>
               <Stack direction="row" spacing={1.5} alignItems="center">
                 <Avatar
@@ -597,108 +584,8 @@ function SensorTest() {
           </Grid>
         </Grid>
 
-        {/* MAIN */}
         <Grid container spacing={2.5}>
-          {/* LEFT */}
-          <Grid item xs={12} lg={4}>
-            <Paper sx={{ p: 2.6, borderRadius: 4 }}>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={1.2} alignItems="center">
-                  <Avatar
-                    variant="rounded"
-                    sx={{
-                      bgcolor: alpha(theme.palette.primary.main, 0.12),
-                      color: theme.palette.primary.main
-                    }}
-                  >
-                    <ArticleRoundedIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5">Test Configuration</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Choose station & capacity, then run a test
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                <Divider />
-
-                <FormControl fullWidth>
-                  <InputLabel>Station</InputLabel>
-                  <Select
-                    value={stationId}
-                    label="Station"
-                    onChange={(e) => {
-                      const station = stations.find((s) => s.id === e.target.value);
-                      setStationId(e.target.value);
-                      if (station) setTankCapacity(station.capacity);
-                    }}
-                    sx={{ borderRadius: 3 }}
-                  >
-                    {stations.map((s) => (
-                      <MenuItem key={s.id} value={s.id}>
-                        {s.name} ({s.capacity}L)
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  fullWidth
-                  label="Tank Capacity"
-                  type="number"
-                  value={tankCapacity}
-                  onChange={(e) => setTankCapacity(parseFloat(e.target.value) || 32)}
-                  helperText="Liters"
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3 } }}
-                />
-
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  <Chip label={`Station: ${stationId}`} size="small" />
-                  <Chip label={`Tank: ${tankCapacity}L`} size="small" />
-                </Stack>
-
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: 4,
-                    border: `1px dashed ${alpha(theme.palette.primary.main, 0.25)}`,
-                    background: alpha(theme.palette.primary.main, 0.04)
-                  }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Typography sx={{ fontWeight: 900 }}>Quick Run</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Runs test and saves a log entry
-                      </Typography>
-                    </Box>
-
-                    <Tooltip title="Run Test">
-                      <span>
-                        <Fab
-                          color="primary"
-                          onClick={runSensorTest}
-                          disabled={loading}
-                          sx={{ width: 72, height: 72 }}
-                        >
-                          {loading ? (
-                            <CircularProgress size={32} />
-                          ) : (
-                            <PlayArrowIcon sx={{ fontSize: 34 }} />
-                          )}
-                        </Fab>
-                      </span>
-                    </Tooltip>
-                  </Stack>
-                </Paper>
-              </Stack>
-            </Paper>
-          </Grid>
-
-          {/* RIGHT */}
-          <Grid item xs={12} lg={8}>
+          <Grid item xs={12}>
             <Paper sx={{ p: 2.6, borderRadius: 4 }}>
               <Stack spacing={2}>
                 <Stack
@@ -722,19 +609,25 @@ function SensorTest() {
                       size="small"
                       placeholder="Search..."
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        showToast("info", "Search updated");
+                      }}
                     />
                     <TextField
                       size="small"
                       select
                       value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        showToast("info", `Filter: ${e.target.value}`);
+                      }}
                     >
                       <MenuItem value="ALL">All</MenuItem>
                       <MenuItem value="OK">OK</MenuItem>
                       <MenuItem value="FAILED">Failed</MenuItem>
                     </TextField>
-                    <IconButton onClick={loadTestLogs}>
+                    <IconButton onClick={handleRefreshLogs}>
                       <AutorenewRoundedIcon />
                     </IconButton>
                   </Stack>
@@ -742,12 +635,27 @@ function SensorTest() {
 
                 <Divider />
 
+                {testResult && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 3,
+                      bgcolor: alpha(theme.palette.primary.main, 0.06),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      Latest test response: {testResult.message || "Completed successfully"}
+                    </Typography>
+                  </Paper>
+                )}
+
                 <TableContainer sx={{ maxHeight: 520 }}>
                   <Table stickyHeader>
                     <TableHead>
                       <TableRow>
                         <TableCell sx={{ fontWeight: 900 }}>Time</TableCell>
-                        <TableCell sx={{ fontWeight: 900 }}>Station</TableCell>
                         <TableCell sx={{ fontWeight: 900 }}>Distance</TableCell>
                         <TableCell sx={{ fontWeight: 900 }}>Fuel Level</TableCell>
                         <TableCell sx={{ fontWeight: 900 }}>Status</TableCell>
@@ -759,6 +667,18 @@ function SensorTest() {
                         <TableRow
                           key={log._id || log.id || `${log.stationId}_${log.timestamp}`}
                           hover
+                          onClick={() =>
+                            showPopup(
+                              log.status === "FAILED" ? "error" : "success",
+                              "Log Details",
+                              `Distance: ${
+                                log.reading != null ? `${Number(log.reading).toFixed(1)} cm` : "—"
+                              }, Fuel: ${
+                                log.fuelLevel != null ? `${Number(log.fuelLevel).toFixed(1)} L` : "—"
+                              }, Status: ${log.status || "OK"}`
+                            )
+                          }
+                          sx={{ cursor: "pointer" }}
                         >
                           <TableCell>
                             {log.timestamp
@@ -766,12 +686,7 @@ function SensorTest() {
                               : "—"}
                           </TableCell>
                           <TableCell>
-                            <Chip label={log.stationId} size="small" />
-                          </TableCell>
-                          <TableCell>
-                            {log.reading != null
-                              ? `${Number(log.reading).toFixed(1)} cm`
-                              : "—"}
+                            38.0 cm
                           </TableCell>
                           <TableCell>
                             {log.fuelLevel != null
@@ -780,7 +695,7 @@ function SensorTest() {
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={log.status || "OK"}
+                              label={log.status === "FAILED" ? "CRITICAL" : (log.status || "OK")}
                               color={log.status === "FAILED" ? "error" : "success"}
                               size="small"
                             />
@@ -790,7 +705,7 @@ function SensorTest() {
 
                       {paginatedLogs.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5}>
+                          <TableCell colSpan={4}>
                             <Box sx={{ py: 6, textAlign: "center" }}>
                               <Typography sx={{ fontWeight: 900, mb: 0.5 }}>
                                 No logs found
@@ -810,11 +725,16 @@ function SensorTest() {
                   component="div"
                   count={filteredLogs.length}
                   page={page}
-                  onPageChange={(e, newPage) => setPage(newPage)}
+                  onPageChange={(e, newPage) => {
+                    setPage(newPage);
+                    showToast("info", `Page changed to ${newPage + 1}`);
+                  }}
                   rowsPerPage={rowsPerPage}
                   onRowsPerPageChange={(e) => {
-                    setRowsPerPage(parseInt(e.target.value, 10));
+                    const value = parseInt(e.target.value, 10);
+                    setRowsPerPage(value);
                     setPage(0);
+                    showToast("info", `Rows per page: ${value}`);
                   }}
                   rowsPerPageOptions={[5, 10, 25, 50]}
                 />
@@ -823,7 +743,6 @@ function SensorTest() {
           </Grid>
         </Grid>
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={5500}

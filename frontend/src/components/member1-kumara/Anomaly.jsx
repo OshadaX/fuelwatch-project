@@ -44,7 +44,6 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import WhatshotRoundedIcon from "@mui/icons-material/WhatshotRounded";
 
-// ✅ SweetAlert2
 import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 
@@ -68,9 +67,6 @@ const ML_API = "http://127.0.0.1:8090/ml/score-report";
 const BACKEND = "http://localhost:8081";
 const DEFAULT_THRESHOLD = 0.65;
 
-// ==============================
-// Small utilities
-// ==============================
 function safeFixed(v, d = 3) {
   const n = Number(v);
   if (!Number.isFinite(n)) return (0).toFixed(d);
@@ -109,9 +105,6 @@ function downloadCSV(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-// ==============================
-// Enterprise UI components
-// ==============================
 function EnterpriseCard({ children, sx }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -243,18 +236,12 @@ function SeverityChip({ pred }) {
 export default function Anomaly() {
   const theme = useTheme();
 
-  // -----------------------------
-  // UI State
-  // -----------------------------
   const [file, setFile] = useState(null);
   const decisionThreshold = DEFAULT_THRESHOLD;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // -----------------------------
-  // Result State
-  // -----------------------------
   const [scoredDays, setScoredDays] = useState([]);
   const [events, setEvents] = useState([]);
 
@@ -277,9 +264,6 @@ export default function Anomaly() {
   const [stationPreview, setStationPreview] = useState(null);
   const [stationPreviewError, setStationPreviewError] = useState("");
 
-  // -----------------------------
-  // ✅ SweetAlert helpers
-  // -----------------------------
   const loaderOpenRef = useRef(false);
 
   const toast = (message, severity = "success") => {
@@ -313,9 +297,6 @@ export default function Anomaly() {
     Swal.close();
   };
 
-  // -----------------------------
-  // Derived stats
-  // -----------------------------
   const flaggedDays = useMemo(() => {
     return scoredDays.filter((r) => {
       const pred = r.pred ?? r.pred_label ?? r.label_pred ?? r.is_flagged ?? 0;
@@ -344,9 +325,6 @@ export default function Anomaly() {
 
   const filteredScoredDays = useMemo(() => scoredDays, [scoredDays]);
 
-  // -----------------------------
-  // Row mapper
-  // -----------------------------
   const mapRow = (r) => {
     const day = r.day || r.date || r.timestamp || "-";
     const station =
@@ -366,9 +344,7 @@ export default function Anomaly() {
     return { day, station, fuel, score, pred, reason };
   };
 
-  // -----------------------------
-  // Helper: current manager email
-  // -----------------------------
+  //manager email
   const getManagerEmail = () => {
     try {
       const u = JSON.parse(localStorage.getItem("fuelwatch_user") || "null");
@@ -384,14 +360,14 @@ export default function Anomaly() {
   // -----------------------------
   const handleRunScan = useCallback(async () => {
     if (!file) {
-      toast("Please choose a CSV/XLSX file first.", "warning");
+      toast("Please select only CSV file.", "warning");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    showBlockingLoading("Running ML Scan…", "Uploading file and scoring days");
+    showBlockingLoading("Processing…", "Uploading file and scoring days");
 
     try {
       const form = new FormData();
@@ -439,7 +415,7 @@ export default function Anomaly() {
 
       await MySwal.fire({
         icon: "success",
-        title: "Scan completed",
+        title: "Process completed",
         html: `
           <div style="text-align:left">
             <div><b>Scored days:</b> ${Array.isArray(scored) ? scored.length : 0}</div>
@@ -456,7 +432,7 @@ export default function Anomaly() {
       setEvents([]);
 
       closeBlockingLoading();
-      toast(`❌ ${msg}`, "error");
+      toast(`${msg}`, "error");
 
       await MySwal.fire({
         icon: "error",
@@ -499,7 +475,7 @@ export default function Anomaly() {
 
   const openNotifyForm = async () => {
     if (!scoredDays.length) {
-      toast("Run a scan first to notify staff.", "warning");
+      toast("Run the process first to notify staff.", "warning");
       return;
     }
 
@@ -510,8 +486,8 @@ export default function Anomaly() {
 
     setNotifyMessage(
       maxScoreRow?.reason
-        ? `Detected anomaly: ${String(maxScoreRow.reason).slice(0, 180)}`
-        : "Please review the detected anomalies and take action."
+        ? `Detected irregularity: ${String(maxScoreRow.reason).slice(0, 180)}`
+        : "Please review the detected irregularity and take action."
     );
 
     setNotifyOpen(true);
@@ -548,7 +524,7 @@ export default function Anomaly() {
     }
 
     if (!stationPreview?.Id) {
-      toast("Station is not verified. Please register a station first (or login as the correct manager).", "error");
+      toast("Station is not verified", "error");
       return;
     }
 
@@ -573,7 +549,7 @@ export default function Anomaly() {
     if (!confirm.isConfirmed) return;
 
     setNotifySending(true);
-    showBlockingLoading("Sending alert…", "Contacting notification service");
+    showBlockingLoading("Please Wait...", "Process in progress");
 
     try {
       const payload = {
@@ -615,7 +591,7 @@ export default function Anomaly() {
       setNotifyOpen(false);
     } catch (e) {
       closeBlockingLoading();
-      toast(`❌ ${e?.message || "Error"}`, "error");
+      toast(`${e?.message || "Error"}`, "error");
       await MySwal.fire({
         icon: "error",
         title: "Failed to send alert",
@@ -628,9 +604,6 @@ export default function Anomaly() {
     }
   };
 
-  // -----------------------------
-  // Render
-  // -----------------------------
   return (
     <Box
       sx={{
@@ -787,14 +760,14 @@ export default function Anomaly() {
                   fontFamily: "Arial, Helvetica, sans-serif",
                 }}
               >
-                {file ? `Selected: ${file.name}` : "Upload CSV / XLSX"}
-                <input hidden type="file" accept=".csv,.xlsx,.xls" onChange={(e) => onPickFile(e.target.files?.[0] || null)} />
+                {file ? `Selected: ${file.name}` : "Upload CSV File"}
+                <input hidden type="file" accept=".csv" onChange={(e) => onPickFile(e.target.files?.[0] || null)} />
               </Button>
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
                 <InfoOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
                 <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "Arial, Helvetica, sans-serif" }}>
-                  Important: Upload only CSV reports
+                  Important: Upload only CSV files
                 </Typography>
               </Stack>
             </Grid>
@@ -948,7 +921,7 @@ export default function Anomaly() {
                         fontFamily: "Arial, Helvetica, sans-serif",
                       }}
                     >
-                      Notify Responsible Staff
+                      Notify Responsible Person
                     </Button>
                   </Stack>
                 </EnterpriseCard>
@@ -959,13 +932,13 @@ export default function Anomaly() {
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <WarningAmberRoundedIcon color="error" />
                     <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                      Highest score snapshot
+                      Highest score - Recorded
                     </Typography>
                   </Stack>
 
                   {!maxScoreRow ? (
                     <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                      No data yet. Upload a report and run scan.
+                      No data yet. Upload a report.
                     </Typography>
                   ) : (
                     (() => {
@@ -988,7 +961,7 @@ export default function Anomaly() {
                             <b>Day:</b> {String(row.day)}
                           </Typography>
                           <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                            <b>Station (from ML row):</b> {String(row.station)}
+                            <b>Station (from row):</b> {String(row.station)}
                           </Typography>
                           <Typography variant="body2" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                             <b>Fuel:</b> {String(row.fuel)}
@@ -1018,7 +991,7 @@ export default function Anomaly() {
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <WarningAmberRoundedIcon color="error" />
               <Typography variant="h6" fontWeight={950} sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                Top Events (Grouped)
+                Top Events
               </Typography>
               <Chip
                 label={`${events.length} total`}
@@ -1038,7 +1011,7 @@ export default function Anomaly() {
 
             {events.length === 0 ? (
               <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                No events yet. Upload a report and run scan.
+                No events yet. Upload a report.
               </Typography>
             ) : (
               <TableContainer
@@ -1116,7 +1089,7 @@ export default function Anomaly() {
 
             {filteredScoredDays.length === 0 ? (
               <Typography color="text.secondary" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                No scored days yet. Upload a report and run scan.
+                No scored days yet. Upload a report.
               </Typography>
             ) : (
               <TableContainer
@@ -1192,7 +1165,7 @@ export default function Anomaly() {
       {/* ✅ Notification Dialog */}
       <Dialog open={notifyOpen} onClose={() => setNotifyOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 950, fontFamily: "Arial, Helvetica, sans-serif" }}>
-          Send Notification to Responsible Staff
+          Fuelwatch - Notification Generating Portal
         </DialogTitle>
 
         <DialogContent dividers>
@@ -1209,7 +1182,7 @@ export default function Anomaly() {
             />
 
             <TextField
-              label="Station (Auto from manager)"
+              label="Station"
               value={
                 stationPreviewLoading
                   ? "Loading station..."
@@ -1222,7 +1195,7 @@ export default function Anomaly() {
               helperText={
                 stationPreviewError
                   ? stationPreviewError
-                  : "Station is derived from manager_email (no manual selection)."
+                  : "Station selection - Automated"
               }
               error={!!stationPreviewError}
             />
@@ -1244,7 +1217,7 @@ export default function Anomaly() {
               }}
             >
               <MenuItem value="Advisory" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-                Advisory
+                Low-level
               </MenuItem>
               <MenuItem value="Warning" sx={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
                 Warning
@@ -1276,7 +1249,7 @@ export default function Anomaly() {
 
             <TextField
               select
-              label="Recipient Roles"
+              label="Recipient Role"
               fullWidth
               SelectProps={{
                 multiple: true,
@@ -1308,7 +1281,7 @@ export default function Anomaly() {
               fullWidth
               multiline
               minRows={4}
-              placeholder="Explain what was detected and what action is required."
+              placeholder="Subject - Based on the detected irregularity"
               sx={{
                 "& .MuiOutlinedInput-root": {
                   borderRadius: 2,
