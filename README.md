@@ -150,6 +150,7 @@ docker-compose -f docker/docker-compose.dev.yml down
 - [Architecture](docs/architecture/)
 - [Deployment Guide](docs/deployment/)
 - [User Guides](docs/user-guides/)
+- [Member 3: Full Documentation](docs/member3_full_documentation.md)
 
 ## 🧪 Testing
 ```bash

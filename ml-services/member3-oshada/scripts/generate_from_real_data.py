@@ -13,21 +13,73 @@ from utils.holidays import is_sri_lankan_holiday, is_vacation_period
 from utils.weather_utils import simulate_weather_for_date
 
 def load_real_data():
-    """Loads and aggregates real fuel demand data from th.xlsx."""
+    """Loads and aggregates real fuel demand data from all excel and pdf files in the data directory."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    real_data_path = os.path.join(base_dir, 'data', 'th.xlsx')
+    data_dir = os.path.join(base_dir, 'data')
+    
+    daily_demand = {}
     
     try:
-        df = pd.read_excel(real_data_path, skiprows=4)
-        df = df.iloc[:, [2, 6, 7]]
-        df.columns = ['Date', 'Item', 'Qty']
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date', 'Qty'])
-        df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
-        df = df.dropna(subset=['Qty'])
-        
-        daily_demand = df.groupby('Date')['Qty'].sum().to_dict()
-        return {k.strftime('%Y-%m-%d'): v for k, v in daily_demand.items()}
+        # Import pdfplumber inline if available
+        try:
+            import pdfplumber
+            import re
+            has_pdfplumber = True
+        except ImportError:
+            has_pdfplumber = False
+            print("pdfplumber not installed. PDF data extraction will be skipped.")
+
+        for root, dirs, files in os.walk(data_dir):
+            for filename in files:
+                filepath = os.path.join(root, filename)
+                
+                # Handle Excel files
+                if filename.endswith('.xlsx') or filename.endswith('.xls'):
+                    try:
+                        df = pd.read_excel(filepath, skiprows=4)
+                        if df.shape[1] > 6:
+                            df_sub = df.iloc[:, [2, 6]].copy()
+                            df_sub.columns = ['Date', 'Qty']
+                            df_sub['Date'] = pd.to_datetime(df_sub['Date'], errors='coerce')
+                            df_sub = df_sub.dropna(subset=['Date', 'Qty'])
+                            df_sub['Qty'] = pd.to_numeric(df_sub['Qty'], errors='coerce')
+                            df_sub = df_sub.dropna(subset=['Qty'])
+                            
+                            for _, row in df_sub.iterrows():
+                                date_str = row['Date'].strftime('%Y-%m-%d')
+                                if date_str in daily_demand:
+                                    daily_demand[date_str] += row['Qty']
+                                else:
+                                    daily_demand[date_str] = row['Qty']
+                    except Exception as inner_e:
+                        print(f"Skipping or error reading {filename}: {inner_e}")
+                
+                # Handle PDF files
+                elif filename.endswith('.pdf') and has_pdfplumber:
+                    try:
+                        with pdfplumber.open(filepath) as pdf:
+                            for page in pdf.pages:
+                                text = page.extract_text()
+                                if not text: continue
+                                for line in text.split('\\n'):
+                                    match = re.match(r'^(\\d{1,2}/\\d{1,2}/\\d{4})\\s+.*?\\s+([\\d,]+\\.?\\d*)\\s+[\\d,]+\\.?\\d*$', line)
+                                    if match:
+                                        date_str = match.group(1)
+                                        qty_str = match.group(2).replace(',', '')
+                                        try:
+                                            date_obj = pd.to_datetime(date_str)
+                                            qty = float(qty_str)
+                                            formatted_date = date_obj.strftime('%Y-%m-%d')
+                                            if formatted_date in daily_demand:
+                                                daily_demand[formatted_date] += qty
+                                            else:
+                                                daily_demand[formatted_date] = qty
+                                        except:
+                                            pass
+                    except Exception as inner_e:
+                        print(f"Skipping or error reading PDF {filename}: {inner_e}")
+                        
+        return daily_demand
     except Exception as e:
         print(f"Error loading real data: {e}")
         return {}
