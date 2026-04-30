@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const FuelPredictionSchema = new mongoose.Schema(
     {
+        title: {
+            type: String,
+            required: false,
+        },
         stationId: {
             type: String,
             required: true,

@@ -241,12 +241,21 @@ def predict_batch():
             
             # If fuel types are provided individually, sum them
             if fuel_demand is None:
-                fuel_cols = [k for k in forecast.keys() if k not in ['date', 'Date']]
+                fuel_cols = [k for k in forecast.keys() if k.lower() not in ['date', 'createdat', 'updatedat', '_id', 'title', 'mode']]
                 if fuel_cols:
-                    fuel_demand = sum(float(forecast.get(fc, 0)) for fc in fuel_cols if isinstance(forecast.get(fc), (int, float)))
+                    fuel_demand = 0
+                    for fc in fuel_cols:
+                        val = forecast.get(fc)
+                        try:
+                            fuel_demand += float(val)
+                        except (ValueError, TypeError):
+                            continue
             
             if not date_str or fuel_demand is None:
+                print(f"Skipping prediction for day due to missing data: date={date_str}, demand={fuel_demand}")
                 continue
+            
+            print(f"Predicting for {date_str} with fuel demand: {fuel_demand}")
             
             # Force truncation of date string explicitly for Member 1 prediction
             if date_str and "T" in str(date_str):

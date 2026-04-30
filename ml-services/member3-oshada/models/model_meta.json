@@ -29,12 +29,12 @@
     "predicted_fuel_demand"
   ],
   "metrics": {
-    "mae": 0.4982316017316021,
-    "rmse": 0.696879975686798,
-    "mse": 0.48564170051323224,
-    "r2": 0.755826387346411,
-    "cv_mae_mean": 0.48039889775127886,
-    "cv_mae_std": 0.08899481409207569
+    "mae": 0.42474641148325365,
+    "rmse": 0.687484630129364,
+    "mse": 0.47263511666410846,
+    "r2": 0.7230174072796378,
+    "cv_mae_mean": 0.35562162120066876,
+    "cv_mae_std": 0.059136652773511884
   },
   "model_params": {
     "n_estimators": 150,
@@ -50,55 +50,55 @@
   "feature_importance": [
     {
       "feature": "predicted_fuel_demand",
-      "importance": 0.8894095667582846
-    },
-    {
-      "feature": "weather_Sunny",
-      "importance": 0.027805640520442255
-    },
-    {
-      "feature": "day_of_week",
-      "importance": 0.02357088682326929
+      "importance": 0.8980377291278268
     },
     {
       "feature": "week_of_year",
-      "importance": 0.013984722405372975
-    },
-    {
-      "feature": "is_vacation",
-      "importance": 0.011928657759789022
+      "importance": 0.030062269640090816
     },
     {
       "feature": "temperature",
-      "importance": 0.009186846161034275
+      "importance": 0.017288010157962896
     },
     {
-      "feature": "day_of_month",
-      "importance": 0.008239380736391261
+      "feature": "weather_Sunny",
+      "importance": 0.015524257056636527
+    },
+    {
+      "feature": "day_of_week",
+      "importance": 0.013008978608581514
     },
     {
       "feature": "is_weekend",
-      "importance": 0.007763864596918192
+      "importance": 0.010022507956359469
     },
     {
       "feature": "weather_Cloudy",
-      "importance": 0.005290474213990283
-    },
-    {
-      "feature": "weather_Rainy",
-      "importance": 0.0012855743315309596
-    },
-    {
-      "feature": "month",
-      "importance": 0.0009916735553813607
-    },
-    {
-      "feature": "is_month_end",
-      "importance": 0.0005427121375953043
+      "importance": 0.005794493782883888
     },
     {
       "feature": "is_holiday",
-      "importance": 0.0
+      "importance": 0.004730473969363558
+    },
+    {
+      "feature": "day_of_month",
+      "importance": 0.00250077321866869
+    },
+    {
+      "feature": "month",
+      "importance": 0.0022842695680856113
+    },
+    {
+      "feature": "is_vacation",
+      "importance": 0.0004920928574326064
+    },
+    {
+      "feature": "is_month_end",
+      "importance": 0.00021171351797322967
+    },
+    {
+      "feature": "weather_Rainy",
+      "importance": 4.2430538134426165e-05
     },
     {
       "feature": "weather_Stormy",

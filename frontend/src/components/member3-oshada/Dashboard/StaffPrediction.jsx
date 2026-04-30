@@ -33,6 +33,8 @@ const StaffPrediction = () => {
     const [externalForecast, setExternalForecast] = useState(location.state?.fuelForecast || null);
     const [selectedFuelType, setSelectedFuelType] = useState("Lanka Petrol 92 Octane");
     const [availableFuels, setAvailableFuels] = useState([]);
+    const [demandScenarios, setDemandScenarios] = useState([]);
+    const [selectedScenarioId, setSelectedScenarioId] = useState('');
     const hasInitialized = useRef(false);
 
     useEffect(() => {
@@ -45,6 +47,7 @@ const StaffPrediction = () => {
                 handleInitialLoad();
             }
             fetchModelInfo();
+            fetchScenarios();
         } else {
             if (externalForecast) {
                 // When fuel type changes, re-fetch based on the new type
@@ -109,6 +112,44 @@ const StaffPrediction = () => {
         } catch (err) {
             console.error('Error fetching predictions:', err);
             setError(err.message || 'Failed to connect to ML service');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchScenarios = async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/list`, {
+                params: { stationId: 'STATION_001' }
+            });
+            if (response.data.ok) {
+                setDemandScenarios(response.data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching scenarios:', err);
+        }
+    };
+
+    const handleScenarioSelect = async (e) => {
+        const id = e.target.value;
+        if (!id) {
+            handleReset();
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            setSelectedScenarioId(id);
+            const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/${id}`);
+            if (response.data.ok && response.data.data.predictions) {
+                const forecastData = response.data.data.predictions;
+                extractAvailableFuels(forecastData);
+                setExternalForecast(forecastData);
+                toast.success(`Loaded Scenario: ${response.data.data.title || 'Untitled'}`);
+            }
+        } catch (err) {
+            console.error('Error loading scenario:', err);
+            setError('Failed to load selected demand scenario');
         } finally {
             setLoading(false);
         }
@@ -279,8 +320,29 @@ const StaffPrediction = () => {
                     </div>
                 </div>
 
-                {/* Sync Button */}
-                <div className="mb-8 flex justify-end">
+                {/* Scenario Selection */}
+                <div className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <label className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Select Demand Scenario:
+                        </label>
+                        <select
+                            value={selectedScenarioId}
+                            onChange={handleScenarioSelect}
+                            className={`flex-1 md:w-72 px-4 py-3 rounded-2xl text-sm font-medium transition-all border outline-none ${isDark
+                                ? 'bg-slate-800 text-white border-slate-700 focus:border-blue-500'
+                                : 'bg-white text-slate-900 border-slate-200 focus:border-blue-500 shadow-sm'
+                                }`}
+                        >
+                            <option value="">Latest Forecast (Auto-Sync)</option>
+                            {demandScenarios.map(scenario => (
+                                <option key={scenario._id} value={scenario._id}>
+                                    {scenario.title || `Forecast ${new Date(scenario.createdAt).toLocaleDateString()}`}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     <button
                         onClick={handleSyncWithMember1}
                         disabled={loading}
@@ -290,7 +352,7 @@ const StaffPrediction = () => {
                             }`}
                     >
                         <TrendingUp size={18} className={loading ? 'animate-spin' : ''} />
-                        Sync with Member 1 Forecast
+                        Sync with Latest
                     </button>
                 </div>
 
