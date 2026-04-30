@@ -17,7 +17,7 @@ import numpy as np
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.holidays import is_sri_lankan_holiday, is_vacation_period
+from utils.holidays import is_sri_lankan_holiday, is_vacation_period, is_day_before_holiday
 from utils.weather_utils import (
     fetch_weather_forecast,
     simulate_weather_for_date,
@@ -94,6 +94,8 @@ def prepare_features(date_str: str, fuel_demand: float, weather: str = None, tem
         'is_month_end': 1 if date_obj.day >= 25 else 0,
         'is_holiday': 1 if is_sri_lankan_holiday(date_obj) else 0,
         'is_vacation': 1 if is_vacation_period(date_obj) else 0,
+        'is_day_before_holiday': 1 if is_day_before_holiday(date_obj) else 0,
+        'is_friday': 1 if date_obj.weekday() == 4 else 0,
         'weather': weather,
         'temperature': temperature,
         'predicted_fuel_demand': float(fuel_demand)

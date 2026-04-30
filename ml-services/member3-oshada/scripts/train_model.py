@@ -46,6 +46,7 @@ def train_model():
     feature_cols = [
         'month', 'day_of_week', 'day_of_month', 'week_of_year',
         'is_weekend', 'is_month_end', 'is_holiday', 'is_vacation',
+        'is_day_before_holiday', 'is_friday',
         'weather', 'temperature', 'predicted_fuel_demand'
     ]
     target_col = 'employee_count'
