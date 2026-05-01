@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Calendar } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import ShiftScheduler from './ShiftScheduler';
+import { predictStaffBatch } from '../../../services/mlService';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
@@ -26,7 +27,6 @@ const ShiftSchedulerPage = () => {
                 params: { stationId: stationId || 'STATION_001' }
             });
             if (res.data?.ok && res.data?.data?.predictions?.length) {
-                const { predictStaffBatch } = await import('../../../services/mlService');
                 const staffData = await predictStaffBatch(res.data.data.predictions.slice(0, 7));
                 if (staffData.ok) {
                     setPredictions(staffData.predictions);
@@ -34,7 +34,9 @@ const ShiftSchedulerPage = () => {
                     return;
                 }
             }
-        } catch (e) { /* fall through */ }
+        } catch (e) {
+            console.error('Error fetching Member 1 fuel prediction in ShiftScheduler:', e);
+        }
 
         // Fallback: use ML independent forecast
         try {

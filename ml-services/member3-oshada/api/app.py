@@ -241,7 +241,8 @@ def predict_batch():
                 forecast.get('total_demand')
             )
             
-            # If fuel types are provided individually, sum them
+            # If fuel types are provided individually, sum them and track breakdown
+            fuel_breakdown = {}
             if fuel_demand is None:
                 fuel_cols = [k for k in forecast.keys() if k.lower() not in ['date', 'createdat', 'updatedat', '_id', 'title', 'mode']]
                 if fuel_cols:
@@ -249,7 +250,9 @@ def predict_batch():
                     for fc in fuel_cols:
                         val = forecast.get(fc)
                         try:
-                            fuel_demand += float(val)
+                            amount = float(val)
+                            fuel_demand += amount
+                            fuel_breakdown[fc] = amount
                         except (ValueError, TypeError):
                             continue
             
@@ -266,15 +269,34 @@ def predict_batch():
                 date_str = str(date_str).split(" ")[0]
                 
             # Prepare and predict
-            df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
-            prediction = model.predict(df)[0]
-            employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+            employee_breakdown = {}
+            if fuel_breakdown and fuel_demand > 0:
+                total_stripped_staff = 0
+                for fc, amount in fuel_breakdown.items():
+                    df_fuel, _, _ = prepare_features(date_str, float(amount))
+                    pred_fuel = model.predict(df_fuel)[0]
+                    # Subtract base staff (2) to get purely volume/factor driven staff
+                    staff_for_fuel = max(0, int(np.ceil(pred_fuel)) - 2)
+                    employee_breakdown[fc] = staff_for_fuel
+                    total_stripped_staff += staff_for_fuel
+                
+                # Add base staff (2) back ONCE for the whole station
+                employees_needed = total_stripped_staff + 2
+                
+                # Get overall features for the payload
+                df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
+            else:
+                df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
+                prediction = model.predict(df)[0]
+                employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+                
             total_employees += employees_needed
             
             predictions.append({
                 'date': date_str,
                 'day_name': pd.to_datetime(date_str).strftime("%A"),
                 'employees_needed': employees_needed,
+                'breakdown': employee_breakdown,
                 'weather': used_weather,
                 'temperature': used_temp,
                 'fuel_demand': float(fuel_demand),

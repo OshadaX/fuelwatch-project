@@ -25,6 +25,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
         dayName: p.day_name || new Date(p.date).toLocaleDateString('en-US', { weekday: 'short' }),
         monthDay: new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         needed: p.employees_needed,
+        breakdown: p.breakdown || null,
         isHoliday: !!p.is_holiday,
         isWeekend: !!p.is_weekend,
     }));
@@ -210,9 +211,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                             {/* Headcount */}
                             <div className="mb-3">
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        {assigned}/{needed} assigned
-                                    </span>
+                                    <div />
                                     {isFullyCovered && <CheckCircle2 size={12} className="text-emerald-500" />}
                                 </div>
                                 <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
@@ -222,6 +221,35 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                                     />
                                 </div>
                             </div>
+
+                            {/* Fuel Type Breakdown */}
+                            {day.breakdown && Object.keys(day.breakdown).length > 0 && (
+                                <div className={`mb-3 p-2 rounded-xl border ${isDark ? 'bg-slate-800/80 border-slate-700/50' : 'bg-slate-50/80 border-slate-100'}`}>
+                                    <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        Required per Fuel
+                                    </p>
+                                    <div className="space-y-1">
+                                        {Object.entries(day.breakdown).map(([fuel, count], idx) => {
+                                            // Assign colors based on fuel name dynamically
+                                            const isPetrol = fuel.toLowerCase().includes('petrol') || fuel.toLowerCase().includes('92') || fuel.toLowerCase().includes('95');
+                                            const dotColor = isPetrol ? 'bg-red-400' : 'bg-blue-400';
+                                            return (
+                                                <div key={idx} className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`} />
+                                                        <span className={`text-[10px] font-medium truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={fuel}>
+                                                            {fuel}
+                                                        </span>
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                                                        {count}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Employee Avatars */}
                             <div className="flex flex-wrap gap-1 min-h-[24px]">
