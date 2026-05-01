@@ -33,12 +33,12 @@
     "predicted_fuel_demand"
   ],
   "metrics": {
-    "mae": 0.7221572322235588,
-    "rmse": 0.8935396954306396,
-    "mse": 0.7984131873102802,
-    "r2": 0.8295840521079826,
-    "cv_mae_mean": 0.7606820967586735,
-    "cv_mae_std": 0.061477502002009646
+    "mae": 0.6546712380983213,
+    "rmse": 0.845173775366218,
+    "mse": 0.7143187105667862,
+    "r2": 0.8105456073275152,
+    "cv_mae_mean": 0.7818203431396412,
+    "cv_mae_std": 0.11086195329993011
   },
   "model_params": {
     "n_estimators": 150,
@@ -47,74 +47,74 @@
     "min_samples_leaf": 2
   },
   "training_info": {
-    "train_samples": 584,
-    "test_samples": 147,
-    "total_samples": 731
+    "train_samples": 191,
+    "test_samples": 48,
+    "total_samples": 239
   },
   "feature_importance": [
     {
-      "feature": "predicted_fuel_demand",
-      "importance": 0.6720236698373316
-    },
-    {
-      "feature": "is_day_before_holiday",
-      "importance": 0.06697194802667705
-    },
-    {
-      "feature": "day_of_week",
-      "importance": 0.04904072640964446
-    },
-    {
       "feature": "is_vacation",
-      "importance": 0.045105237996097454
+      "importance": 0.27101643603511394
     },
     {
-      "feature": "temperature",
-      "importance": 0.04203405691213363
-    },
-    {
-      "feature": "day_of_month",
-      "importance": 0.038218740443848785
-    },
-    {
-      "feature": "week_of_year",
-      "importance": 0.019825225723085513
-    },
-    {
-      "feature": "weather_Rainy",
-      "importance": 0.016649876084672742
-    },
-    {
-      "feature": "weather_Sunny",
-      "importance": 0.013685737709960896
+      "feature": "predicted_fuel_demand",
+      "importance": 0.18570539287040472
     },
     {
       "feature": "month",
-      "importance": 0.008126727723597982
+      "importance": 0.16977595005291313
     },
     {
-      "feature": "is_friday",
-      "importance": 0.006949674059015439
+      "feature": "day_of_month",
+      "importance": 0.08046854688538693
     },
     {
-      "feature": "is_holiday",
-      "importance": 0.006071149809537253
+      "feature": "week_of_year",
+      "importance": 0.0740220262596723
     },
     {
-      "feature": "weather_Cloudy",
-      "importance": 0.004993973496707535
+      "feature": "day_of_week",
+      "importance": 0.05089339069616683
     },
     {
-      "feature": "is_month_end",
-      "importance": 0.004629394856204105
+      "feature": "weather_Rainy",
+      "importance": 0.03241542445660068
+    },
+    {
+      "feature": "weather_Sunny",
+      "importance": 0.0312870540508261
     },
     {
       "feature": "weather_Stormy",
-      "importance": 0.003909163551973377
+      "importance": 0.029954557398520397
+    },
+    {
+      "feature": "temperature",
+      "importance": 0.024691952241998782
+    },
+    {
+      "feature": "is_day_before_holiday",
+      "importance": 0.012955631520600464
+    },
+    {
+      "feature": "weather_Cloudy",
+      "importance": 0.011885228960794613
+    },
+    {
+      "feature": "is_holiday",
+      "importance": 0.010417451089940017
+    },
+    {
+      "feature": "is_month_end",
+      "importance": 0.008281228765768063
     },
     {
       "feature": "is_weekend",
-      "importance": 0.0017646973595120395
+      "importance": 0.0033868798514983746
+    },
+    {
+      "feature": "is_friday",
+      "importance": 0.0028428488637946042
     }
   ]
 }
