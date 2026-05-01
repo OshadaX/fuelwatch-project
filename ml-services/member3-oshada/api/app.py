@@ -273,12 +273,17 @@ def predict_batch():
             
             predictions.append({
                 'date': date_str,
+                'day_name': pd.to_datetime(date_str).strftime("%A"),
                 'employees_needed': employees_needed,
                 'weather': used_weather,
                 'temperature': used_temp,
                 'fuel_demand': float(fuel_demand),
                 'is_holiday': bool(df['is_holiday'].iloc[0]),
-                'is_weekend': bool(df['is_weekend'].iloc[0])
+                'is_weekend': bool(df['is_weekend'].iloc[0]),
+                'is_vacation': bool(df['is_vacation'].iloc[0]),
+                'is_day_before_holiday': bool(df['is_day_before_holiday'].iloc[0]),
+                'is_friday': bool(df['is_friday'].iloc[0]),
+                'day_of_week': int(df['day_of_week'].iloc[0])
             })
         
         if not predictions:
@@ -357,7 +362,11 @@ def predict_weekly():
                 'temperature': round(temperature, 1),
                 'estimated_fuel_demand': round(fuel_demand),
                 'is_holiday': is_sri_lankan_holiday(target_date),
-                'is_weekend': target_date.weekday() >= 5
+                'is_weekend': target_date.weekday() >= 5,
+                'is_vacation': is_vacation_period(target_date),
+                'is_day_before_holiday': is_day_before_holiday(target_date),
+                'is_friday': target_date.weekday() == 4,
+                'day_of_week': target_date.weekday()
             })
         
         return jsonify({
