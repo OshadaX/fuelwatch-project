@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Calendar } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import ShiftScheduler from './ShiftScheduler';
+import PendingRequestsPanel from './PendingRequestsPanel';
 import { predictStaffBatch } from '../../../services/mlService';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
@@ -56,7 +57,7 @@ const ShiftSchedulerPage = () => {
             <div className="max-w-7xl mx-auto">
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center justify-between mb-4">
                     <div>
                         <h1 className={`text-4xl md:text-5xl font-light tracking-tight ${isDark ? 'text-white' : 'text-slate-900'} mb-2`}>
                             Shift Scheduler
@@ -72,6 +73,8 @@ const ShiftSchedulerPage = () => {
                         {isDark ? '☀️' : '🌙'}
                     </button>
                 </div>
+
+                <PendingRequestsPanel isDark={isDark} />
 
                 {/* Loading State */}
                 {loading ? (

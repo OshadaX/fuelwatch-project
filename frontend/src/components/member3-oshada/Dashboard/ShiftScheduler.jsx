@@ -18,6 +18,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
     const [saving, setSaving] = useState(false);
     const [selectedShiftType, setSelectedShiftType] = useState('Morning');
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+    const [targetStaffing, setTargetStaffing] = useState({}); // { date: count }
 
     // Build a clean date list from predictions
     const days = predictions.map(p => ({
@@ -61,6 +62,18 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
         fetchEmployees();
     }, [fetchShifts, fetchEmployees]);
 
+    // Initialize targetStaffing from predictions
+    useEffect(() => {
+        if (predictions.length > 0) {
+            const initial = {};
+            predictions.forEach(p => {
+                const d = p.date?.split('T')[0] || p.date;
+                initial[d] = p.employees_needed;
+            });
+            setTargetStaffing(prev => ({ ...initial, ...prev }));
+        }
+    }, [predictions]);
+
     const openPanel = (day) => {
         setSelectedDay(day);
         setSelectedEmployeeIds([]);
@@ -98,7 +111,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                         stationId,
                         employeeId: empId,
                         shiftType: selectedShiftType,
-                        recommendedHeadcount: selectedDay.needed,
+                        recommendedHeadcount: targetStaffing[selectedDay.date] || selectedDay.needed,
                     })
                 )
             );
@@ -183,7 +196,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                 {days.map(day => {
                     const dayShifts = shifts[day.date] || [];
                     const assigned = dayShifts.length;
-                    const needed = day.needed;
+                    const needed = targetStaffing[day.date] !== undefined ? targetStaffing[day.date] : day.needed;
                     const coverage = needed > 0 ? Math.min(Math.round((assigned / needed) * 100), 100) : 0;
                     const isFullyCovered = assigned >= needed;
 
@@ -308,9 +321,27 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                             <p className={`text-sm font-semibold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
                                 {selectedDay.dayName} · {selectedDay.monthDay}
                             </p>
-                            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                ML recommends <strong>{selectedDay.needed}</strong> employees · {(shifts[selectedDay.date] || []).length} currently assigned
-                            </p>
+                            <div className="flex items-center gap-3 mt-2">
+                                <div className="flex flex-col">
+                                    <label className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        Required Staffing
+                                    </label>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={targetStaffing[selectedDay.date] ?? selectedDay.needed}
+                                            onChange={(e) => setTargetStaffing({ ...targetStaffing, [selectedDay.date]: parseInt(e.target.value) || 0 })}
+                                            className={`w-16 px-3 py-1.5 rounded-xl text-sm font-bold border outline-none transition-all ${isDark 
+                                                ? 'bg-slate-800 border-slate-700 text-white focus:border-blue-500' 
+                                                : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 shadow-sm'}`}
+                                        />
+                                        <span className={`text-xs font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            · {(shifts[selectedDay.date] || []).length} currently assigned
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Shift Type Selector */}

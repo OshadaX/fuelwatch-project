@@ -29,6 +29,20 @@ const ShiftScheduleSchema = new mongoose.Schema({
     },
     recommendedHeadcount: {
         type: Number // ML recommended count stored for reference
+    },
+    swapRequested: {
+        type: Boolean,
+        default: false
+    },
+    swapCoveredBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee',
+        default: null
+    },
+    swapStatus: {
+        type: String,
+        enum: ['none', 'requested', 'offered', 'approved', 'rejected'],
+        default: 'none'
     }
 }, {
     timestamps: true
