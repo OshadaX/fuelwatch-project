@@ -17,7 +17,7 @@ import numpy as np
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.holidays import is_sri_lankan_holiday, is_vacation_period
+from utils.holidays import is_sri_lankan_holiday, is_vacation_period, is_day_before_holiday
 from utils.weather_utils import (
     fetch_weather_forecast,
     simulate_weather_for_date,
@@ -94,6 +94,8 @@ def prepare_features(date_str: str, fuel_demand: float, weather: str = None, tem
         'is_month_end': 1 if date_obj.day >= 25 else 0,
         'is_holiday': 1 if is_sri_lankan_holiday(date_obj) else 0,
         'is_vacation': 1 if is_vacation_period(date_obj) else 0,
+        'is_day_before_holiday': 1 if is_day_before_holiday(date_obj) else 0,
+        'is_friday': 1 if date_obj.weekday() == 4 else 0,
         'weather': weather,
         'temperature': temperature,
         'predicted_fuel_demand': float(fuel_demand)
@@ -239,14 +241,26 @@ def predict_batch():
                 forecast.get('total_demand')
             )
             
-            # If fuel types are provided individually, sum them
+            # If fuel types are provided individually, sum them and track breakdown
+            fuel_breakdown = {}
             if fuel_demand is None:
-                fuel_cols = [k for k in forecast.keys() if k not in ['date', 'Date']]
+                fuel_cols = [k for k in forecast.keys() if k.lower() not in ['date', 'createdat', 'updatedat', '_id', 'title', 'mode']]
                 if fuel_cols:
-                    fuel_demand = sum(float(forecast.get(fc, 0)) for fc in fuel_cols if isinstance(forecast.get(fc), (int, float)))
+                    fuel_demand = 0
+                    for fc in fuel_cols:
+                        val = forecast.get(fc)
+                        try:
+                            amount = float(val)
+                            fuel_demand += amount
+                            fuel_breakdown[fc] = amount
+                        except (ValueError, TypeError):
+                            continue
             
             if not date_str or fuel_demand is None:
+                print(f"Skipping prediction for day due to missing data: date={date_str}, demand={fuel_demand}")
                 continue
+            
+            print(f"Predicting for {date_str} with fuel demand: {fuel_demand}")
             
             # Force truncation of date string explicitly for Member 1 prediction
             if date_str and "T" in str(date_str):
@@ -255,19 +269,43 @@ def predict_batch():
                 date_str = str(date_str).split(" ")[0]
                 
             # Prepare and predict
-            df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
-            prediction = model.predict(df)[0]
-            employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+            employee_breakdown = {}
+            if fuel_breakdown and fuel_demand > 0:
+                total_stripped_staff = 0
+                for fc, amount in fuel_breakdown.items():
+                    df_fuel, _, _ = prepare_features(date_str, float(amount))
+                    pred_fuel = model.predict(df_fuel)[0]
+                    # Subtract base staff (2) to get purely volume/factor driven staff
+                    staff_for_fuel = max(0, int(np.ceil(pred_fuel)) - 2)
+                    employee_breakdown[fc] = staff_for_fuel
+                    total_stripped_staff += staff_for_fuel
+                
+                # Add base staff (2) back ONCE for the whole station
+                employees_needed = total_stripped_staff + 2
+                
+                # Get overall features for the payload
+                df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
+            else:
+                df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
+                prediction = model.predict(df)[0]
+                employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+                
             total_employees += employees_needed
             
             predictions.append({
                 'date': date_str,
+                'day_name': pd.to_datetime(date_str).strftime("%A"),
                 'employees_needed': employees_needed,
+                'breakdown': employee_breakdown,
                 'weather': used_weather,
                 'temperature': used_temp,
                 'fuel_demand': float(fuel_demand),
                 'is_holiday': bool(df['is_holiday'].iloc[0]),
-                'is_weekend': bool(df['is_weekend'].iloc[0])
+                'is_weekend': bool(df['is_weekend'].iloc[0]),
+                'is_vacation': bool(df['is_vacation'].iloc[0]),
+                'is_day_before_holiday': bool(df['is_day_before_holiday'].iloc[0]),
+                'is_friday': bool(df['is_friday'].iloc[0]),
+                'day_of_week': int(df['day_of_week'].iloc[0])
             })
         
         if not predictions:
@@ -346,7 +384,11 @@ def predict_weekly():
                 'temperature': round(temperature, 1),
                 'estimated_fuel_demand': round(fuel_demand),
                 'is_holiday': is_sri_lankan_holiday(target_date),
-                'is_weekend': target_date.weekday() >= 5
+                'is_weekend': target_date.weekday() >= 5,
+                'is_vacation': is_vacation_period(target_date),
+                'is_day_before_holiday': is_day_before_holiday(target_date),
+                'is_friday': target_date.weekday() == 4,
+                'day_of_week': target_date.weekday()
             })
         
         return jsonify({

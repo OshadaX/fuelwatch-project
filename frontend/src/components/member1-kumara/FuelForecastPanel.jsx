@@ -422,7 +422,7 @@ export default function FuelForecastPanel() {
         : "";
 
   async function saveForecastToDb(payload) {
-    const response = await axios.post(`${API_BASE_URL}/forecast/save`, payload);
+    const response = await axios.post(`${API_BASE_URL}/reports/fuel-prediction`, payload);
     return response.data;
   }
 
@@ -485,16 +485,25 @@ export default function FuelForecastPanel() {
       setSavingForecast(true);
       showLoading({ title: "Saving Forecast", text: "Please wait" });
 
+      const from = forecastObj?.from || result?.from_date || result?.from || null;
+      const to = forecastObj?.to || result?.to_date || result?.to || null;
+      
+      // Auto-generate title with dates
+      const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)} Forecast (${shortDate(from)} to ${shortDate(to)})`;
+
       const payload = {
+        stationId: 'STATION_001', // Ensure stationId is included
+        title,
         mode,
-        from: forecastObj?.from || result?.from_date || result?.from || null,
-        to: forecastObj?.to || result?.to_date || result?.to || null,
+        from,
+        to,
         totals: forecastObj?.totals || {},
         daily: forecastObj?.daily || [],
         monthly: forecastObj?.monthly || [],
         ingest: result?.ingest || null,
         sourceFileName: file?.name || null,
         savedAt: new Date().toISOString(),
+        predictions: forecastObj?.daily || [] // Backend expects 'predictions' field
       };
 
       await saveForecastToDb(payload);

@@ -82,6 +82,27 @@ def is_sri_lankan_holiday(check_date: Union[date, datetime, str]) -> bool:
     return False
 
 
+def is_day_before_holiday(check_date: Union[date, datetime, str]) -> bool:
+    """
+    Check if the NEXT day is a Sri Lankan public holiday.
+    Day before a holiday typically sees a fuel rush as people prepare for travel.
+    
+    Args:
+        check_date: Date to check
+    
+    Returns:
+        True if tomorrow is a holiday
+    """
+    if isinstance(check_date, str):
+        check_date = datetime.strptime(check_date, "%Y-%m-%d").date()
+    elif isinstance(check_date, datetime):
+        check_date = check_date.date()
+    
+    from datetime import timedelta
+    tomorrow = check_date + timedelta(days=1)
+    return is_sri_lankan_holiday(tomorrow)
+
+
 def is_vacation_period(check_date: Union[date, datetime, str]) -> bool:
     """
     Check if a date falls within a typical Sri Lankan vacation/school holiday period.

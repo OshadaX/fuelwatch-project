@@ -34,6 +34,13 @@ def train_model():
         return
     
     df = pd.read_csv(data_path)
+    
+    # Drop tracking columns that aren't features
+    if 'data_source' in df.columns:
+        print(f"Data source breakdown:")
+        print(f"  {df['data_source'].value_counts().to_dict()}")
+        df = df.drop(columns=['data_source'])
+    
     print(f"\n{'='*60}")
     print("TRAINING EMPLOYEE DEMAND MODEL")
     print(f"{'='*60}")
@@ -46,6 +53,7 @@ def train_model():
     feature_cols = [
         'month', 'day_of_week', 'day_of_month', 'week_of_year',
         'is_weekend', 'is_month_end', 'is_holiday', 'is_vacation',
+        'is_day_before_holiday', 'is_friday',
         'weather', 'temperature', 'predicted_fuel_demand'
     ]
     target_col = 'employee_count'

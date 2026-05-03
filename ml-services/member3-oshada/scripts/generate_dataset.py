@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.holidays import is_sri_lankan_holiday, is_vacation_period
+from utils.holidays import is_sri_lankan_holiday, is_vacation_period, is_day_before_holiday
 from utils.weather_utils import simulate_weather_for_date
 
 
@@ -57,6 +57,8 @@ def generate_synthetic_data(start_date='2023-01-01', days=1095):
         # ============================================
         is_holiday = 1 if is_sri_lankan_holiday(current_date) else 0
         is_vacation = 1 if is_vacation_period(current_date) else 0
+        pre_holiday = 1 if is_day_before_holiday(current_date) else 0
+        is_friday = 1 if day_of_week == 4 else 0
         
         # ============================================
         # 3. Weather Features (Simulated based on monsoon patterns)
@@ -104,39 +106,63 @@ def generate_synthetic_data(start_date='2023-01-01', days=1095):
         fuel_demand = max(2000, int(base_demand + np.random.normal(0, 500)))
         
         # ============================================
-        # 5. Target: Employee Demand Calculation
+        # 5. Target: Employee Count (Weighted Point System)
+        # Each factor contributes independently
         # ============================================
-        # Base staff requirement
-        employees_needed = 4
+        points = 3.0  # Base minimum staff
         
-        # Demand-based staffing: 1 employee per 1200L above base
-        demand_factor = fuel_demand // 1200
-        employees_needed += demand_factor
+        # Fuel demand (capped contribution, ~30-40%)
+        demand_normalized = min(fuel_demand / 3000, 3.5)
+        points += demand_normalized * 1.2
         
-        # Weather adjustments
-        if weather == 'Stormy':
-            employees_needed -= 2  # Less traffic, safety concerns
-        elif weather == 'Rainy':
-            employees_needed -= 1  # Slightly less traffic
-        elif weather == 'Sunny':
-            employees_needed += 1  # More activity
+        # Day of week (strong independent effect)
+        day_weights = {
+            0: 1.5,  # Monday
+            1: 0.5,  # Tuesday
+            2: 0.5,  # Wednesday
+            3: 1.0,  # Thursday
+            4: 2.0,  # Friday
+            5: 2.5,  # Saturday
+            6: 1.5,  # Sunday
+        }
+        points += day_weights.get(day_of_week, 1.0)
         
-        # Holiday/Weekend extra staff for rush handling
+        # Holiday effects
         if is_holiday:
-            employees_needed += 2
-        if is_weekend:
-            employees_needed += 1
+            points += 2.0
+        if pre_holiday:
+            points += 2.5
         
-        # Vacation period adjustment
+        # Weather (independent effect)
+        weather_points = {
+            'Sunny': 1.0,
+            'Cloudy': 0.5,
+            'Rainy': -0.5,
+            'Stormy': -1.5
+        }
+        points += weather_points.get(weather, 0.0)
+        
+        # Vacation/seasonal
         if is_vacation:
-            employees_needed += 1
+            points += 1.5
+        if month in [4, 12]:
+            points += 1.0
         
-        # Temperature comfort factor (very hot = more breaks needed, more staff)
-        if temperature > 32:
-            employees_needed += 1
+        # Temperature
+        if temperature > 33:
+            points += 1.0
+        elif temperature > 31:
+            points += 0.5
         
-        # Enforce reasonable bounds (min 2, max 15)
-        employees_needed = max(2, min(employees_needed, 15))
+        # Month-end
+        if is_month_end:
+            points += 1.0
+        
+        # Noise
+        points += np.random.normal(0, 0.4)
+        
+        # Clamp
+        employees_needed = int(np.ceil(max(2, min(points, 15))))
         
         # ============================================
         # Append record
@@ -151,6 +177,8 @@ def generate_synthetic_data(start_date='2023-01-01', days=1095):
             'is_month_end': is_month_end,
             'is_holiday': is_holiday,
             'is_vacation': is_vacation,
+            'is_day_before_holiday': pre_holiday,
+            'is_friday': is_friday,
             'weather': weather,
             'temperature': temperature,
             'predicted_fuel_demand': fuel_demand,

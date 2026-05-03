@@ -18,6 +18,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
     const [saving, setSaving] = useState(false);
     const [selectedShiftType, setSelectedShiftType] = useState('Morning');
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+    const [targetStaffing, setTargetStaffing] = useState({}); // { date: count }
 
     // Build a clean date list from predictions
     const days = predictions.map(p => ({
@@ -25,6 +26,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
         dayName: p.day_name || new Date(p.date).toLocaleDateString('en-US', { weekday: 'short' }),
         monthDay: new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         needed: p.employees_needed,
+        breakdown: p.breakdown || null,
         isHoliday: !!p.is_holiday,
         isWeekend: !!p.is_weekend,
     }));
@@ -59,6 +61,18 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
         fetchShifts();
         fetchEmployees();
     }, [fetchShifts, fetchEmployees]);
+
+    // Initialize targetStaffing from predictions
+    useEffect(() => {
+        if (predictions.length > 0) {
+            const initial = {};
+            predictions.forEach(p => {
+                const d = p.date?.split('T')[0] || p.date;
+                initial[d] = p.employees_needed;
+            });
+            setTargetStaffing(prev => ({ ...initial, ...prev }));
+        }
+    }, [predictions]);
 
     const openPanel = (day) => {
         setSelectedDay(day);
@@ -97,7 +111,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                         stationId,
                         employeeId: empId,
                         shiftType: selectedShiftType,
-                        recommendedHeadcount: selectedDay.needed,
+                        recommendedHeadcount: targetStaffing[selectedDay.date] || selectedDay.needed,
                     })
                 )
             );
@@ -182,7 +196,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                 {days.map(day => {
                     const dayShifts = shifts[day.date] || [];
                     const assigned = dayShifts.length;
-                    const needed = day.needed;
+                    const needed = targetStaffing[day.date] !== undefined ? targetStaffing[day.date] : day.needed;
                     const coverage = needed > 0 ? Math.min(Math.round((assigned / needed) * 100), 100) : 0;
                     const isFullyCovered = assigned >= needed;
 
@@ -210,9 +224,7 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                             {/* Headcount */}
                             <div className="mb-3">
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className={`text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        {assigned}/{needed} assigned
-                                    </span>
+                                    <div />
                                     {isFullyCovered && <CheckCircle2 size={12} className="text-emerald-500" />}
                                 </div>
                                 <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
@@ -222,6 +234,35 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                                     />
                                 </div>
                             </div>
+
+                            {/* Fuel Type Breakdown */}
+                            {day.breakdown && Object.keys(day.breakdown).length > 0 && (
+                                <div className={`mb-3 p-2 rounded-xl border ${isDark ? 'bg-slate-800/80 border-slate-700/50' : 'bg-slate-50/80 border-slate-100'}`}>
+                                    <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        Required per Fuel
+                                    </p>
+                                    <div className="space-y-1">
+                                        {Object.entries(day.breakdown).map(([fuel, count], idx) => {
+                                            // Assign colors based on fuel name dynamically
+                                            const isPetrol = fuel.toLowerCase().includes('petrol') || fuel.toLowerCase().includes('92') || fuel.toLowerCase().includes('95');
+                                            const dotColor = isPetrol ? 'bg-red-400' : 'bg-blue-400';
+                                            return (
+                                                <div key={idx} className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0`} />
+                                                        <span className={`text-[10px] font-medium truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`} title={fuel}>
+                                                            {fuel}
+                                                        </span>
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                                                        {count}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Employee Avatars */}
                             <div className="flex flex-wrap gap-1 min-h-[24px]">
@@ -280,9 +321,27 @@ const ShiftScheduler = ({ predictions = [], stationId, isDark }) => {
                             <p className={`text-sm font-semibold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
                                 {selectedDay.dayName} · {selectedDay.monthDay}
                             </p>
-                            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                ML recommends <strong>{selectedDay.needed}</strong> employees · {(shifts[selectedDay.date] || []).length} currently assigned
-                            </p>
+                            <div className="flex items-center gap-3 mt-2">
+                                <div className="flex flex-col">
+                                    <label className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        Required Staffing
+                                    </label>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={targetStaffing[selectedDay.date] ?? selectedDay.needed}
+                                            onChange={(e) => setTargetStaffing({ ...targetStaffing, [selectedDay.date]: parseInt(e.target.value) || 0 })}
+                                            className={`w-16 px-3 py-1.5 rounded-xl text-sm font-bold border outline-none transition-all ${isDark 
+                                                ? 'bg-slate-800 border-slate-700 text-white focus:border-blue-500' 
+                                                : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 shadow-sm'}`}
+                                        />
+                                        <span className={`text-xs font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            · {(shifts[selectedDay.date] || []).length} currently assigned
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Shift Type Selector */}

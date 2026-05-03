@@ -8,6 +8,8 @@
     "is_month_end",
     "is_holiday",
     "is_vacation",
+    "is_day_before_holiday",
+    "is_friday",
     "weather",
     "temperature",
     "predicted_fuel_demand"
@@ -25,16 +27,18 @@
     "is_month_end",
     "is_holiday",
     "is_vacation",
+    "is_day_before_holiday",
+    "is_friday",
     "temperature",
     "predicted_fuel_demand"
   ],
   "metrics": {
-    "mae": 0.4982316017316021,
-    "rmse": 0.696879975686798,
-    "mse": 0.48564170051323224,
-    "r2": 0.755826387346411,
-    "cv_mae_mean": 0.48039889775127886,
-    "cv_mae_std": 0.08899481409207569
+    "mae": 0.6546712380983213,
+    "rmse": 0.845173775366218,
+    "mse": 0.7143187105667862,
+    "r2": 0.8105456073275152,
+    "cv_mae_mean": 0.7818203431396412,
+    "cv_mae_std": 0.11086195329993011
   },
   "model_params": {
     "n_estimators": 150,
@@ -43,66 +47,74 @@
     "min_samples_leaf": 2
   },
   "training_info": {
-    "train_samples": 73,
-    "test_samples": 19,
-    "total_samples": 92
+    "train_samples": 191,
+    "test_samples": 48,
+    "total_samples": 239
   },
   "feature_importance": [
     {
-      "feature": "predicted_fuel_demand",
-      "importance": 0.8894095667582846
-    },
-    {
-      "feature": "weather_Sunny",
-      "importance": 0.027805640520442255
-    },
-    {
-      "feature": "day_of_week",
-      "importance": 0.02357088682326929
-    },
-    {
-      "feature": "week_of_year",
-      "importance": 0.013984722405372975
-    },
-    {
       "feature": "is_vacation",
-      "importance": 0.011928657759789022
+      "importance": 0.27101643603511394
     },
     {
-      "feature": "temperature",
-      "importance": 0.009186846161034275
-    },
-    {
-      "feature": "day_of_month",
-      "importance": 0.008239380736391261
-    },
-    {
-      "feature": "is_weekend",
-      "importance": 0.007763864596918192
-    },
-    {
-      "feature": "weather_Cloudy",
-      "importance": 0.005290474213990283
-    },
-    {
-      "feature": "weather_Rainy",
-      "importance": 0.0012855743315309596
+      "feature": "predicted_fuel_demand",
+      "importance": 0.18570539287040472
     },
     {
       "feature": "month",
-      "importance": 0.0009916735553813607
+      "importance": 0.16977595005291313
     },
     {
-      "feature": "is_month_end",
-      "importance": 0.0005427121375953043
+      "feature": "day_of_month",
+      "importance": 0.08046854688538693
     },
     {
-      "feature": "is_holiday",
-      "importance": 0.0
+      "feature": "week_of_year",
+      "importance": 0.0740220262596723
+    },
+    {
+      "feature": "day_of_week",
+      "importance": 0.05089339069616683
+    },
+    {
+      "feature": "weather_Rainy",
+      "importance": 0.03241542445660068
+    },
+    {
+      "feature": "weather_Sunny",
+      "importance": 0.0312870540508261
     },
     {
       "feature": "weather_Stormy",
-      "importance": 0.0
+      "importance": 0.029954557398520397
+    },
+    {
+      "feature": "temperature",
+      "importance": 0.024691952241998782
+    },
+    {
+      "feature": "is_day_before_holiday",
+      "importance": 0.012955631520600464
+    },
+    {
+      "feature": "weather_Cloudy",
+      "importance": 0.011885228960794613
+    },
+    {
+      "feature": "is_holiday",
+      "importance": 0.010417451089940017
+    },
+    {
+      "feature": "is_month_end",
+      "importance": 0.008281228765768063
+    },
+    {
+      "feature": "is_weekend",
+      "importance": 0.0033868798514983746
+    },
+    {
+      "feature": "is_friday",
+      "importance": 0.0028428488637946042
     }
   ]
 }

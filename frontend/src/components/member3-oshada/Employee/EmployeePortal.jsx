@@ -13,6 +13,13 @@ const EmployeePortal = () => {
     const [status, setStatus] = useState({ isClockedIn: false, record: null });
     const [history, setHistory] = useState([]);
     const [mySchedule, setMySchedule] = useState([]);
+    const [leaveRequests, setLeaveRequests] = useState([]);
+    const [availableSwaps, setAvailableSwaps] = useState([]);
+    const [showLeaveModal, setShowLeaveModal] = useState(false);
+    
+    // Leave form state
+    const [leaveForm, setLeaveForm] = useState({ startDate: '', endDate: '', reason: '' });
+
     const [loading, setLoading] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
     const [manualStationId, setManualStationId] = useState('');
@@ -24,6 +31,8 @@ const EmployeePortal = () => {
             fetchStatus();
             fetchHistory();
             fetchMySchedule();
+            fetchLeaveRequests();
+            fetchAvailableSwaps();
             if (user.stationId) {
                 fetchAssignedStation(user.stationId);
             }
@@ -38,6 +47,63 @@ const EmployeePortal = () => {
             setMySchedule(res.data || []);
         } catch (err) {
             console.error('Failed to fetch schedule:', err);
+        }
+    };
+
+    const fetchLeaveRequests = async () => {
+        if (!user?._id && !user?.id) return;
+        try {
+            const res = await axios.get(`${API_URL}/leave/employee/${user._id || user.id}`);
+            setLeaveRequests(res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch leave requests:', err);
+        }
+    };
+
+    const fetchAvailableSwaps = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/shifts/swaps/available`);
+            setAvailableSwaps(res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch swaps:', err);
+        }
+    };
+
+    const submitLeaveRequest = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.post(`${API_URL}/leave`, {
+                employeeId: user._id || user.id,
+                ...leaveForm
+            });
+            toast.success('Leave request submitted!');
+            setShowLeaveModal(false);
+            setLeaveForm({ startDate: '', endDate: '', reason: '' });
+            fetchLeaveRequests();
+        } catch (error) {
+            toast.error('Failed to submit leave request');
+        }
+    };
+
+    const handleRequestSwap = async (shiftId) => {
+        try {
+            await axios.post(`${API_URL}/shifts/${shiftId}/request-swap`);
+            toast.success('Swap requested successfully!');
+            fetchMySchedule();
+        } catch (error) {
+            toast.error('Failed to request swap');
+        }
+    };
+
+    const handleOfferCover = async (shiftId) => {
+        try {
+            await axios.post(`${API_URL}/shifts/${shiftId}/offer-cover`, {
+                employeeId: user._id || user.id
+            });
+            toast.success('Offer to cover submitted! Awaiting manager approval.');
+            fetchAvailableSwaps();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to offer cover');
         }
     };
 
@@ -365,21 +431,132 @@ const EmployeePortal = () => {
                                                         <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">TODAY</span>
                                                     )}
                                                 </div>
-                                                <span className={`text-[10px] font-black uppercase tracking-wider 
-                                                    ${s.status === 'confirmed' ? 'text-emerald-500' : s.status === 'cancelled' ? 'text-red-400' : 'text-slate-400'}`}>
-                                                    {s.status}
-                                                </span>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider 
+                                                        ${s.status === 'confirmed' ? 'text-emerald-500' : s.status === 'cancelled' ? 'text-red-400' : 'text-slate-400'}`}>
+                                                        {s.status}
+                                                    </span>
+                                                    {!isToday && s.status !== 'cancelled' && !s.swapRequested && (
+                                                        <button 
+                                                            onClick={() => handleRequestSwap(s._id)}
+                                                            className="text-[10px] px-2 py-1 bg-amber-100 text-amber-700 font-bold rounded hover:bg-amber-200 transition-colors"
+                                                        >
+                                                            Request Swap
+                                                        </button>
+                                                    )}
+                                                    {s.swapRequested && (
+                                                        <span className="text-[10px] px-2 py-1 bg-purple-100 text-purple-700 font-bold rounded">
+                                                            Swap Requested
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}
                                 </div>
                             )}
                         </div>
+
+                        {/* Available Swaps */}
+                        <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100">
+                            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-5">
+                                <span className="text-purple-600">🔄</span>
+                                Open Shifts to Cover
+                            </h3>
+                            {availableSwaps.length === 0 ? (
+                                <div className="text-center py-6">
+                                    <p className="text-xs text-slate-400">No open shifts to cover.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {availableSwaps.map(s => {
+                                        const dateObj = new Date(s.date);
+                                        // Don't show employee's own requests here
+                                        if (s.employeeId._id === (user._id || user.id)) return null;
+
+                                        return (
+                                            <div key={s._id} className="flex flex-col gap-2 p-3 rounded-2xl border border-slate-100 bg-slate-50">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800">
+                                                            {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {s.shiftType}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-500">Requested by {s.employeeId.name}</p>
+                                                    </div>
+                                                    {s.swapStatus === 'offered' ? (
+                                                        <span className="text-[10px] px-2 py-1 bg-slate-200 text-slate-600 font-bold rounded">
+                                                            Pending Approval
+                                                        </span>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => handleOfferCover(s._id)}
+                                                            className="text-[10px] px-3 py-1.5 bg-slate-900 text-white font-bold rounded hover:bg-slate-800 transition-colors"
+                                                        >
+                                                            Offer Cover
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
                     </div>
 
-                    {/* Right: History */}
-                    <div className="lg:col-span-2">
-                        <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100 min-h-full">
+                    {/* Right: Leave Requests & History */}
+                    <div className="lg:col-span-2 space-y-8">
+                        {/* Leave Requests Card */}
+                        <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100">
+                            <div className="flex items-center justify-between mb-8">
+                                <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                                    <span className="text-amber-500">🏖️</span>
+                                    Time Off / Leave
+                                </h3>
+                                <button
+                                    onClick={() => setShowLeaveModal(true)}
+                                    className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-all"
+                                >
+                                    Request Time Off
+                                </button>
+                            </div>
+
+                            <div className="space-y-3">
+                                {leaveRequests.length === 0 ? (
+                                    <div className="p-10 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-[28px]">
+                                        No leave requests submitted yet.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {leaveRequests.map(leave => (
+                                            <div key={leave._id} className="p-5 rounded-[24px] bg-slate-50 border border-slate-100">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${leave.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : leave.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                        {leave.status}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400">
+                                                        Applied: {new Date(leave.createdAt).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm font-bold text-slate-800 mb-1">
+                                                    {new Date(leave.startDate).toLocaleDateString()} → {new Date(leave.endDate).toLocaleDateString()}
+                                                </div>
+                                                <p className="text-xs text-slate-500 italic mb-2">"{leave.reason}"</p>
+                                                {leave.managerNotes && (
+                                                    <div className="mt-2 p-2 bg-white rounded-lg border border-slate-100 text-xs">
+                                                        <strong>Manager Note:</strong> {leave.managerNotes}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Attendance History Card */}
+                        <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
                                     <History className="text-blue-600" size={24} />
@@ -438,6 +615,69 @@ const EmployeePortal = () => {
                         <div className="p-8 text-center">
                             <p className="text-sm text-slate-400">Position the station QR code within the frame to check-in</p>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Leave Request Modal */}
+            {showLeaveModal && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={() => setShowLeaveModal(false)}></div>
+                    <div className="relative bg-white rounded-[40px] p-8 max-w-md w-full overflow-hidden shadow-2xl">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                <span className="text-amber-500">🏖️</span> Request Time Off
+                            </h3>
+                            <button onClick={() => setShowLeaveModal(false)} className="p-2 bg-slate-100 hover:bg-slate-200 transition-colors rounded-xl">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={submitLeaveRequest} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Start Date</label>
+                                    <input 
+                                        type="date" 
+                                        required
+                                        min={new Date().toISOString().split('T')[0]}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={leaveForm.startDate}
+                                        onChange={e => setLeaveForm({...leaveForm, startDate: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">End Date</label>
+                                    <input 
+                                        type="date" 
+                                        required
+                                        min={leaveForm.startDate || new Date().toISOString().split('T')[0]}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={leaveForm.endDate}
+                                        onChange={e => setLeaveForm({...leaveForm, endDate: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Reason</label>
+                                <textarea 
+                                    required
+                                    rows="3"
+                                    placeholder="Briefly explain why you need time off..."
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                    value={leaveForm.reason}
+                                    onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})}
+                                ></textarea>
+                            </div>
+
+                            <button 
+                                type="submit"
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl active:scale-95 mt-4"
+                            >
+                                Submit Request
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}

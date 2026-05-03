@@ -67,6 +67,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/shifts", shiftRoutes);
+app.use("/api/leave", require("./src/routes/member3-oshada/leave.routes"));
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/seed", seedRoutes);
 app.use("/api/reports", reportRoutes);

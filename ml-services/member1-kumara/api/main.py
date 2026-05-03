@@ -36,8 +36,10 @@ app.add_middleware(
 try:
     predictor = FuelDemandPredictor()
 except Exception as e:
+    import traceback
     predictor = None
-    print("⚠️ Forecast model not loaded:", e)
+    print("⚠️ Forecast model not loaded:")
+    traceback.print_exc()
 
 
 # LOAD RF MISBEHAVIOR MODEL

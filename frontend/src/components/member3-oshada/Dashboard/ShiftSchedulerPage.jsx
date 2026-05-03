@@ -3,6 +3,8 @@ import axios from 'axios';
 import { Calendar } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import ShiftScheduler from './ShiftScheduler';
+import PendingRequestsPanel from './PendingRequestsPanel';
+import { predictStaffBatch } from '../../../services/mlService';
 
 const ML_API_URL = process.env.REACT_APP_ML_API_URL || 'http://localhost:5003';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
@@ -26,7 +28,6 @@ const ShiftSchedulerPage = () => {
                 params: { stationId: stationId || 'STATION_001' }
             });
             if (res.data?.ok && res.data?.data?.predictions?.length) {
-                const { predictStaffBatch } = await import('../../../services/mlService');
                 const staffData = await predictStaffBatch(res.data.data.predictions.slice(0, 7));
                 if (staffData.ok) {
                     setPredictions(staffData.predictions);
@@ -34,7 +35,9 @@ const ShiftSchedulerPage = () => {
                     return;
                 }
             }
-        } catch (e) { /* fall through */ }
+        } catch (e) {
+            console.error('Error fetching Member 1 fuel prediction in ShiftScheduler:', e);
+        }
 
         // Fallback: use ML independent forecast
         try {
@@ -54,7 +57,7 @@ const ShiftSchedulerPage = () => {
             <div className="max-w-7xl mx-auto">
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center justify-between mb-4">
                     <div>
                         <h1 className={`text-4xl md:text-5xl font-light tracking-tight ${isDark ? 'text-white' : 'text-slate-900'} mb-2`}>
                             Shift Scheduler
@@ -70,6 +73,8 @@ const ShiftSchedulerPage = () => {
                         {isDark ? '☀️' : '🌙'}
                     </button>
                 </div>
+
+                <PendingRequestsPanel isDark={isDark} />
 
                 {/* Loading State */}
                 {loading ? (

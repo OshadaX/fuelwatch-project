@@ -4,7 +4,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import {
     Users, Calendar, CloudSun, TrendingUp, RefreshCw,
     Sun, Cloud, CloudRain, CloudLightning, Loader2,
-    AlertCircle, CheckCircle2, BarChart3
+    AlertCircle, CheckCircle2, BarChart3, Info, X
 } from 'lucide-react';
 import axios from 'axios';
 import {
@@ -25,6 +25,7 @@ const StaffPrediction = () => {
     const [modelInfo, setModelInfo] = useState(null);
     const [baseDemand, setBaseDemand] = useState(6000);
     const [isDark, setIsDark] = useState(false);
+    const [selectedPrediction, setSelectedPrediction] = useState(null);
 
     const { user } = useAuth();
     const stationId = user?.stationId || '';
@@ -33,6 +34,8 @@ const StaffPrediction = () => {
     const [externalForecast, setExternalForecast] = useState(location.state?.fuelForecast || null);
     const [selectedFuelType, setSelectedFuelType] = useState("Lanka Petrol 92 Octane");
     const [availableFuels, setAvailableFuels] = useState([]);
+    const [demandScenarios, setDemandScenarios] = useState([]);
+    const [selectedScenarioId, setSelectedScenarioId] = useState('');
     const hasInitialized = useRef(false);
 
     useEffect(() => {
@@ -45,6 +48,7 @@ const StaffPrediction = () => {
                 handleInitialLoad();
             }
             fetchModelInfo();
+            fetchScenarios();
         } else {
             if (externalForecast) {
                 // When fuel type changes, re-fetch based on the new type
@@ -109,6 +113,44 @@ const StaffPrediction = () => {
         } catch (err) {
             console.error('Error fetching predictions:', err);
             setError(err.message || 'Failed to connect to ML service');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchScenarios = async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/list`, {
+                params: { stationId: 'STATION_001' }
+            });
+            if (response.data.ok) {
+                setDemandScenarios(response.data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching scenarios:', err);
+        }
+    };
+
+    const handleScenarioSelect = async (e) => {
+        const id = e.target.value;
+        if (!id) {
+            handleReset();
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            setSelectedScenarioId(id);
+            const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/${id}`);
+            if (response.data.ok && response.data.data.predictions) {
+                const forecastData = response.data.data.predictions;
+                extractAvailableFuels(forecastData);
+                setExternalForecast(forecastData);
+                toast.success(`Loaded Scenario: ${response.data.data.title || 'Untitled'}`);
+            }
+        } catch (err) {
+            console.error('Error loading scenario:', err);
+            setError('Failed to load selected demand scenario');
         } finally {
             setLoading(false);
         }
@@ -279,8 +321,29 @@ const StaffPrediction = () => {
                     </div>
                 </div>
 
-                {/* Sync Button */}
-                <div className="mb-8 flex justify-end">
+                {/* Scenario Selection */}
+                <div className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <label className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Select Demand Scenario:
+                        </label>
+                        <select
+                            value={selectedScenarioId}
+                            onChange={handleScenarioSelect}
+                            className={`flex-1 md:w-72 px-4 py-3 rounded-2xl text-sm font-medium transition-all border outline-none ${isDark
+                                ? 'bg-slate-800 text-white border-slate-700 focus:border-blue-500'
+                                : 'bg-white text-slate-900 border-slate-200 focus:border-blue-500 shadow-sm'
+                                }`}
+                        >
+                            <option value="">Latest Forecast (Auto-Sync)</option>
+                            {demandScenarios.map(scenario => (
+                                <option key={scenario._id} value={scenario._id}>
+                                    {scenario.title || `Forecast ${new Date(scenario.createdAt).toLocaleDateString()}`}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     <button
                         onClick={handleSyncWithMember1}
                         disabled={loading}
@@ -290,7 +353,7 @@ const StaffPrediction = () => {
                             }`}
                     >
                         <TrendingUp size={18} className={loading ? 'animate-spin' : ''} />
-                        Sync with Member 1 Forecast
+                        Sync with Latest
                     </button>
                 </div>
 
@@ -407,67 +470,18 @@ const StaffPrediction = () => {
                     </div>
                 </div>
 
-                {/* Charts Section */}
+                {/* Employee Chart Section */}
                 {!loading && predictions.length > 0 && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-                        {/* Fuel Demand Bar Chart */}
-                        <div className={`${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white/60 border-white/50'} backdrop-blur-sm rounded-3xl border p-6 shadow-xl`}>
-                            <div className="flex items-center gap-3 mb-6">
-                                <BarChart3 className={`w-5 h-5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                                <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                                    7-Day Fuel Demand Forecast
-                                </h3>
-                            </div>
-                            <ResponsiveContainer width="100%" height={280}>
-                                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
-                                    <XAxis
-                                        dataKey="day"
-                                        tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
-                                        axisLine={{ stroke: isDark ? '#374151' : '#e5e7eb' }}
-                                    />
-                                    <YAxis
-                                        tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
-                                        axisLine={{ stroke: isDark ? '#374151' : '#e5e7eb' }}
-                                        tickFormatter={(value) => `${value}kL`}
-                                    />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="fuelDemand" radius={[8, 8, 0, 0]} name="Fuel Demand">
-                                        {chartData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                fill={entry.isHoliday ? '#ef4444' : entry.isWeekend ? '#3b82f6' : '#10b981'}
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                            <div className="flex justify-center gap-6 mt-4 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Weekday</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded bg-blue-500"></div>
-                                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Weekend</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded bg-red-500"></div>
-                                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Holiday</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Employee Count Line Chart */}
+                    <div className="mb-12">
                         <div className={`${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white/60 border-white/50'} backdrop-blur-sm rounded-3xl border p-6 shadow-xl`}>
                             <div className="flex items-center gap-3 mb-6">
                                 <Users className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
                                 <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                                    Staff Requirement Trend
+                                    7-Day Staff Requirement Trend
                                 </h3>
                             </div>
-                            <ResponsiveContainer width="100%" height={280}>
-                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                            <ResponsiveContainer width="100%" height={320}>
+                                <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: -10, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="employeeGradient" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -477,13 +491,14 @@ const StaffPrediction = () => {
                                     <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
                                     <XAxis
                                         dataKey="day"
-                                        tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
+                                        tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 13 }}
                                         axisLine={{ stroke: isDark ? '#374151' : '#e5e7eb' }}
                                     />
                                     <YAxis
                                         tick={{ fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
                                         axisLine={{ stroke: isDark ? '#374151' : '#e5e7eb' }}
                                         domain={[0, 'auto']}
+                                        label={{ value: 'Employees', angle: -90, position: 'insideLeft', fill: isDark ? '#9ca3af' : '#6b7280', fontSize: 12 }}
                                     />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Area
@@ -492,10 +507,15 @@ const StaffPrediction = () => {
                                         stroke="#3b82f6"
                                         strokeWidth={3}
                                         fill="url(#employeeGradient)"
-                                        dot={{ fill: '#3b82f6', strokeWidth: 2, r: 5, stroke: '#fff' }}
-                                        activeDot={{ r: 7, stroke: '#3b82f6', strokeWidth: 2 }}
+                                        dot={{ fill: '#3b82f6', strokeWidth: 2, r: 6, stroke: '#fff' }}
+                                        activeDot={{ r: 8, stroke: '#3b82f6', strokeWidth: 2 }}
                                     />
-                                </AreaChart>
+                                    <Bar dataKey="employees" radius={[6, 6, 0, 0]} barSize={36} fillOpacity={0.15}>
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={getEmployeeColor(entry.employees)} />
+                                        ))}
+                                    </Bar>
+                                </ComposedChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
@@ -522,7 +542,7 @@ const StaffPrediction = () => {
                             {predictions.map((prediction, index) => (
                                 <div
                                     key={prediction.date}
-                                    className={`p-6 text-center transition-all hover:scale-[1.02] ${prediction.is_holiday || prediction.is_weekend
+                                    className={`relative p-6 text-center transition-all hover:scale-[1.02] cursor-pointer ${prediction.is_holiday || prediction.is_weekend
                                         ? isDark ? 'bg-blue-500/5' : 'bg-blue-50/50'
                                         : ''
                                         }`}
@@ -536,6 +556,15 @@ const StaffPrediction = () => {
                                     <div className={`text-sm font-medium mb-4 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                                         {new Date(prediction.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                     </div>
+
+                                    {/* Info Button */}
+                                    <button
+                                        onClick={() => setSelectedPrediction(prediction)}
+                                        className={`absolute top-4 right-4 p-1.5 rounded-full transition-all ${isDark ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-600'}`}
+                                        title="Why this count?"
+                                    >
+                                        <Info size={16} />
+                                    </button>
 
                                     {/* Employee Count Badge */}
                                     <div
@@ -595,12 +624,210 @@ const StaffPrediction = () => {
                             <div className="w-4 h-4 rounded bg-amber-500"></div>
                             <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>High (9-11)</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded bg-red-500"></div>
-                            <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Peak (12-15)</span>
-                        </div>
                     </div>
                 </div>
+
+                {/* Explanation Modal */}
+                {selectedPrediction && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+                        <div className={`w-full max-w-md p-6 rounded-3xl shadow-2xl ${isDark ? 'bg-slate-800 border border-slate-700 text-white' : 'bg-white text-slate-900'}`}>
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                        <Info className="w-5 h-5 text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold">Prediction Reasoning</h3>
+                                        <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            {selectedPrediction.day_name} • {new Date(selectedPrediction.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedPrediction(null)}
+                                    className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="mb-5 flex justify-center">
+                                <div className="text-center">
+                                    <div className="text-5xl font-bold mb-1" style={{ color: getEmployeeColor(selectedPrediction.employees_needed) }}>
+                                        {selectedPrediction.employees_needed}
+                                    </div>
+                                    <div className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        Staff Required
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Data Overview Grid */}
+                            <div className={`grid grid-cols-3 gap-2 mb-5 p-3 rounded-xl ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                                <div className="text-center">
+                                    <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Fuel Demand</div>
+                                    <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                        {Math.round(selectedPrediction.fuel_demand || selectedPrediction.estimated_fuel_demand || 0).toLocaleString()}L
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Weather</div>
+                                    <div className="flex items-center justify-center gap-1">
+                                        {getWeatherIcon(selectedPrediction.weather)}
+                                        <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedPrediction.weather}</span>
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Temperature</div>
+                                    <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                        {selectedPrediction.temperature?.toFixed(1)}°C
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Day Info */}
+                            <div className={`grid grid-cols-2 gap-2 mb-5 text-xs`}>
+                                <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                                    <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Day: </span>
+                                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{selectedPrediction.day_name} ({['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][selectedPrediction.day_of_week]})</span>
+                                </div>
+                                <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                                    <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Date: </span>
+                                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{new Date(selectedPrediction.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
+                                <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    Influencing Factors:
+                                </h4>
+
+                                {/* Always show fuel demand factor */}
+                                <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                                    <span className="text-lg">⛽</span>
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium">Fuel Demand</p>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${(selectedPrediction.fuel_demand || selectedPrediction.estimated_fuel_demand) > 7000 ? 'bg-red-100 text-red-700' : (selectedPrediction.fuel_demand || selectedPrediction.estimated_fuel_demand) > 4000 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                                                {(selectedPrediction.fuel_demand || selectedPrediction.estimated_fuel_demand) > 7000 ? 'HIGH' : (selectedPrediction.fuel_demand || selectedPrediction.estimated_fuel_demand) > 4000 ? 'MEDIUM' : 'LOW'}
+                                            </span>
+                                        </div>
+                                        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                                            {Math.round(selectedPrediction.fuel_demand || selectedPrediction.estimated_fuel_demand || 0).toLocaleString()}L projected — higher volume needs more staff for pumping and service.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Weather - always show */}
+                                <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? (selectedPrediction.weather === 'Stormy' ? 'bg-purple-500/10' : selectedPrediction.weather === 'Rainy' ? 'bg-blue-500/10' : 'bg-amber-500/10') : (selectedPrediction.weather === 'Stormy' ? 'bg-purple-50' : selectedPrediction.weather === 'Rainy' ? 'bg-blue-50' : 'bg-amber-50')}`}>
+                                    <span className="text-lg">{selectedPrediction.weather === 'Sunny' ? '☀️' : selectedPrediction.weather === 'Cloudy' ? '☁️' : selectedPrediction.weather === 'Rainy' ? '🌧️' : '⛈️'}</span>
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium">{selectedPrediction.weather} Weather</p>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${selectedPrediction.weather === 'Stormy' ? 'bg-purple-100 text-purple-700' : selectedPrediction.weather === 'Rainy' ? 'bg-blue-100 text-blue-700' : selectedPrediction.weather === 'Sunny' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
+                                                {selectedPrediction.weather === 'Stormy' ? '−1.5 pts' : selectedPrediction.weather === 'Rainy' ? '−0.5 pts' : selectedPrediction.weather === 'Sunny' ? '+1.0 pts' : '+0.5 pts'}
+                                            </span>
+                                        </div>
+                                        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                                            {selectedPrediction.weather === 'Sunny' ? 'Clear conditions increase station traffic and activity.' : selectedPrediction.weather === 'Cloudy' ? 'Normal conditions with average traffic expected.' : selectedPrediction.weather === 'Rainy' ? 'Reduced traffic expected due to rain.' : 'Significantly reduced traffic due to storm safety concerns.'}
+                                            {` Temperature: ${selectedPrediction.temperature?.toFixed(1)}°C`}{selectedPrediction.temperature > 33 ? ' (very hot — extra staff breaks needed)' : selectedPrediction.temperature > 31 ? ' (warm conditions)' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {selectedPrediction.is_day_before_holiday && (
+                                    <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                                        <span className="text-lg">⚠️</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-amber-600">Pre-Holiday Rush</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">+2.5 pts</span>
+                                            </div>
+                                            <p className={`text-xs mt-0.5 ${isDark ? 'text-amber-500/80' : 'text-amber-700/80'}`}>
+                                                Biggest staffing impact — travelers fuel up heavily the day before a holiday.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedPrediction.is_holiday && (
+                                    <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
+                                        <span className="text-lg">🎉</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-red-600">Public Holiday</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">+2.0 pts</span>
+                                            </div>
+                                            <p className={`text-xs mt-0.5 ${isDark ? 'text-red-500/80' : 'text-red-700/80'}`}>
+                                                Sri Lankan public holiday — increased travel and fuel demand patterns.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedPrediction.is_vacation && (
+                                    <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
+                                        <span className="text-lg">🏖️</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-teal-600">Vacation Period</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-teal-100 text-teal-700">+1.5 pts</span>
+                                            </div>
+                                            <p className={`text-xs mt-0.5 ${isDark ? 'text-teal-500/80' : 'text-teal-700/80'}`}>
+                                                School holidays drive family travel and higher fuel demand.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedPrediction.is_friday && !selectedPrediction.is_holiday && (
+                                    <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+                                        <span className="text-lg">🚗</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-blue-600">Friday Buildup</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">+2.0 pts</span>
+                                            </div>
+                                            <p className={`text-xs mt-0.5 ${isDark ? 'text-blue-500/80' : 'text-blue-700/80'}`}>
+                                                Weekend preparation traffic increases station activity.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedPrediction.is_weekend && !selectedPrediction.is_holiday && !selectedPrediction.is_friday && (
+                                    <div className={`p-3 rounded-xl flex gap-3 items-start ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                                        <span className="text-lg">📅</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-emerald-600">Weekend Operations</p>
+                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">+2.5 pts</span>
+                                            </div>
+                                            <p className={`text-xs mt-0.5 ${isDark ? 'text-emerald-500/80' : 'text-emerald-700/80'}`}>
+                                                Saturday/Sunday personal travel increases demand.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Breakdown per fuel type if available */}
+                                {selectedPrediction.breakdown && Object.keys(selectedPrediction.breakdown).length > 0 && (
+                                    <div className={`p-3 rounded-xl ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                                        <p className="text-sm font-medium mb-2">📋 Per Fuel Type Breakdown</p>
+                                        <div className="space-y-1.5">
+                                            {Object.entries(selectedPrediction.breakdown).map(([fuel, staff]) => (
+                                                <div key={fuel} className="flex items-center justify-between text-xs">
+                                                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{fuel}</span>
+                                                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{staff} staff</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

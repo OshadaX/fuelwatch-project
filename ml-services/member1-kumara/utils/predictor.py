@@ -74,16 +74,7 @@ class FuelDemandPredictor:
         self.fuel_cols = self.meta["fuel_cols"]
         self.time_cols = self.meta["time_cols"]
 
-        self.model = tf.keras.models.load_model(
-            self.model_path,
-            custom_objects={
-                "tolerance_accuracy": tolerance_accuracy,
-                "function": tolerance_accuracy,
-            },
-            compile=False,
-            safe_mode=False,
-        )
-
+        self.model = tf.keras.models.load_model(self.model_path, compile=False)
         self.scaler_X = load(self.scaler_x_path)
         self.scaler_y = load(self.scaler_y_path)
 

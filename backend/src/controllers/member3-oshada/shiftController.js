@@ -128,11 +128,114 @@ const deleteShift = async (req, res) => {
     }
 };
 
+// SWAP LOGIC
+
+// POST /api/shifts/:id/request-swap
+const requestSwap = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updated = await ShiftSchedule.findByIdAndUpdate(
+            id,
+            { swapRequested: true, swapStatus: 'requested' },
+            { new: true }
+        ).populate('employeeId', 'name avatar color');
+        if (!updated) return res.status(404).json({ message: 'Shift not found' });
+        res.status(200).json({ message: 'Swap requested successfully', shift: updated });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// POST /api/shifts/:id/offer-cover
+const offerCover = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { employeeId } = req.body; // The ID of the employee offering to cover
+        
+        const shift = await ShiftSchedule.findById(id);
+        if (!shift) return res.status(404).json({ message: 'Shift not found' });
+        
+        // Prevent covering own shift
+        if (shift.employeeId.toString() === employeeId) {
+            return res.status(400).json({ message: 'Cannot cover your own shift' });
+        }
+
+        const updated = await ShiftSchedule.findByIdAndUpdate(
+            id,
+            { swapCoveredBy: employeeId, swapStatus: 'offered' },
+            { new: true }
+        ).populate('employeeId', 'name avatar color').populate('swapCoveredBy', 'name avatar color');
+        
+        res.status(200).json({ message: 'Cover offered successfully', shift: updated });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// POST /api/shifts/:id/approve-swap
+const approveSwap = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { approve } = req.body; // boolean
+
+        const shift = await ShiftSchedule.findById(id);
+        if (!shift) return res.status(404).json({ message: 'Shift not found' });
+
+        if (approve) {
+            // Swap ownership
+            const updated = await ShiftSchedule.findByIdAndUpdate(
+                id,
+                { 
+                    employeeId: shift.swapCoveredBy,
+                    swapRequested: false,
+                    swapCoveredBy: null,
+                    swapStatus: 'none'
+                },
+                { new: true }
+            );
+            return res.status(200).json({ message: 'Swap approved successfully', shift: updated });
+        } else {
+            // Reject offer, goes back to 'requested'
+            const updated = await ShiftSchedule.findByIdAndUpdate(
+                id,
+                { swapCoveredBy: null, swapStatus: 'requested' },
+                { new: true }
+            );
+            return res.status(200).json({ message: 'Swap offer rejected', shift: updated });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// GET /api/shifts/swaps/available
+const getAvailableSwaps = async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const shifts = await ShiftSchedule.find({
+            date: { $gte: today },
+            swapRequested: true,
+            status: { $ne: 'cancelled' }
+        })
+        .populate('employeeId', 'name avatar color')
+        .populate('swapCoveredBy', 'name avatar color')
+        .sort({ date: 1 });
+        
+        res.status(200).json(shifts);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     createShift,
     getShiftsByDate,
     getShiftsByStation,
     getShiftsByEmployee,
     updateShift,
-    deleteShift
+    deleteShift,
+    requestSwap,
+    offerCover,
+    approveSwap,
+    getAvailableSwaps
 };

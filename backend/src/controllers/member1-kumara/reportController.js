@@ -161,7 +161,7 @@ async function generateReport(req, res) {
 
 async function saveFuelPrediction(req, res) {
   try {
-    const { stationId, mode, predictions } = req.body;
+    const { stationId, mode, predictions, title } = req.body;
 
     if (!stationId || !mode || !predictions) {
       return res.status(400).json({ ok: false, message: "Missing required fields: stationId, mode, predictions" });
@@ -171,6 +171,7 @@ async function saveFuelPrediction(req, res) {
       stationId,
       mode,
       predictions,
+      title,
     });
 
     return res.status(201).json({
@@ -205,4 +206,44 @@ async function getLatestFuelPrediction(req, res) {
   }
 }
 
-module.exports = { generateReport, saveFuelPrediction, getLatestFuelPrediction };
+async function listFuelPredictions(req, res) {
+  try {
+    const { stationId } = req.query;
+    const query = stationId ? { stationId } : {};
+
+    const list = await FuelPrediction.find(query)
+      .select("title mode createdAt stationId")
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean();
+
+    return res.json({ ok: true, data: list });
+  } catch (err) {
+    console.error("Error listing fuel predictions:", err);
+    return res.status(500).json({ ok: false, message: "Server error while listing fuel predictions", details: err.message });
+  }
+}
+
+async function getFuelPredictionById(req, res) {
+  try {
+    const { id } = req.params;
+    const prediction = await FuelPrediction.findById(id).lean();
+
+    if (!prediction) {
+      return res.status(404).json({ ok: false, message: "Prediction not found" });
+    }
+
+    return res.json({ ok: true, data: prediction });
+  } catch (err) {
+    console.error("Error fetching fuel prediction by ID:", err);
+    return res.status(500).json({ ok: false, message: "Server error while fetching fuel prediction", details: err.message });
+  }
+}
+
+module.exports = {
+  generateReport,
+  saveFuelPrediction,
+  getLatestFuelPrediction,
+  listFuelPredictions,
+  getFuelPredictionById,
+};
