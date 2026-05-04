@@ -169,7 +169,7 @@ def predict_employee_demand():
         
         # Predict
         prediction = model.predict(df)[0]
-        employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+        employees_needed = int(np.ceil(max(2, min(prediction, 20))))
         
         return jsonify({
             'date': date_str,
@@ -224,6 +224,12 @@ def predict_batch():
         
         # Support both formats
         forecasts = data.get('forecasts') or data.get('daily', [])
+        
+        # DEEP DEBUG: See exactly what the frontend is sending
+        print(f"\n--- [DEBUG] Received Batch Request with {len(forecasts)} days ---")
+        if forecasts:
+            print(f"--- [DEBUG] Day 1 Data: {forecasts[0]} ---\n")
+            
         if not forecasts:
             return jsonify({'error': 'No forecast data provided'}), 400
         
@@ -260,7 +266,8 @@ def predict_batch():
                 print(f"Skipping prediction for day due to missing data: date={date_str}, demand={fuel_demand}")
                 continue
             
-            print(f"Predicting for {date_str} with fuel demand: {fuel_demand}")
+            # DEBUG LOGGING - Check this in your terminal
+            print(f"--- [AI PREDICTION] Date: {date_str} | Total Demand: {fuel_demand} Liters ---")
             
             # Force truncation of date string explicitly for Member 1 prediction
             if date_str and "T" in str(date_str):
@@ -288,7 +295,7 @@ def predict_batch():
             else:
                 df, used_weather, used_temp = prepare_features(date_str, float(fuel_demand))
                 prediction = model.predict(df)[0]
-                employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+                employees_needed = int(np.ceil(max(2, min(prediction, 20))))
                 
             total_employees += employees_needed
             
@@ -374,7 +381,7 @@ def predict_weekly():
             # Prepare and predict
             df, _, _ = prepare_features(date_str, fuel_demand, weather, temperature)
             prediction = model.predict(df)[0]
-            employees_needed = int(np.ceil(max(2, min(prediction, 15))))
+            employees_needed = int(np.ceil(max(2, min(prediction, 20))))
             
             predictions.append({
                 'date': date_str,
