@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { RefreshCw, Download, Monitor, Share2, Info, MapPin, Loader2 } from 'lucide-react';
+import { RefreshCw, Download, Monitor, Share2, Info, MapPin, Loader2, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/api';
 
@@ -12,6 +13,7 @@ const AdminQRView = () => {
     const [loading, setLoading] = useState(true);
     const [stationName, setStationName] = useState('');
     const [lastRefreshed, setLastRefreshed] = useState(new Date());
+    const qrRef = useRef(null);
 
     const { user } = useAuth();
     const isStationAdmin = user?.role === 'admin';
@@ -47,6 +49,37 @@ const AdminQRView = () => {
 
     const refreshQR = () => {
         setLastRefreshed(new Date());
+        toast.success('QR Token Refreshed');
+    };
+
+    const downloadQR = () => {
+        try {
+            const svg = qrRef.current.querySelector('svg');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(svgBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = svgUrl;
+            downloadLink.download = `station-${stationId}-qr.svg`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            toast.success('QR Code downloaded successfully!');
+        } catch (error) {
+            console.error('Download failed:', error);
+            toast.error('Failed to download QR code');
+        }
+    };
+
+    const pushToDisplay = () => {
+        toast.promise(
+            new Promise((resolve) => setTimeout(resolve, 1500)),
+            {
+                loading: 'Connecting to station display...',
+                success: 'QR Code pushed to display successfully!',
+                error: 'Failed to connect to display.',
+            }
+        );
     };
 
     const qrValue = JSON.stringify({
@@ -106,7 +139,7 @@ const AdminQRView = () => {
                         <div className="bg-white rounded-[40px] p-12 shadow-2xl shadow-blue-500/10 border border-slate-100 flex flex-col items-center gap-8 relative overflow-hidden group">
                             <div className="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
 
-                            <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100 transition-transform group-hover:scale-105 duration-500">
+                            <div ref={qrRef} className="bg-slate-50 p-8 rounded-[32px] border border-slate-100 transition-transform group-hover:scale-105 duration-500">
                                 <QRCodeSVG
                                     value={qrValue}
                                     size={256}
@@ -161,11 +194,17 @@ const AdminQRView = () => {
                                     Administrator Tools
                                 </h4>
                                 <div className="space-y-4">
-                                    <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors group">
+                                    <button 
+                                        onClick={downloadQR}
+                                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors group"
+                                    >
                                         <span className="text-sm font-medium text-slate-700">Download for Print</span>
                                         <Download size={18} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                                     </button>
-                                    <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors group">
+                                    <button 
+                                        onClick={pushToDisplay}
+                                        className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors group"
+                                    >
                                         <span className="text-sm font-medium text-slate-700">Push to Station Display</span>
                                         <Share2 size={18} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                                     </button>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import MainLayout from './components/shared/MainLayout';
 import LiveFuelStock from './components/member3-oshada/Station/LiveFuelStock';
 import EmployeeDashboard from './components/member3-oshada/Employee/EmployeeDashboard';
@@ -57,6 +58,7 @@ function App() {
 
   return (
     <div className="App">
+      <Toaster position="top-right" reverseOrder={false} />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />

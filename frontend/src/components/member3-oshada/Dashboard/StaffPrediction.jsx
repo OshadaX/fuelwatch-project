@@ -4,13 +4,13 @@ import toast, { Toaster } from 'react-hot-toast';
 import {
     Users, Calendar, CloudSun, TrendingUp, RefreshCw,
     Sun, Cloud, CloudRain, CloudLightning, Loader2,
-    AlertCircle, CheckCircle2, BarChart3, Info, X
+    AlertCircle, CheckCircle2, BarChart3, Info, X, Zap
 } from 'lucide-react';
 import axios from 'axios';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, AreaChart, Area, Cell, Legend,
-    ComposedChart, Line
+    ComposedChart, Line, LabelList
 } from 'recharts';
 import { predictStaffBatch } from '../../../services/mlService';
 import { useAuth } from '../../../context/AuthContext';
@@ -32,18 +32,22 @@ const StaffPrediction = () => {
 
     const location = useLocation();
     const [externalForecast, setExternalForecast] = useState(location.state?.fuelForecast || null);
-    const [selectedFuelType, setSelectedFuelType] = useState("Lanka Petrol 92 Octane");
-    const [availableFuels, setAvailableFuels] = useState([]);
     const [demandScenarios, setDemandScenarios] = useState([]);
     const [selectedScenarioId, setSelectedScenarioId] = useState('');
+    const [demandMultiplier, setDemandMultiplier] = useState(1.0); // New What-If slider
     const hasInitialized = useRef(false);
+
+    useEffect(() => {
+        if (externalForecast) {
+            fetchExternalPredictions(externalForecast);
+        }
+    }, [demandMultiplier]);
 
     useEffect(() => {
         if (!hasInitialized.current) {
             hasInitialized.current = true;
             if (externalForecast) {
-                extractAvailableFuels(externalForecast);
-                fetchExternalPredictions(externalForecast, selectedFuelType);
+                fetchExternalPredictions(externalForecast);
             } else {
                 handleInitialLoad();
             }
@@ -51,27 +55,50 @@ const StaffPrediction = () => {
             fetchScenarios();
         } else {
             if (externalForecast) {
-                // When fuel type changes, re-fetch based on the new type
-                fetchExternalPredictions(externalForecast, selectedFuelType);
+                fetchExternalPredictions(externalForecast);
             } else {
                 fetchPredictions();
             }
         }
-    }, [externalForecast, selectedFuelType]);
+    }, [externalForecast]);
 
-    const extractAvailableFuels = (predictionsArray) => {
-        if (predictionsArray && predictionsArray.length > 0) {
-            const firstDay = predictionsArray[0];
-            const fuels = Object.keys(firstDay).filter(key => key !== 'Date' && key !== 'createdAt' && key !== 'updatedAt' && key !== '_id');
-            setAvailableFuels(fuels);
-        }
-    };
+    const processTotalForecast = (predictionsArray) => {
+        if (!Array.isArray(predictionsArray)) return [];
+        
+        return predictionsArray.map(day => {
+            // Define metadata keys to ignore
+            const metaKeys = [
+                'Date', 'date', 'createdAt', 'updatedAt', '_id', 'title', 'mode', 
+                'stationId', '__v', 'day_name', 'status', 'type', 'id',
+                'station', 'location', 'weather', 'temperature', 'baseDemand',
+                'fuel_demand', 'predicted_fuel_demand' // Ignore these as they might be static
+            ];
 
-    const processForecastForFuelType = (predictionsArray, fuelType) => {
-        return predictionsArray.map(day => ({
-            Date: day.Date,
-            [fuelType]: day[fuelType] || 0
-        }));
+            // Sum up only numeric fields that are NOT metadata
+            const keys = Object.keys(day);
+            let dailyTotal = 0;
+            let foundFuel = false;
+
+            keys.forEach(key => {
+                if (!metaKeys.includes(key)) {
+                    const val = parseFloat(day[key]);
+                    if (!isNaN(val) && val > 0) {
+                        dailyTotal += val;
+                        foundFuel = true;
+                    }
+                }
+            });
+
+            // If we didn't find any individual fuels, only THEN fall back to total_demand
+            if (!foundFuel && day.total_demand) {
+                dailyTotal = parseFloat(day.total_demand) || 0;
+            }
+
+            return {
+                Date: day.Date || day.date,
+                total_demand: dailyTotal
+            };
+        });
     };
 
     const handleInitialLoad = async () => {
@@ -86,7 +113,6 @@ const StaffPrediction = () => {
 
             if (response.data?.ok && response.data?.data?.predictions) {
                 const latestPredictions = response.data.data.predictions;
-                extractAvailableFuels(latestPredictions);
                 setExternalForecast(latestPredictions);
                 return; // Let the useEffect trigger fetchExternalPredictions
             }
@@ -144,9 +170,18 @@ const StaffPrediction = () => {
             const response = await axios.get(`${API_BASE_URL}/reports/fuel-prediction/${id}`);
             if (response.data.ok && response.data.data.predictions) {
                 const forecastData = response.data.data.predictions;
-                extractAvailableFuels(forecastData);
+                
+                const filtered = processTotalForecast(forecastData);
+                const firstDayDemand = filtered[0]?.total_demand;
+                
+                toast(`Loading Scenario: ${response.data.data.title}\nDemand (Day 1): ${firstDayDemand?.toLocaleString()}L`, {
+                    icon: '📊',
+                    duration: 4000
+                });
+
+                // Immediately fetch staff predictions for this scenario
+                await fetchExternalPredictions(forecastData);
                 setExternalForecast(forecastData);
-                toast.success(`Loaded Scenario: ${response.data.data.title || 'Untitled'}`);
             }
         } catch (err) {
             console.error('Error loading scenario:', err);
@@ -156,21 +191,30 @@ const StaffPrediction = () => {
         }
     };
 
-    const fetchExternalPredictions = async (forecastData, fuelType) => {
+    const fetchExternalPredictions = async (forecastData) => {
         try {
             setLoading(true);
             setError(null);
 
             if (!forecastData) return;
 
-            const filteredForecast = processForecastForFuelType(forecastData, fuelType);
+            // 1. Process and sum up total demand from individual fuel types
+            let filteredForecast = processTotalForecast(forecastData);
+            
+            // 2. Apply "What-If" Demand Multiplier
+            if (demandMultiplier !== 1.0) {
+                filteredForecast = filteredForecast.map(day => ({
+                    ...day,
+                    total_demand: day.total_demand * demandMultiplier
+                }));
+            }
 
-            // Call the batch prediction service with Member 1's daily data
+            // 3. Call the batch prediction service
             const data = await predictStaffBatch(filteredForecast);
 
             if (data.ok) {
                 setPredictions(data.predictions);
-                toast.success(`Analyzing impact of Member 1 Fuel Forecast (${fuelType})`);
+                toast.success(`Analyzing impact of Member 1 Total Fuel Forecast`);
             } else {
                 setError('Failed to process external forecast data');
             }
@@ -184,7 +228,6 @@ const StaffPrediction = () => {
 
     const handleReset = () => {
         setExternalForecast(null);
-        setSelectedFuelType("Lanka Petrol 92 Octane"); // Reset default
     };
 
     const handleSyncWithMember1 = async () => {
@@ -199,8 +242,7 @@ const StaffPrediction = () => {
 
             if (response.data.ok && response.data.data.predictions) {
                 const latestPredictions = response.data.data.predictions;
-                extractAvailableFuels(latestPredictions);
-                const filteredForecast = processForecastForFuelType(latestPredictions, selectedFuelType);
+                const filteredForecast = processTotalForecast(latestPredictions);
 
                 // 2. Pass to STAFF ML service
                 const staffData = await predictStaffBatch(filteredForecast);
@@ -208,7 +250,7 @@ const StaffPrediction = () => {
                 if (staffData.ok) {
                     setPredictions(staffData.predictions);
                     setExternalForecast(latestPredictions);
-                    toast.success(`Successfully synced with Member 1 Fuel Forecast (${selectedFuelType})`);
+                    toast.success(`Successfully synced with Member 1 Total Fuel Forecast`);
                 } else {
                     setError('Staffing service failed to process synced data');
                 }
@@ -371,21 +413,43 @@ const StaffPrediction = () => {
                                 </p>
                             </div>
                         </div>
+
+                        {/* What-If Analysis Slider */}
+                        <div className={`p-6 rounded-3xl ${isDark ? 'bg-blue-500/5 border-blue-500/20' : 'bg-blue-50 border-blue-100'} border`}>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-2 bg-blue-500 rounded-lg">
+                                            <Zap className="w-4 h-4 text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>What-If Analysis</h3>
+                                            <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Simulate higher/lower demand</p>
+                                        </div>
+                                    </div>
+                                    <span className="px-3 py-1 bg-blue-500 text-white text-xs font-bold rounded-full">
+                                        {demandMultiplier.toFixed(1)}x Demand
+                                    </span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="0.5" 
+                                    max="3.0" 
+                                    step="0.1" 
+                                    value={demandMultiplier}
+                                    onChange={(e) => setDemandMultiplier(parseFloat(e.target.value))}
+                                    className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                />
+                                <div className="flex justify-between text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                                    <span>Low Demand</span>
+                                    <span>Normal</span>
+                                    <span>High Demand</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="flex items-center gap-3">
-                            {availableFuels.length > 0 && (
-                                <select
-                                    value={selectedFuelType}
-                                    onChange={(e) => setSelectedFuelType(e.target.value)}
-                                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border outline-none ${isDark
-                                        ? 'bg-slate-800 text-white border-slate-700 focus:border-blue-500'
-                                        : 'bg-white text-blue-900 border-blue-200 focus:border-blue-500'
-                                        }`}
-                                >
-                                    {availableFuels.map(fuel => (
-                                        <option key={fuel} value={fuel}>{fuel}</option>
-                                    ))}
-                                </select>
-                            )}
+                            {/* Reset button to clear external data (Member 1 forecast) and return to default staff forecast */}
                             <button
                                 onClick={handleReset}
                                 className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${isDark ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
@@ -510,9 +574,18 @@ const StaffPrediction = () => {
                                         dot={{ fill: '#3b82f6', strokeWidth: 2, r: 6, stroke: '#fff' }}
                                         activeDot={{ r: 8, stroke: '#3b82f6', strokeWidth: 2 }}
                                     />
-                                    <Bar dataKey="employees" radius={[6, 6, 0, 0]} barSize={36} fillOpacity={0.15}>
-                                        {chartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={getEmployeeColor(entry.employees)} />
+                                    <Bar 
+                                        dataKey="employees_needed" 
+                                        radius={[6, 6, 0, 0]}
+                                        animationDuration={1500}
+                                    >
+                                        <LabelList 
+                                            dataKey="employees_needed" 
+                                            position="top" 
+                                            style={{ fill: isDark ? '#f1f5f9' : '#1e293b', fontSize: '12px', fontWeight: 'bold' }} 
+                                        />
+                                        {predictions.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={getEmployeeColor(entry.employees_needed)} />
                                         ))}
                                     </Bar>
                                 </ComposedChart>
